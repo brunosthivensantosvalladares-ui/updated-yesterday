@@ -6,13 +6,15 @@ from datetime import datetime, time, timedelta
 from io import BytesIO
 from fpdf import FPDF
 import google.generativeai as genai
+import time as time_module # Importado para evitar conflito com datetime.time
+
 # Certifique-se de ter a sua API KEY configurada nas secrets
 # Tenta configurar a IA, mas não trava o app se a chave faltar
 if "GEMINI_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 else:
     st.error("⚠️ Configuração de IA ausente. Cadastre a GEMINI_API_KEY nos Secrets.")
-import time as time_module # Importado para evitar conflito com datetime.time
+
 def gerar_pdf_manual_oficial_pro():
     from fpdf import FPDF
     class PDF(FPDF):
@@ -31,8 +33,7 @@ def gerar_pdf_manual_oficial_pro():
             self.set_text_color(128, 128, 128)
             self.cell(0, 10, f"Página {self.page_no()}", 0, 0, 'C')
 
-    # Criamos o PDF usando latin-1 para compatibilidade padrão, 
-    # mas trataremos o texto para aceitar acentos.
+    # Criamos o PDF usando latin-1 para compatibilidade padrão
     pdf = PDF()
     pdf.set_auto_page_break(auto=True, margin=15)
     
@@ -173,7 +174,6 @@ def gerar_pdf_manual_oficial_pro():
         "baixa imediata ou reagendar tarefas para o presente com um único clique."
     ))
 
-    # Usamos o 'replace' para garantir que caracteres não suportados pelo latin-1 não quebrem o PDF
     texto_pdf = pdf.output(dest='S')
     return texto_pdf.encode('latin-1', 'replace')
     
@@ -188,44 +188,36 @@ LISTA_TURNOS = ["Não definido", "Dia", "Noite"]
 def obter_proxima_os(engine, emp_id):
     try:
         with engine.connect() as conn:
-            # Busca o maior número de OS da empresa no banco
             result = conn.execute(text("SELECT MAX(numero_os) FROM tarefas WHERE empresa_id = :eid"), {"eid": emp_id}).fetchone()
             maior_os = result[0]
             if maior_os is None:
-                return 1001 # Primeira OS do sistema
+                return 1001 
             return int(maior_os) + 1
     except:
         return 1001
 
 # PALETA DE CORES EXTRAÍDA FIELMENTE DO LOGOTIPO U2T
-COR_AZUL = "#1b224c" # Azul Marinho Profundo do 'U'
-COR_VERDE = "#31ad64" # Verde Esmeralda do '2T'
+COR_AZUL = "#1b224c" 
+COR_VERDE = "#31ad64" 
 COR_FUNDO = "#f4f7f6"
-COR_DOURADO = "#FFD700" # Amarelo Dourado para Destaque
+COR_DOURADO = "#FFD700" 
 
 # --- 1. CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title=f"{NOME_SISTEMA} - Tudo em Dia", layout="wide", page_icon="🛠️")
 
-# --- CSS REVISADO: SETA CINZA, SIDEBAR #DFDFDF E DESTAQUE DE ABA ---
+# --- CSS REVISADO ---
 st.markdown(f"""
     <style>
-    /* 1. FUNDOS: App Branco e Sidebar Cinza #DFDFDF */
     html, body, [data-testid="stAppViewContainer"], .stApp {{ background-color: #FFFFFF !important; }}
     [data-testid="stSidebar"] {{ background-color: #DFDFDF !important; }}
-
-    /* 2. FLECHINHA DA SIDEBAR EM CINZA */
     [data-testid="stSidebarCollapsedControl"] svg, 
     button[data-testid="stBaseButton-headerNoPadding"] svg {{
         fill: #808080 !important;
         color: #808080 !important;
     }}
-
-    /* 3. TEXTOS: Garante visibilidade em cinza escuro */
     p, label, span, div, .stMarkdown, [data-testid="stText"] {{
         color: #31333F !important;
     }}
-
-    /* 4. CENTRALIZAÇÃO DOS BOTÕES DE LOGIN/CADASTRO */
     div[data-testid="stRadio"] > div {{
         display: flex;
         justify-content: center;
@@ -234,16 +226,12 @@ st.markdown(f"""
         border-radius: 10px;
         border: 1px solid #e0e0e0;
     }}
-
-    /* 5. BOTÕES GERAIS: Azul Marinho (Original) */
     button[kind="primary"], button[kind="secondary"], button {{
         background-color: #1b224c !important;
         border: 2px solid #31ad64 !important;
         border-radius: 8px !important;
         color: #FFFFFF !important;
     }}
-
-    /* 5.1 BOTÃO DE RENOVAÇÃO (DOURADO) */
     div.stButton > button[key*="renov_btn"] {{
         background-color: {COR_DOURADO} !important;
         color: #000000 !important;
@@ -251,35 +239,24 @@ st.markdown(f"""
         font-weight: bold !important;
     }}
     div.stButton > button[key*="renov_btn"] p {{ color: #000000 !important; }}
-
-    /* 6. DESTAQUE DA ABA ATUAL: Verde Esmeralda */
-    /* Aplica o verde apenas nos botões de navegação do topo que estão ativos */
     div.stHorizontalBlock button[kind="primary"] {{
         background-color: #31ad64 !important;
         border: 2px solid #1b224c !important;
     }}
-
-    /* Texto branco em todos os botões */
     button p, button span, button div {{
         color: #FFFFFF !important;
         -webkit-text-fill-color: #FFFFFF !important;
     }}
-
-    /* 7. ÍCONES: Olhinho e Calendário em Branco */
     button svg, [data-testid="stDateInput"] svg {{
         fill: #FFFFFF !important;
         color: #FFFFFF !important;
     }}
-
-    /* 8. CALENDÁRIO: Fundo Verde para Seleção */
     div[data-baseweb="calendar"] [aria-selected="true"],
     div[data-baseweb="calendar"] [class*="Selected"],
     div[data-baseweb="calendar"] [class*="Highlighted"] {{
         background-color: #31ad64 !important;
         background: #31ad64 !important;
     }}
-
-    /* 9. LOGOTIPO */
     .logo-u {{ color: #1b224c !important; }}
     .logo-2t {{ color: #31ad64 !important; }}
     </style>
@@ -297,7 +274,7 @@ def exibir_painel_pagamento_pro(origem):
                     <p>✅ <b>Gestão Master:</b> Agenda e Cadastro de Manutenções ilimitados.</p>
                     <p>✅ <b>Equipe Total:</b> Acessos para motoristas e administradores sem limites.</p>
                     <p>✅ <b>Indicadores Inteligentes:</b> Gráficos de performance e Lead Time real.</p>
-                    <p>✅ <b>Relatórios Ilimitados:</b> Exportação profissional em PDF e Excel.</p>
+                    <p>✅ <b>Relatórios Ilimitados:</b> Exportação profissional in PDF e Excel.</p>
                 </div>
                 <p>Escaneie o QR Code abaixo no app do seu banco:</p>
             </div>
@@ -313,14 +290,10 @@ def exibir_painel_pagamento_pro(origem):
 # --- 2. FUNÇÕES DE SUPORTE E BANCO ---
 @st.cache_resource
 def get_engine():
-    # Tenta pegar das Secrets do Streamlit (nuvem) ou variável de ambiente (Render)
-    # Se não encontrar nada, ele retorna None para não expor dados
     db_url = st.secrets.get("database_url") or os.environ.get("database_url")
-    
     if not db_url:
         st.error("Erro crítico: Configuração do banco de dados não encontrada.")
         st.stop()
-        
     return create_engine(db_url.replace("postgres://", "postgresql://", 1), pool_pre_ping=True)
 
 def inicializar_banco():
@@ -332,7 +305,6 @@ def inicializar_banco():
             conn.execute(text("ALTER TABLE tarefas ADD COLUMN IF NOT EXISTS numero_os INTEGER"))
             conn.commit()
             
-            # NOVA TABELA DE EMPRESAS PARA SAAS
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS empresa (
                     id SERIAL PRIMARY KEY,
@@ -344,7 +316,6 @@ def inicializar_banco():
                     data_expiracao DATE DEFAULT (CURRENT_DATE + INTERVAL '7 days')
                 )
             """))
-            # NOVA TABELA DE USUÁRIOS (MOTORISTAS/EQUIPE)
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS usuarios (
                     id SERIAL PRIMARY KEY,
@@ -373,11 +344,10 @@ def gerar_pdf_periodo(df_periodo, data_inicio, data_fim):
     pdf = FPDF()
     pdf.add_page()
     
-    # --- CABEÇALHO COM MARCA U2T (AJUSTADO: LETRAS PRÓXIMAS) ---
     pdf.set_font("Arial", "B", 22)
-    pdf.set_text_color(27, 34, 76) # Azul Logo
-    pdf.cell(6, 10, "U", ln=0)     # Célula estreita para aproximar
-    pdf.set_text_color(49, 173, 100) # Verde Logo
+    pdf.set_text_color(27, 34, 76) 
+    pdf.cell(6, 10, "U", ln=0)     
+    pdf.set_text_color(49, 173, 100) 
     pdf.cell(40, 10, "2T", ln=0)
     
     pdf.set_font("Arial", "I", 8)
@@ -404,14 +374,12 @@ def gerar_pdf_periodo(df_periodo, data_inicio, data_fim):
                 pdf.set_font("Arial", "B", 9); pdf.set_text_color(49, 173, 100)
                 pdf.cell(190, 7, f" Setor: {area}", ln=True)
                 
-                # Títulos da Tabela (Restaurado para Cinza)
                 pdf.set_font("Arial", "B", 8); pdf.set_text_color(50); pdf.set_fill_color(230, 230, 230)
                 pdf.cell(20, 6, "Prefixo", 1, 0, 'C', True)
                 pdf.cell(35, 6, "Executor", 1, 0, 'C', True)
                 pdf.cell(40, 6, "Disponibilidade", 1, 0, 'C', True)
                 pdf.cell(95, 6, "Descricao", 1, 1, 'C', True)
                 
-                # Linhas da Tabela
                 pdf.set_font("Arial", "", 7); pdf.set_text_color(0)
                 for _, row in df_area.iterrows():
                     pdf.cell(20, 6, str(row['prefixo']), 1, 0, 'C')
@@ -430,11 +398,9 @@ if not st.session_state["logado"]:
     _, col_login, _ = st.columns([1.2, 1, 1.2])
     with col_login:
         placeholder_topo = st.empty()
-        # Logotipo centralizado com cores travadas
         placeholder_topo.markdown(f"<h1 style='text-align: center; margin-bottom: 0;'><span class='logo-u'>U</span><span class='logo-2t'>2T</span></h1>", unsafe_allow_html=True)
         st.markdown(f"<p style='text-align: center; font-style: italic; color: #555; margin-top: 0;'>{SLOGAN}</p>", unsafe_allow_html=True)
         
-        # ALTERNÂNCIA ENTRE LOGIN E CADASTRO (Centralizado pelo CSS acima)
         aba = st.radio("Selecione uma opção", ["Acessar", "Criar Conta"], horizontal=True, label_visibility="collapsed")
         
         if aba == "Acessar":
@@ -461,7 +427,6 @@ if not st.session_state["logado"]:
                             if res and res[2] == pw_input:
                                 hoje = datetime.now().date()
                                 if res[3] < hoje and res[4] != 'ativo':
-                                    # ATENÇÃO: Aqui ligamos o erro na memória da sessão
                                     st.session_state["erro_bloqueio"] = True
                                     st.session_state["msg_bloqueio"] = f"⚠️ Acesso bloqueado: Período de teste expirado em {res[3].strftime('%d/%m/%Y')}."
                                 else:
@@ -478,7 +443,6 @@ if not st.session_state["logado"]:
                     elif not st.session_state.get("erro_bloqueio"):
                         st.error("Dados incorretos.")
 
-                # ESTA PARTE É O SEGREDO: Ela fica fora do botão, vigiando a memória
                 if st.session_state.get("erro_bloqueio"):
                     st.error(st.session_state["msg_bloqueio"])
                     if st.button("Renove agora a sua assinatura", use_container_width=True, key="renov_btn_login"):
@@ -487,7 +451,7 @@ if not st.session_state["logado"]:
                     if st.session_state.get("show_pay_login"):
                         exibir_painel_pagamento_pro("login")
 
-        else: # ABA CRIAR CONTA
+        else: 
             with st.container(border=True):
                 st.markdown(f"<h4 style='color:{COR_AZUL}'>🚀 7 Dias Grátis</h4>", unsafe_allow_html=True)
                 n_emp = st.text_input("Nome da Empresa")
@@ -509,10 +473,9 @@ if not st.session_state["logado"]:
 
 else:
     engine = get_engine(); inicializar_banco()
-    emp_id = st.session_state["empresa"] # Filtro global
+    emp_id = st.session_state["empresa"] 
     usuario_ativo = st.session_state.get("usuario_ativo", "")
     
-    # --- BANNER DE PAGAMENTO PROFISSIONAL ANTECIPADO (2 DIAS ANTES) ---
     if st.session_state["perfil"] == "admin" and usuario_ativo != "bruno":
         with engine.connect() as conn:
             dados_exp = conn.execute(text("SELECT data_expiracao, status_assinatura FROM empresa WHERE nome = :n"), {"n": emp_id}).fetchone()
@@ -531,7 +494,6 @@ else:
         opcoes = ["✍️ Abrir Solicitação", "📜 Status"]
     else:
         opcoes = ["📅 Agenda Principal", "📋 Cadastro Direto", "📥 Chamados Oficina", "⏳ OSs Pendentes", "✅ OSs Concluídas", "📊 Indicadores", "👥 Minha Equipe", "📖 Manual do Sistema"]
-        # ADICIONA ABA MASTER APENAS PARA O BRUNO
         if usuario_ativo == "bruno":
             opcoes.append("👑 Gestão Master")
 
@@ -547,7 +509,6 @@ else:
 
     # 1. BARRA LATERAL
     with st.sidebar:
-        # LOGO DIMINUÍDO NA SIDEBAR
         _, col_img, _ = st.columns([0.15, 0.7, 0.15])
         with col_img:
             st.image(LOGO_URL, width=150)
@@ -579,8 +540,8 @@ else:
     for i, nome in enumerate(opcoes):
         eh_ativo = nome == st.session_state.opcao_selecionada
         if cols[i].button(nome, key=f"btn_tab_{i}", use_container_width=True, 
-                         type="primary" if eh_ativo else "secondary",
-                         on_click=set_nav, args=(nome,)):
+                          type="primary" if eh_ativo else "secondary",
+                          on_click=set_nav, args=(nome,)):
             pass
 
     st.divider()
@@ -609,13 +570,13 @@ else:
                         if c4.button("🚫 Bloquear", key=f"bloq_{row['id']}", use_container_width=True):
                             with engine.connect() as conn:
                                 conn.execute(text("UPDATE empresa SET status_assinatura = 'ativo', data_expiracao = :d WHERE id = :i"), 
-             {"d": datetime.now().date() + timedelta(days=30), "i": row['id']})
+                                             {"d": datetime.now().date() + timedelta(days=30), "i": row['id']})
                                 conn.commit()
                             st.rerun()
 
     elif aba_ativa == "✍️ Abrir Solicitação":
         st.subheader("✍️ Nova Solicitação de Manutenção")
-        st.info("💡 **Dica:** Informe o prefixo e detalhe o problema para que a oficina possa se programar.")
+        st.info("💡 **Dica:** Informe o prefixo e detalhe o problem para que a oficina possa se programar.")
         with st.form("f_ch", clear_on_submit=True):
             p, d = st.text_input("Prefixo do Veículo"), st.text_area("Descrição do Problema")
             if st.form_submit_button("Enviar para Oficina"):
@@ -634,11 +595,8 @@ else:
     
     elif aba_ativa == "📖 Manual do Sistema":
         st.subheader("📖 Manual Oficial e Treinamento")
-        
         with st.container(border=True):
             st.markdown(f"### 📥 Documentação Oficial {NOME_SISTEMA}")
-            
-            # Chamada da função corrigida
             try:
                 pdf_manual_content = gerar_pdf_manual_oficial_pro()
                 st.download_button(
@@ -653,30 +611,25 @@ else:
                 st.error("Erro ao gerar o arquivo PDF. Verifique a codificação dos textos.")
 
         st.divider()
-
         col_m1, col_m2 = st.columns(2)
         with col_m1:
             with st.expander("👑 Perfil ADMINISTRADOR", expanded=True):
                 st.write("- Gestão total da Agenda.\n- Cadastro de usuários.\n- Análise de indicadores.")
-        
         with col_m2:
             with st.expander("🚛 Perfil MOTORISTA", expanded=True):
                 st.write("- Interface para celular.\n- Abertura de chamados.\n- Acompanhamento de status.")
-
         st.info("💡 Este manual explica a diferença entre os níveis de acesso e como maximizar os lucros da oficina.")
 
     elif aba_ativa == "⏳ OSs Pendentes":
-        # 1. Inicializa o estado de controle se não existir
         if 'os_em_baixa' not in st.session_state:
             st.session_state.os_em_baixa = None
 
-        # --- MODO 1: TELA DE BAIXA (Aparece apenas quando uma OS é selecionada) ---
+        # --- MODO 1: TELA DE BAIXA ---
         if st.session_state.os_em_baixa is not None:
             os_data = st.session_state.os_em_baixa
             os_num = str(os_data['numero_os']).split('.')[0]
             
             st.button("⬅️ Voltar para a Lista", on_click=lambda: setattr(st.session_state, 'os_em_baixa', None))
-            
             st.subheader(f"⚡ Baixa Técnica: OS {os_num}")
             with st.container(border=True):
                 st.write(f"🚜 **Veículo:** {os_data['prefixo']}")
@@ -685,7 +638,6 @@ else:
                 with st.form("form_baixa_exclusiva"):
                     servico_realizado = st.text_area("O que foi feito de fato?", placeholder="Descreva a execução...")
                     executor = st.text_input("Mecânico Responsável")
-                    
                     c1, c2 = st.columns(2)
                     h_ini = c1.text_input("Início", "08:00")
                     h_fim = c2.text_input("Fim", "10:00")
@@ -696,12 +648,6 @@ else:
                         else:
                             relato = f"Execução: {servico_realizado}; Mecânico: {executor}; Horário: {h_ini}-{h_fim}"
                             with engine.begin() as conn:
-                                # Garantimos que tudo seja string/int puro do Python antes da query
-                                os_final = str(os_num)
-                                pref_final = str(os_data['prefixo'])
-                                id_banco_final = int(os_data['id'])
-                                eid_final = str(emp_id)
-                                
                                 query_update = text("""
                                     UPDATE tarefas 
                                     SET realizado = True, 
@@ -709,22 +655,19 @@ else:
                                     WHERE id = :id_banco 
                                     AND empresa_id = :eid
                                 """)
-                                
                                 conn.execute(query_update, {
                                     "relato": str(relato),
-                                    "os": os_final,
-                                    "pref": pref_final,
-                                    "id_banco": id_banco_final,
-                                    "eid": eid_final
+                                    "os": str(os_num),
+                                    "pref": str(os_data['prefixo']),
+                                    "id_banco": int(os_data['id']),
+                                    "eid": str(emp_id)
                                 })
-                            
-                            # Limpa o estado e o cache para voltar à lista limpa
                             st.cache_data.clear()
                             st.session_state.os_em_baixa = None
-                            st.success(f"✅ OS {os_final} finalizada com sucesso!")
+                            st.success(f"✅ OS {os_num} finalizada com sucesso!")
                             st.rerun()
 
-        # --- MODO 2: TELA DE LISTA (Só aparece se nenhuma OS estiver em baixa) ---
+        # --- MODO 2: TELA DE LISTA ---
         else:
             st.subheader("⏳ Ordens de Serviço em Aberto")
             try:
@@ -733,7 +676,6 @@ else:
 
                 if not df_p.empty:
                     df_p['Nº OS'] = df_p['numero_os'].astype(str).str.replace('.0', '', regex=False)
-                    
                     st.info("Clique em uma linha para abrir a tela de baixa.")
                     
                     event = st.dataframe(
@@ -744,7 +686,6 @@ else:
                     )
 
                     if event.selection.rows:
-                        # Em vez de abrir o form aqui, salvamos no estado e reiniciamos
                         st.session_state.os_em_baixa = df_p.iloc[event.selection.rows[0]]
                         st.rerun()
                 else:
@@ -754,14 +695,11 @@ else:
     
     elif aba_ativa == "✅ OSs Concluídas":
         st.subheader("✅ Histórico de OSs Concluídas")
-        
-        # FORÇAR ATUALIZAÇÃO: Isso garante que a 1004 apareça assim que for salva
         if st.button("🔄 Atualizar Relatório"):
             st.cache_data.clear()
             st.rerun()
 
         try:
-            # Buscamos os dados com uma query que limpa os tipos de dados no SQL
             query_c = text("""
                 SELECT 
                     id,
@@ -774,61 +712,62 @@ else:
                 AND (TRIM(CAST(empresa_id AS TEXT)) = TRIM(:eid) OR empresa_id IS NULL)
                 ORDER BY id DESC
             """)
-            
-            # Usamos o engine diretamente para evitar cache de conexão
             with engine.connect() as conn:
                 df_c = pd.read_sql(query_c, conn, params={"eid": str(emp_id)})
             
             if not df_c.empty:
-                # Tratamento para exibir 'S/N' em vez de 'None' ou vazio
                 df_c['os_formatada'] = df_c['os_formatada'].replace(['None', '', 'nan'], 'S/N')
-                
-                # Seleção e renomeação
                 df_view = df_c[['os_formatada', 'data', 'prefixo', 'descricao']].copy()
                 df_view.columns = ['Nº OS', 'Data', 'Veículo', 'Prontuário de Manutenção']
                 
                 st.write(f"### 📋 {len(df_view)} Manutenções Registradas")
                 st.dataframe(df_view, use_container_width=True)
-                
-                # Botão de exportação
                 csv = df_view.to_csv(index=False).encode('utf-8')
                 st.download_button("📥 Baixar Relatório", csv, "historico_up2today.csv", "text/csv")
             else:
                 st.info("Nenhuma OS concluída encontrada.")
-                
         except Exception as e:
             st.error("Erro ao carregar histórico."); st.code(str(e))
             
     elif aba_ativa == "📅 Agenda Principal":
         st.subheader("📅 Cronograma Geral de Manutenções")
+        
+        # --- PAINEL DE RESUMO RÁPIDO NO TOPO ---
         try:
-            # BUSCA APENAS O CALENDÁRIO (O QUE FOI PLANEJADO)
-            query = text("""
-                SELECT numero_os, data, prefixo, descricao, realizado 
-                FROM tarefas 
-                WHERE empresa_id = :eid 
-                ORDER BY data DESC
-            """)
-            df_agenda = pd.read_sql(query, engine, params={"eid": str(emp_id)})
+            df_stats = pd.read_sql(text("SELECT data, realizado FROM tarefas WHERE empresa_id = :eid"), engine, params={"eid": emp_id})
+            if not df_stats.empty:
+                df_stats['data'] = pd.to_datetime(df_stats['data']).dt.date
+                hoje_dt = datetime.now().date()
+                df_hoje = df_stats[df_stats['data'] == hoje_dt]
+                
+                m1, m2, m3 = st.columns(3)
+                with m1: st.metric("Agendados Hoje", len(df_hoje))
+                with m2: st.metric("Concluídos", len(df_hoje[df_hoje['realizado'] == True]))
+                with m3: st.metric("Pendentes", len(df_hoje[df_hoje['realizado'] == False]))
+                st.divider()
+        except:
+            st.warning("⚠️ O banco de dados está iniciando. Aguarde alguns segundos.")
+            st.stop()
 
+        try:
+            query = text("SELECT numero_os, data, prefixo, descricao, realizado FROM tarefas WHERE empresa_id = :eid ORDER BY data DESC")
+            df_agenda = pd.read_sql(query, engine, params={"eid": str(emp_id)})
             if not df_agenda.empty:
-                # Limpeza estética
                 df_agenda['Nº OS'] = df_agenda['numero_os'].astype(str).replace(['None', 'nan', 'None.0'], '')
                 df_agenda['Nº OS'] = df_agenda['Nº OS'].str.replace('.0', '', regex=False)
-                
             else:
                 st.info("Agenda vazia.")
         except Exception as e:
             st.error("Erro ao carregar agenda."); st.code(str(e))
             
-        # Agora o popover está fora do try, no lugar certo
         with st.popover("💡 Como usar a Agenda?"):
             st.markdown("""
             1. Selecione a OS na lista.
             2. Grave o áudio citando seu Nome, Prefixo e Horários.
             3. Confira a transcrição e clique em Confirmar.
             """)
-# --- ASSISTENTE COM ANIMAÇÃO DE ALERTA ---
+
+        # --- ASSISTENTE COM ANIMAÇÃO DE ALERTA INTEGRADO ---
         if "exibir_bot" not in st.session_state:
             st.session_state.exibir_bot = True
 
@@ -883,7 +822,6 @@ else:
                             st.divider()
                             st.markdown("🔍 **Ajuste Pontual ou Baixa Rápida:**")
                             
-                            # Alinhamento manual: Todas as linhas abaixo devem estar na mesma coluna
                             df_atrasadas['Nº OS'] = df_atrasadas['numero_os'].astype(str).str.replace('.0', '', regex=False)
                             
                             event_atraso = st.dataframe(
@@ -895,20 +833,18 @@ else:
                                     "prefixo": "Veículo", 
                                     "descricao": "Serviço"
                                 },
-                                hide_index=True, 
-                                use_container_width=True,
-                                on_select="rerun", 
-                                selection_mode="single-row",
+                                hide_index=True, use_container_width=True,
+                                on_select="rerun", selection_mode="single-row",
                                 key="tabela_atrasos_popover"
                             )
 
                             if event_atraso.selection.rows:
                                 idx_atraso = event_atraso.selection.rows[0]
                                 os_data_atraso = df_atrasadas.iloc[idx_atraso]
-                                os_label = str(os_data_atraso['Nº OS'])
+                                os_label = str(os_data_atraso['Nº OS']) if str(os_data_atraso['Nº OS']) != 'nan' else "Sem Nº"
                                 
                                 with container_botao_topo:
-                                    st.info(f"OS Selecionada: **{os_label}**")
+                                    st.warning(f"OS Selecionada: **{os_label}**")
                                     if st.button(f"🚀 Abrir Baixa Técnica da OS {os_label}", type="primary", use_container_width=True, key="btn_baixa_topo"):
                                         st.session_state.os_em_baixa = os_data_atraso
                                         st.session_state.opcao_selecionada = "⏳ OSs Pendentes"
@@ -923,80 +859,13 @@ else:
                 if st.button("🔔 Ver Pendências"):
                     st.session_state.exibir_bot = True
                     st.rerun()
-        
-        st.divider()
-        
-        # O DIVIDER QUE ESTAVA DANDO ERRO (Agora alinhado com o IF principal)
-        st.divider()
-        st.markdown("🔍 **Ajuste Pontual ou Baixa Rápida:**")
-                            
-                            # ESTA LINHA ABAIXO PRECISA ESTAR ALINHADA COM O ST.MARKDOWN ACIMA
-                    df_atrasadas['Nº OS'] = df_atrasadas['numero_os'].astype(str).str.replace('.0', '', regex=False)
-                            
-                            event_atraso = st.dataframe(
-                                df_atrasadas[['Nº OS', 'data', 'prefixo', 'descricao', 'id']],
-                                column_config={
-                                    "id": None,
-                                    "Nº OS": st.column_config.TextColumn("Nº OS", width="small"),
-                                    "data": st.column_config.DateColumn("Data Original"),
-                                    "prefixo": "Veículo",
-                                    "descricao": "Serviço"
-                                },
-                                hide_index=True,
-                                use_container_width=True,
-                                on_select="rerun",
-                                selection_mode="single-row",
-                                key="tabela_atrasos_popover"
-                            )
-    # 3. Lógica para "Injetar" o botão no container do topo
-    if event_atraso.selection.rows:
-        idx_atraso = event_atraso.selection.rows[0]
-        os_data_atraso = df_atrasadas.iloc[idx_atraso]
-        os_label = str(os_data_atraso['Nº OS']) if str(os_data_atraso['Nº OS']) != 'nan' else "Sem Nº"
-        
-        with container_botao_topo:
-            st.warning(f"OS Selecionada: **{os_label}**")
-            if st.button(f"🚀 Abrir Baixa Técnica da OS {os_label}", type="primary", use_container_width=True, key="btn_baixa_topo"):
-                st.session_state.os_em_baixa = os_data_atraso
-                st.session_state.opcao_selecionada = "⏳ OSs Pendentes"
-                st.rerun()
-            st.divider()
-                    with c_close:
-                        if st.button("❌", key="close_assist"):
-                            st.session_state.exibir_bot = False
-                            st.rerun()
-            else:
-                if st.button("🔔 Ver Pendências"):
-                    st.session_state.exibir_bot = True
-                    st.rerun()
-        
-        # Este divider deve estar com APENAS 8 espaços (2 TABs) de recuo
-        st.divider()
-        
-        # --- PAINEL DE RESUMO RÁPIDO NO TOPO ---
-        try:
-            df_stats = pd.read_sql(text("SELECT data, realizado FROM tarefas WHERE empresa_id = :eid"), engine, params={"eid": emp_id})
-            if not df_stats.empty:
-                df_stats['data'] = pd.to_datetime(df_stats['data']).dt.date
-                hoje_dt = datetime.now().date()
-                df_hoje = df_stats[df_stats['data'] == hoje_dt]
-                
-                m1, m2, m3 = st.columns(3)
-                with m1: st.metric("Agendados Hoje", len(df_hoje))
-                with m2: st.metric("Concluídos", len(df_hoje[df_hoje['realizado'] == True]))
-                with m3: st.metric("Pendentes", len(df_hoje[df_hoje['realizado'] == False]))
-                st.divider()
-        except:
-            st.warning("⚠️ O banco de dados está iniciando. Aguarde alguns segundos.")
-            st.stop()
 
+        st.divider()
         st.info("✍️ **Logística:** Clique nas colunas de **Início** ou **Fim** para preencher. **PCM:** Clique em **Área** ou **Executor** para definir. O salvamento é automático.")
         
-        # 1. Carrega os dados da agenda
         df_a = pd.read_sql(text("SELECT * FROM tarefas WHERE empresa_id = :eid ORDER BY data DESC"), engine, params={"eid": emp_id})
         hoje_input, amanha = datetime.now().date(), datetime.now().date() + timedelta(days=1)
         
-        # 2. LINHA DE FILTROS
         c_per, c_area, c_turno = st.columns([0.4, 0.3, 0.3])
         with c_per: p_sel = st.date_input("Filtrar Período", [hoje_input, amanha], key="dt_filter")
         
@@ -1140,15 +1009,15 @@ else:
             ed_c = st.data_editor(st.session_state.df_ap_work, hide_index=True, use_container_width=True, column_config={"data_solicitacao": "Aberto em", "motorista": "Solicitante", "Data_Programada": st.column_config.DateColumn("Data Programada"), "Area_Destino": st.column_config.SelectboxColumn("Área", options=ORDEM_AREAS), "Aprovar": st.column_config.CheckboxColumn("Aprovar?"), "id": None}, key="editor_chamados")
             if st.button("Processar Agendamentos", type="primary"):
                 selecionados = ed_c[ed_c['Aprovar'] == True]
-            if not selecionados.empty:
-                with engine.connect() as conn:
-                    for _, r in selecionados.iterrows():
-                        v_os = obter_proxima_os(engine, emp_id)
-                        conn.execute(text("INSERT INTO tarefas (data, executor, prefixo, inicio_disp, fim_disp, descricao, area, turno, id_chamado, origem, empresa_id, numero_os) VALUES (:dt, :ex, :pr, :ti, :tf, :ds, :ar, 'Não definido', :ic, 'Chamado', :eid, :nos)"), 
-                                     {"dt": str(r['Data_Programada']), "ex": r['Executor'], "pr": r['prefixo'], "ti": r['Inicio'], "tf": r['Fim'], "ds": r['descricao'], "ar": r['Area_Destino'], "ic": r['id'], "eid": emp_id, "nos": v_os})
-                        conn.execute(text("UPDATE chamados SET status = 'Agendado' WHERE id = :id"), {"id": r['id']})
-                    conn.commit()
-                st.success("✅ Agendamentos processados!"); st.rerun()
+                if not selecionados.empty:
+                    with engine.connect() as conn:
+                        for _, r in selecionados.iterrows():
+                            v_os = obter_proxima_os(engine, emp_id)
+                            conn.execute(text("INSERT INTO tarefas (data, executor, prefixo, inicio_disp, fim_disp, descricao, area, turno, id_chamado, origem, empresa_id, numero_os) VALUES (:dt, :ex, :pr, :ti, :tf, :ds, :ar, 'Não definido', :ic, 'Chamado', :eid, :nos)"), 
+                                         {"dt": str(r['Data_Programada']), "ex": r['Executor'], "pr": r['prefixo'], "ti": r['Inicio'], "tf": r['Fim'], "ds": r['descricao'], "ar": r['Area_Destino'], "ic": r['id'], "eid": emp_id, "nos": v_os})
+                            conn.execute(text("UPDATE chamados SET status = 'Agendado' WHERE id = :id"), {"id": r['id']})
+                        conn.commit()
+                    st.success("✅ Agendamentos processados!"); st.rerun()
         else: st.info("Nenhum chamado pendente no momento.")
 
     elif aba_ativa == "📊 Indicadores":
