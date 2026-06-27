@@ -178,7 +178,7 @@ def gerar_pdf_manual_oficial_pro():
     return texto_pdf.encode('latin-1', 'replace')
     
 # --- CONFIGURAÇÕES DE MARCA ---
-NOME_SISTEMA = "Up 2 Today"
+NOME_SISTEMA = "Updated Yesterday"
 SLOGAN = "Seu Controle. Nossa Prioridade."
 LOGO_URL = "https://i.postimg.cc/85HwzdmP/logo-png.png"
 ORDEM_AREAS = ["Motorista", "Borracharia", "Mecânica", "Elétrica", "Chapeamento", "Limpeza"]
@@ -196,69 +196,89 @@ def obter_proxima_os(engine, emp_id):
     except:
         return 1001
 
-# PALETA DE CORES EXTRAÍDA FIELMENTE DO LOGOTIPO U2T
-COR_AZUL = "#1b224c" 
-COR_VERDE = "#31ad64" 
-COR_FUNDO = "#f4f7f6"
-COR_DOURADO = "#FFD700" 
+# PALETA DE CORES RETRÔ INDUSTRIAL EXTRAÍDA DO LOGOTIPO E DO PETCAR
+COR_BRONZE = "#4A3C31"  # Bronze forjado do escudo base
+COR_OURO = "#C5A059"    # Latão / Ouro envelhecido do símbolo UY e textos
+COR_CHAPA = "#E2DFD2"   # Chapa metálica fosca clara do corpo do PetCar
+COR_TEXTO = "#231F20"   # Grafite escuro fosco dos rebites e pneus
 
 # --- 1. CONFIGURAÇÃO DA PÁGINA ---
-st.set_page_config(page_title=f"{NOME_SISTEMA} - Tudo em Dia", layout="wide", page_icon="🛠️")
+st.set_page_config(page_title=f"{NOME_SISTEMA} - Painel de Controle", layout="wide", page_icon="⚙️")
 
-# --- CSS REVISADO ---
+# --- CSS REVISADO: ESTÉTICA RETRÔ MECÂNICA ---
 st.markdown(f"""
     <style>
-    html, body, [data-testid="stAppViewContainer"], .stApp {{ background-color: #FFFFFF !important; }}
-    [data-testid="stSidebar"] {{ background-color: #DFDFDF !important; }}
+    /* 1. FUNDOS: App na cor Chapa Clara e Sidebar em Bronze Forjado */
+    html, body, [data-testid="stAppViewContainer"], .stApp {{ background-color: {COR_CHAPA} !important; }}
+    [data-testid="stSidebar"] {{ background-color: {COR_BRONZE} !important; }}
+
+    /* Elementos expansíveis e flechas na barra lateral em Ouro Envelhecido */
     [data-testid="stSidebarCollapsedControl"] svg, 
     button[data-testid="stBaseButton-headerNoPadding"] svg {{
-        fill: #808080 !important;
-        color: #808080 !important;
+        fill: {COR_OURO} !important;
+        color: {COR_OURO} !important;
     }}
+
+    /* 2. TEXTOS: Visibilidade garantida usando o Grafite Escuro */
     p, label, span, div, .stMarkdown, [data-testid="stText"] {{
-        color: #31333F !important;
+        color: {COR_TEXTO} !important;
     }}
+    
+    /* Textos na barra lateral invertem o tom para garantir o contraste */
+    [data-testid="stSidebar"] p, [data-testid="stSidebar"] label, [data-testid="stSidebar"] span, [data-testid="stSidebar"] div {{
+        color: #F5F5F0 !important;
+    }}
+
+    /* 3. CENTRALIZAÇÃO DOS BOTÕES DE LOGIN/CADASTRO */
     div[data-testid="stRadio"] > div {{
         display: flex;
         justify-content: center;
-        background-color: #ffffff;
+        background-color: {COR_CHAPA};
         padding: 10px;
-        border-radius: 10px;
-        border: 1px solid #e0e0e0;
+        border-radius: 6px;
+        border: 2px solid {COR_BRONZE};
     }}
+
+    /* 4. BOTÕES GERAIS: Fundo Bronze com Borda Ouro Envelhecido */
     button[kind="primary"], button[kind="secondary"], button {{
-        background-color: #1b224c !important;
-        border: 2px solid #31ad64 !important;
-        border-radius: 8px !important;
+        background-color: {COR_BRONZE} !important;
+        border: 2px solid {COR_OURO} !important;
+        border-radius: 4px !important; /* Visual de painel mecânico */
         color: #FFFFFF !important;
     }}
-    div.stButton > button[key*="renov_btn"] {{
-        background-color: {COR_DOURADO} !important;
-        color: #000000 !important;
-        border: 2px solid #B8860B !important;
-        font-weight: bold !important;
-    }}
-    div.stButton > button[key*="renov_btn"] p {{ color: #000000 !important; }}
+
+    /* 5. DESTAQUE DA ABA ATUAL: Ouro Envelhecido com Borda Bronze */
     div.stHorizontalBlock button[kind="primary"] {{
-        background-color: #31ad64 !important;
-        border: 2px solid #1b224c !important;
+        background-color: {COR_OURO} !important;
+        border: 2px solid {COR_BRONZE} !important;
     }}
-    button p, button span, button div {{
+
+    /* Tratamento de contraste dos textos dos botões ativos e secundários */
+    button[kind="primary"] p, button[kind="primary"] span, button[kind="primary"] div {{
+        color: {COR_TEXTO} !important;
+        -webkit-text-fill-color: {COR_TEXTO} !important;
+    }}
+    button[kind="secondary"] p, button[kind="secondary"] span, button[kind="secondary"] div {{
         color: #FFFFFF !important;
         -webkit-text-fill-color: #FFFFFF !important;
     }}
+
+    /* Elementos iconográficos e calendário */
     button svg, [data-testid="stDateInput"] svg {{
         fill: #FFFFFF !important;
         color: #FFFFFF !important;
     }}
+
+    /* 6. CALENDÁRIO: Seleção na cor Bronze */
     div[data-baseweb="calendar"] [aria-selected="true"],
     div[data-baseweb="calendar"] [class*="Selected"],
     div[data-baseweb="calendar"] [class*="Highlighted"] {{
-        background-color: #31ad64 !important;
-        background: #31ad64 !important;
+        background-color: {COR_BRONZE} !important;
+        background: {COR_BRONZE} !important;
     }}
-    .logo-u {{ color: #1b224c !important; }}
-    .logo-2t {{ color: #31ad64 !important; }}
+
+    .logo-u {{ color: {COR_BRONZE} !important; font-weight: bold; }}
+    .logo-2t {{ color: {COR_OURO} !important; font-weight: bold; }}
     </style>
 """, unsafe_allow_html=True)
 
