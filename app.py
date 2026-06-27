@@ -205,35 +205,35 @@ COR_TEXTO = "#231F20"   # Grafite escuro fosco dos rebites e pneus
 # --- 1. CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title=f"{NOME_SISTEMA} - Painel de Controle", layout="wide", page_icon="⚙️")
 
-# --- CSS REVISADO: ESTÉTICA RETRÔ MECÂNICA ---
+# --- CSS REVISADO: SIDEBAR BRANCA PARA INTEGRAR O LOGO ---
 st.markdown(f"""
     <style>
-    /* 1. FUNDOS: App na cor Chapa Clara e Sidebar em Bronze Forjado */
+    /* 1. FUNDOS: App na cor Chapa Clara e Sidebar em Branco Puro */
     html, body, [data-testid="stAppViewContainer"], .stApp {{ background-color: {COR_CHAPA} !important; }}
-    [data-testid="stSidebar"] {{ background-color: {COR_BRONZE} !important; }}
+    [data-testid="stSidebar"] {{ background-color: #FFFFFF !important; }}
 
-    /* Elementos expansíveis e flechas na barra lateral em Ouro Envelhecido */
+    /* Flechinha da Sidebar e cabeçalhos em Bronze Forjado para contrastar com o fundo branco */
     [data-testid="stSidebarCollapsedControl"] svg, 
     button[data-testid="stBaseButton-headerNoPadding"] svg {{
-        fill: {COR_OURO} !important;
-        color: {COR_OURO} !important;
+        fill: {COR_BRONZE} !important;
+        color: {COR_BRONZE} !important;
     }}
 
-    /* 2. TEXTOS: Visibilidade garantida usando o Grafite Escuro */
+    /* 2. TEXTOS DA ÁREA PRINCIPAL: Grafite Escuro */
     p, label, span, div, .stMarkdown, [data-testid="stText"] {{
         color: {COR_TEXTO} !important;
     }}
     
-    /* Textos na barra lateral invertem o tom para garantir o contraste */
+    /* TEXTOS DA SIDEBAR: Ajustados para Bronze Forjado para leitura perfeita sobre o fundo branco */
     [data-testid="stSidebar"] p, [data-testid="stSidebar"] label, [data-testid="stSidebar"] span, [data-testid="stSidebar"] div {{
-        color: #F5F5F0 !important;
+        color: {COR_BRONZE} !important;
     }}
 
     /* 3. CENTRALIZAÇÃO DOS BOTÕES DE LOGIN/CADASTRO */
     div[data-testid="stRadio"] > div {{
         display: flex;
         justify-content: center;
-        background-color: {COR_CHAPA};
+        background-color: #FFFFFF;
         padding: 10px;
         border-radius: 6px;
         border: 2px solid {COR_BRONZE};
@@ -243,7 +243,7 @@ st.markdown(f"""
     button[kind="primary"], button[kind="secondary"], button {{
         background-color: {COR_BRONZE} !important;
         border: 2px solid {COR_OURO} !important;
-        border-radius: 4px !important; /* Visual de painel mecânico */
+        border-radius: 4px !important;
         color: #FFFFFF !important;
     }}
 
@@ -253,7 +253,7 @@ st.markdown(f"""
         border: 2px solid {COR_BRONZE} !important;
     }}
 
-    /* Tratamento de contraste dos textos dos botões ativos e secundários */
+    /* Contraste dos textos dos botões */
     button[kind="primary"] p, button[kind="primary"] span, button[kind="primary"] div {{
         color: {COR_TEXTO} !important;
         -webkit-text-fill-color: {COR_TEXTO} !important;
