@@ -1074,7 +1074,7 @@ else:
     st.subheader("📊 Painel de Performance Operacional")
     st.info("💡 **Dica:** Utilize esses dados para identificar gargalos e planejar a capacidade da oficina.")
     
-    # CORREÇÃO 1: SELECT alterado para trazer as colunas de data e horários necessários para o Lead Time
+    # Consulta SQL corrigida trazendo os campos necessários
     query_ind = text("SELECT area, realizado, data, inicio_disp, fim_disp FROM tarefas WHERE empresa_id = :eid")
     df_ind = pd.read_sql(query_ind, engine, params={"eid": emp_id})
     
@@ -1099,18 +1099,16 @@ else:
     
     if not df_ind.empty:
         try:
-            # Garante a conversão da data base para formato temporal
+            # Conversão segura de datas
             df_ind['data_dt'] = pd.to_datetime(df_ind['data'], errors='coerce')
             df_ind['Mês'] = df_ind['data_dt'].dt.to_period('M').astype(str)
             
-            # CORREÇÃO 2: Cálculo dinâmico do Lead Time (Diferença em horas entre fim_disp e inicio_disp)
+            # Cálculo do tempo de atendimento em horas
             df_ind['h_inicio'] = pd.to_timedelta(df_ind['inicio_disp'] + ':00', errors='coerce')
             df_ind['h_fim'] = pd.to_timedelta(df_ind['fim_disp'] + ':00', errors='coerce')
-            
-            # Calcula a diferença absoluta em horas de atendimento na oficina
             df_ind['lead_time_horas'] = (df_ind['h_fim'] - df_ind['h_inicio']).dt.total_seconds() / 3600
             
-            # Filtra valores inválidos ou negativos de horários lançados incorretamente
+            # Filtra registros válidos
             df_valid = df_ind[df_ind['lead_time_horas'] >= 0]
             
             if not df_valid.empty:
@@ -1118,14 +1116,13 @@ else:
                 df_lead_time = df_lead_time.set_index('Mês')
                 st.line_chart(df_lead_time, color="#C5A059")
             else:
-                st.warning("Aguardando registros com horários de início e fim válidos para calcular o Lead Time.")
+                st.warning("Aguardando registros com horários válidos para calcular o Lead Time.")
                 
         except Exception as e:
             st.error(f"Erro ao processar gráfico de evolução: {e}")
     else:
         st.warning("Sem dados de tarefas disponíveis para calcular indicadores de evolução.")
 
-# CORREÇÃO 3: Alinhamento exato de espaços (identação) para evitar o SyntaxError nas abas seguintes
 elif aba_ativa == "👥 Minha Equipe":
     st.subheader("👥 Gestão de Equipe e Acessos")
         st.info("💡 **Dica profissional:** Para editar senhas ou cargos, altere diretamente na tabela. Para excluir, marque 'Exc' e clique no botão abaixo.")
