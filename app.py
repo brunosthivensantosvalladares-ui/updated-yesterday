@@ -460,7 +460,7 @@ if not st.session_state["logado"]:
                         engine = get_engine()
                         inicializar_banco()
                         
-                        # 1. Tenta logar como Administrador Dono (Tabela Empresa)
+                        # 1. Busca robusta ignorando Case Sensitivity e espaços vazios na tabela empresa
                         with engine.connect() as conn:
                             empresa = conn.execute(
                                 text("""
@@ -479,7 +479,7 @@ if not st.session_state["logado"]:
                             st.success("✅ Login efetuado com sucesso!")
                             st.rerun()
                         
-                        # 2. Se não achou na empresa, tenta na tabela de usuários integrantes
+                        # 2. Busca sanitizada na tabela de integrantes da equipe (Para o usuário bruno)
                         else:
                             with engine.connect() as conn:
                                 usuario = conn.execute(
@@ -661,7 +661,7 @@ else:
                     type="primary"
                 )
             except:
-                st.error("Erro ao generate o arquivo PDF. Verifique a codificação dos textos.")
+                st.error("Erro ao gerar o arquivo PDF. Verifique a codificação dos textos.")
 
         st.divider()
         col_m1, col_m2 = st.columns(2)
@@ -994,12 +994,11 @@ else:
             st.markdown("""
                 ### 📝 Guia Rápido - Cadastro
                 1. **Uso:** Utilize para preventivas ou serviços que não vieram de uma reclamação de motorista.
-                2. **Formulário:** Preencha os campos e confirme.
+                2. **Formulário:** Preencha os campos and confirme.
                 3. **Gestão:** Na lista abaixo, você pode excluir registros marcando a coluna **Exc** e clicando em excluir.
             """)
         st.info("💡 **Atenção:** Use este formulário para serviços que não vieram de chamados.")
         st.warning("⚠️ **Nota:** Para reagendar ou corrigir, basta alterar diretamente na lista abaixo. O salvamento é automático.")
-        
         with st.form("f_d", clear_on_submit=True):
             c1, c2, c3, c4 = st.columns(4)
             with c1: d_i = st.date_input("Data", datetime.now())
@@ -1020,32 +1019,23 @@ else:
                 st.code(f"NÚMERO DA ORDEM DE SERVIÇO: {nova_os}", language="markdown")
                 st.rerun()
         
-        st.divider()
-        st.subheader("📋 Lista de serviços")
+        st.divider(); st.subheader("📋 Lista de serviços")
         df_lista = pd.read_sql(text("SELECT * FROM tarefas WHERE empresa_id = :eid ORDER BY data DESC, id DESC"), engine, params={"eid": emp_id})
-        
         if not df_lista.empty:
             df_lista['data'] = pd.to_datetime(df_lista['data']).dt.date
             df_lista['Exc'] = False
             ed_l = st.data_editor(df_lista[['Exc', 'data', 'turno', 'executor', 'prefixo', 'inicio_disp', 'fim_disp', 'descricao', 'area', 'id']], hide_index=True, use_container_width=True, key="ed_lista")
-            
             if st.button("🗑️ Excluir Selecionados"):
                 with engine.connect() as conn:
-                    for i in ed_l[ed_l['Exc']==True]['id'].tolist(): 
-                        conn.execute(text("DELETE FROM tarefas WHERE id = :id"), {"id": int(i)})
-                    conn.commit()
-                st.warning("🗑️ Itens excluídos.")
-                st.rerun()
-                
+                    for i in ed_l[ed_l['Exc']==True]['id'].tolist(): conn.execute(text("DELETE FROM tarefas WHERE id = :id"), {"id": int(i)})
+                    conn.commit(); st.warning("🗑️ Itens excluídos."); st.rerun()
             if st.session_state.ed_lista["edited_rows"]:
                 with engine.connect() as conn:
                     for idx, changes in st.session_state.ed_lista["edited_rows"].items():
                         rid = int(df_lista.iloc[idx]['id'])
                         for col, val in changes.items():
-                            if col != 'Exc': 
-                                conn.execute(text(f"UPDATE tarefas SET {col} = :v WHERE id = :i"), {"v": str(val), "i": rid})
-                    conn.commit()
-                st.rerun()
+                            if col != 'Exc': conn.execute(text(f"UPDATE tarefas SET {col} = :v WHERE id = :i"), {"v": str(val), "i": rid})
+                    conn.commit(); st.rerun()
 
     elif aba_ativa == "📥 Chamados Oficina":
         c_tit, c_refresh = st.columns([0.8, 0.2])
@@ -1055,7 +1045,7 @@ else:
         with st.popover("💡 Como usar os Chamados?"):
             st.markdown("""
                 ### 📥 Guia Rápido - Chamados
-                1. **Triagem:** Veja o que os motoristas relataram. 
+                1. **Triagem:** Veja o what os motoristas relataram. 
                 2. **Planejamento:** Preencha o Executor e a Data Programada diretamente na tabela.
                 3. **Aprovação:** Marque a caixa **Aprovar?** e clique no botão **Processar Agendamentos**. 
                 *O serviço sairá desta lista e irá direto para a Agenda Principal.*
@@ -1104,7 +1094,6 @@ else:
         c1, c2 = st.columns(2)
         with c1:
             st.markdown("**Serviços por Área**")
-            st.caption("Mapeia quais setores da oficina (Mecânica, Elétrica, Borracharia, etc.) estão recebendo mais ordens de serviço.")
             if not df_ind.empty:
                 st.bar_chart(df_ind['area'].value_counts(), color=COR_OURO) 
             else:
@@ -1114,7 +1103,6 @@ else:
             if not df_ind.empty:
                 df_st = df_ind['realizado'].map({True: 'Concluído', False: 'Pendente'}).value_counts()
                 st.markdown("**Status de Conclusão**")
-                st.caption("Mostra a proporção entre os serviços que já receberam baixa técnica (Concluídos) e os que ainda estão na fila (Pendentes).")
                 st.bar_chart(df_st, color=COR_OURO) 
                 
         st.divider() 
@@ -1146,14 +1134,12 @@ else:
                     with col_metrica:
                         if media_geral_horas >= 24:
                             media_geral_dias = media_geral_horas / 24
-                            st.metric(label="Média Geral de Retenção", value=f"{media_geral_dias:.1f} Dias")
+                            st.metric(label="Média Geral de Espera", value=f"{media_geral_dias:.1f} Dias")
                         else:
-                            st.metric(label="Média Geral de Retenção", value=f"{media_geral_horas:.1f} Horas")
-                        st.caption("Tempo médio total que um veículo passa retido em manutenção, do início à baixa técnica.")
+                            st.metric(label="Média Geral de Espera", value=f"{media_geral_horas:.1f} Horas")
                             
                     with col_grafico:
                         st.caption("Evolução Mensal (Média de Horas)")
-                        st.caption("Histórico do tempo de retenção ao longo dos meses para avaliar o ganho de eficiência da equipe.")
                         df_lead_time = df_valid.groupby('Mês')['lead_time_horas'].mean().reset_index()
                         df_lead_time = df_lead_time.set_index('Mês')
                         st.line_chart(df_lead_time, color="#C5A059")
