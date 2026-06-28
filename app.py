@@ -428,8 +428,22 @@ if not st.session_state["logado"]:
     _, col_login, _ = st.columns([1.2, 1, 1.2])
     with col_login:
         placeholder_topo = st.empty()
-        placeholder_topo.markdown(f"<h1 style='text-align: center; margin-bottom: 0;'><span class='logo-u'>U</span><span class='logo-2t'>2T</span></h1>", unsafe_allow_html=True)
-        st.markdown(f"<p style='text-align: center; font-style: italic; color: #555; margin-top: 0;'>{SLOGAN}</p>", unsafe_allow_html=True)
+        
+        # =====================================================================
+        # CABEÇALHO DO LOGIN (É ESTE BLOCO EXATO QUE VOCÊ VAI SUBSTITUIR)
+        # =====================================================================
+        st.markdown(
+            f"""
+            <div style='text-align: center; margin-bottom: 20px;'>
+                <h1 style='margin-bottom: 0px; font-size: 3rem; line-height: 1.2;'>
+                    <span style='color: {COR_BRONZE} !important; font-weight: bold; display: inline-block;'>U</span><span style='color: {COR_OURO} !important; font-weight: bold; display: inline-block;'>Y</span>
+                </h1>
+                <p style='font-size: 1rem; color: #FFFFFF !important; margin-top: 5px; font-weight: 500;'>{SLOGAN}</p>
+            </div>
+            """, 
+            unsafe_allow_html=True
+        )
+        # =====================================================================
         
         aba = st.radio("Selecione uma opção", ["Acessar", "Criar Conta"], horizontal=True, label_visibility="collapsed")
         
@@ -440,6 +454,7 @@ if not st.session_state["logado"]:
                 
                 if st.button(f"Acessar Painel {NOME_SISTEMA}", use_container_width=True, type="primary"):
                     engine = get_engine()
+                    # ... (O código continua com a validação das senhas)
                     inicializar_banco()
                     
                     masters = {
