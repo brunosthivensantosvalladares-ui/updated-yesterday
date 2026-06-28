@@ -501,9 +501,9 @@ if not st.session_state["logado"]:
                     if st.session_state.get("show_pay_login"):
                         exibir_painel_pagamento_pro("login")
 
-        else: # Aba Criar Conta
+else: # Aba Criar Conta
             with st.container(border=True):
-                # CORRIGIDO: Agora usando COR_BRONZE em vez de COR_AZUL
+                # CORRIGIDO: Trocado COR_AZUL por COR_BRONZE para eliminar o NameError
                 st.markdown(f"<h4 style='color:{COR_BRONZE}'>🚀 7 Dias Grátis</h4>", unsafe_allow_html=True)
                 n_emp = st.text_input("Nome da Empresa")
                 n_ema = st.text_input("E-mail Corporativo")
