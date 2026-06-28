@@ -1057,6 +1057,7 @@ elif aba_ativa == "📊 Indicadores":
             c1, c2 = st.columns(2)
             with c1:
                 st.markdown("**Serviços por Área**")
+                st.caption("Mapeia quais setores da oficina (Mecânica, Elétrica, Borracharia, etc.) estão recebendo mais ordens de serviço.")
                 if not df_ind.empty:
                     st.bar_chart(df_ind['area'].value_counts(), color=COR_OURO) 
                 else:
@@ -1066,6 +1067,7 @@ elif aba_ativa == "📊 Indicadores":
                 if not df_ind.empty:
                     df_st = df_ind['realizado'].map({True: 'Concluído', False: 'Pendente'}).value_counts()
                     st.markdown("**Status de Conclusão**")
+                    st.caption("Mostra a proporção entre os serviços que já receberam baixa técnica (Concluídos) e os que ainda estão na fila (Pendentes).")
                     st.bar_chart(df_st, color=COR_OURO) 
                     
             st.divider() 
@@ -1079,7 +1081,7 @@ elif aba_ativa == "📊 Indicadores":
                     df_ind['data_dt'] = pd.to_datetime(df_ind['data'], errors='coerce')
                     df_ind['Mês'] = df_ind['data_dt'].dt.to_period('M').astype(str)
                     
-                    # Cálculo do tempo de atendimento em horas (alinhado com 16 espaços)
+                    # Cálculo do tempo de atendimento em horas
                     df_ind['h_inicio'] = pd.to_timedelta(df_ind['inicio_disp'] + ':00', errors='coerce')
                     df_ind['h_fim'] = pd.to_timedelta(df_ind['fim_disp'] + ':00', errors='coerce')
                     df_ind['lead_time_horas'] = (df_ind['h_fim'] - df_ind['h_inicio']).dt.total_seconds() / 3600
@@ -1097,12 +1099,14 @@ elif aba_ativa == "📊 Indicadores":
                         with col_metrica:
                             if media_geral_horas >= 24:
                                 media_geral_dias = media_geral_horas / 24
-                                st.metric(label="Média Geral de Espera", value=f"{media_geral_dias:.1f} Dias")
+                                st.metric(label="Média Geral de Retenção", value=f"{media_geral_dias:.1f} Dias")
                             else:
-                                st.metric(label="Média Geral de Espera", value=f"{media_geral_horas:.1f} Horas")
+                                st.metric(label="Média Geral de Retenção", value=f"{media_geral_horas:.1f} Horas")
+                            st.caption("Tempo médio total que um veículo passa retido em manutenção, do início à baixa técnica.")
                                 
                         with col_grafico:
                             st.caption("Evolução Mensal (Média de Horas)")
+                            st.caption("Histórico do tempo de retenção ao longo dos meses para avaliar o ganho de eficiência da equipe.")
                             df_lead_time = df_valid.groupby('Mês')['lead_time_horas'].mean().reset_index()
                             df_lead_time = df_lead_time.set_index('Mês')
                             st.line_chart(df_lead_time, color="#C5A059")
