@@ -1081,17 +1081,25 @@ else:
             if not df_ind.empty:
                 df_st = df_ind['realizado'].map({True: 'Concluído', False: 'Pendente'}).value_counts()
                 st.markdown("**Status de Conclusão**"); st.bar_chart(df_st, color=COR_OURO) 
-        st.divider(); st.markdown("**⏳ Tempo de Resposta (Lead Time)**")
-        query_lead = text("SELECT c.data_solicitacao, t.data as data_conclusao FROM chamados c JOIN tarefas t ON c.id = t.id_chamado WHERE t.realizado = True AND t.empresa_id = :eid")
-        df_lead = pd.read_sql(query_lead, engine, params={"eid": emp_id})
-        if not df_lead.empty:
-            df_lead['data_solicitacao'], df_lead['data_conclusao'] = pd.to_datetime(df_lead['data_solicitacao']), pd.to_datetime(df_lead['data_conclusao'])
-            df_lead['dias'] = (df_lead['data_conclusao'] - df_lead['data_solicitacao']).dt.days.apply(lambda x: max(x, 0))
-            col_m1, col_m2 = st.columns([0.3, 0.7])
-            with col_m1: st.metric("Lead Time Médio", f"{df_lead['dias'].mean():.1f} Dias")
-            with col_m2:
-                df_ev = df_lead.groupby('data_conclusao')['dias'].mean().reset_index()
-                st.line_chart(df_ev.set_index('data_conclusao'), color=COR_OURO)
+        st.divider(); st.markdown("**Evolução do Lead Time (Média em Dias por Mês)**")
+
+# 1. Garante que a coluna de data esteja no formato correto de datetime
+df_ind['data_dt'] = pd.to_datetime(df_ind['data'])
+
+# 2. Cria uma coluna representando o Ano-Mês (Ex: 2026-06) para agrupamento
+df_ind['Mês'] = df_ind['data_dt'].dt.to_period('M').astype(str)
+
+# 3. Agrupa por mês e calcula a média do Lead Time (substitua 'lead_time' pelo nome exato da sua coluna se for diferente)
+if 'lead_time' in df_ind.columns:
+    df_lead_time = df_ind.groupby('Mês')['lead_time'].mean().reset_index()
+    
+    # Define o Mês como índice para o Streamlit plotar o eixo X corretamente
+    df_lead_time = df_lead_time.set_index('Mês')
+    
+    # 4. Renderiza o gráfico de linha para mostrar a evolução temporal com a cor dourada da marca
+    st.line_chart(df_lead_time, color="#C5A059")
+else:
+    st.warning("Coluna de cálculo de 'lead_time' não encontrada no conjunto de dados.")
 
     elif aba_ativa == "👥 Minha Equipe":
         st.subheader("👥 Gestão de Equipe e Acessos")
