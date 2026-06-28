@@ -287,11 +287,14 @@ st.markdown(f"""
         background: {COR_BRONZE} !important;
     }}
 
-    /* REGRA DO CSS ANTERIOR (FECHAMENTO SEGURO) */
+    </style>
+""", unsafe_allow_html=True)
+
+# --- INJEÇÃO ISOLADA DO ESTILO DO LOGO E DA MARCA NO LOGIN ---
+st.markdown("""
+    <style>
     .logo-u { color: #4A3C31 !important; font-weight: bold; }
     .logo-y { color: #C5A059 !important; font-weight: bold; }
-
-    /* ESTILO EXCLUSIVO DO UY DO LOGIN */
     .login-brand-title {
         text-align: center !important;
         color: #C5A059 !important;
@@ -442,7 +445,7 @@ if not st.session_state["logado"]:
     with col_login:
         
         # =====================================================================
-        # CABEÇALHO LIMPO: EM PARÁGRAFO PARA ADOTAR O DOURADO SEM BUG DE ALINHAMENTO
+        # CABEÇALHO PURIFICADO OPERACIONAL
         # =====================================================================
         st.markdown("<p class='login-brand-title'>UY</p>", unsafe_allow_html=True)
         st.markdown(f"<p style='text-align: center; font-style: italic; color: #555; margin-top: 0;'>{SLOGAN}</p>", unsafe_allow_html=True)
