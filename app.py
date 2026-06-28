@@ -946,77 +946,77 @@ else:
                                 time_module.sleep(0.5); st.rerun()
 
 if aba_ativa == "📋 Cadastro Direto":
-            st.subheader("📝 Agendamento Direto")
-            with st.popover("💡 Como usar o Cadastro Direto?"):
-                st.markdown("""
-                    ### 📝 Guia Rápido - Cadastro
-                    1. **Uso:** Utilize para preventivas ou serviços que não vieram de uma reclamação de motorista.
-                    2. **Formulário:** Preencha os campos e confirme.
-                    3. **Gestão:** Na lista abaixo, você pode excluir registros marcando a coluna **Exc** e clicando em excluir.
-                """)
-            st.info("💡 **Atenção:** Use este formulário para serviços que não vieram de chamados.")
-            st.warning("⚠️ **Nota:** Para reagendar ou corrigir, basta alterar diretamente na lista abaixo. O salvamento é automático.")
+        st.subheader("📝 Agendamento Direto")
+        with st.popover("💡 Como usar o Cadastro Direto?"):
+            st.markdown("""
+                ### 📝 Guia Rápido - Cadastro
+                1. **Uso:** Utilize para preventivas ou serviços que não vieram de uma reclamação de motorista.
+                2. **Formulário:** Preencha os campos e confirme.
+                3. **Gestão:** Na lista abaixo, você pode excluir registros marcando a coluna **Exc** e clicando em excluir.
+            """)
+        st.info("💡 **Atenção:** Use este formulário para serviços que não vieram de chamados.")
+        st.warning("⚠️ **Nota:** Para reagendar ou corrigir, basta alterar diretamente na lista abaixo. O salvamento é automático.")
+        
+        with st.form("f_d", clear_on_submit=True):
+            c1, c2, c3, c4 = st.columns(4)
+            with c1: d_i = st.date_input("Data", datetime.now())
+            with c2: e_i = st.text_input("Executor")
+            with c3: p_i = st.text_input("Prefixo")
+            with c4: a_i = st.selectbox("Área", ORDEM_AREAS)
+            c5, c6 = st.columns(2)
+            with c5: t_ini = st.text_input("Início (Ex: 08:00)", "00:00")
+            with c6: t_fim = st.text_input("Fim (Ex: 10:00)", "00:00")
+            ds_i, t_i = st.text_area("Descrição"), st.selectbox("Turno", LISTA_TURNOS)
+            if st.form_submit_button("Confirmar Agendamento"):
+                nova_os = obter_proxima_os(engine, emp_id)
+                with engine.connect() as conn:
+                    conn.execute(text("INSERT INTO tarefas (data, executor, prefixo, inicio_disp, fim_disp, descricao, area, turno, origem, empresa_id, numero_os) VALUES (:dt, :ex, :pr, :ti, :tf, :ds, :ar, :tu, 'Direto', :eid, :nos)"), 
+                                 {"dt": str(d_i), "ex": e_i, "pr": p_i, "ti": t_ini, "tf": t_fim, "ds": ds_i, "ar": a_i, "tu": t_i, "eid": emp_id, "nos": nova_os})
+                    conn.commit()
+                st.success(f"✅ SERVIÇO AGENDADO!")
+                st.code(f"NÚMERO DA ORDEM DE SERVIÇO: {nova_os}", language="markdown")
+                st.rerun()
+        
+        st.divider()
+        st.subheader("📋 Lista de serviços")
+        df_lista = pd.read_sql(text("SELECT * FROM tarefas WHERE empresa_id = :eid ORDER BY data DESC, id DESC"), engine, params={"eid": emp_id})
+        
+        if not df_lista.empty:
+            df_lista['data'] = pd.to_datetime(df_lista['data']).dt.date
+            df_lista['Exc'] = False
+            ed_l = st.data_editor(df_lista[['Exc', 'data', 'turno', 'executor', 'prefixo', 'inicio_disp', 'fim_disp', 'descricao', 'area', 'id']], hide_index=True, use_container_width=True, key="ed_lista")
             
-            with st.form("f_d", clear_on_submit=True):
-                c1, c2, c3, c4 = st.columns(4)
-                with c1: d_i = st.date_input("Data", datetime.now())
-                with c2: e_i = st.text_input("Executor")
-                with c3: p_i = st.text_input("Prefixo")
-                with c4: a_i = st.selectbox("Área", ORDEM_AREAS)
-                c5, c6 = st.columns(2)
-                with c5: t_ini = st.text_input("Início (Ex: 08:00)", "00:00")
-                with c6: t_fim = st.text_input("Fim (Ex: 10:00)", "00:00")
-                ds_i, t_i = st.text_area("Descrição"), st.selectbox("Turno", LISTA_TURNOS)
-                if st.form_submit_button("Confirmar Agendamento"):
-                    nova_os = obter_proxima_os(engine, emp_id)
-                    with engine.connect() as conn:
-                        conn.execute(text("INSERT INTO tarefas (data, executor, prefixo, inicio_disp, fim_disp, descricao, area, turno, origem, empresa_id, numero_os) VALUES (:dt, :ex, :pr, :ti, :tf, :ds, :ar, :tu, 'Direto', :eid, :nos)"), 
-                                     {"dt": str(d_i), "ex": e_i, "pr": p_i, "ti": t_ini, "tf": t_fim, "ds": ds_i, "ar": a_i, "tu": t_i, "eid": emp_id, "nos": nova_os})
-                        conn.commit()
-                    st.success(f"✅ SERVIÇO AGENDADO!")
-                    st.code(f"NÚMERO DA ORDEM DE SERVIÇO: {nova_os}", language="markdown")
-                    st.rerun()
-            
-            st.divider()
-            st.subheader("📋 Lista de serviços")
-            df_lista = pd.read_sql(text("SELECT * FROM tarefas WHERE empresa_id = :eid ORDER BY data DESC, id DESC"), engine, params={"eid": emp_id})
-            
-            if not df_lista.empty:
-                df_lista['data'] = pd.to_datetime(df_lista['data']).dt.date
-                df_lista['Exc'] = False
-                ed_l = st.data_editor(df_lista[['Exc', 'data', 'turno', 'executor', 'prefixo', 'inicio_disp', 'fim_disp', 'descricao', 'area', 'id']], hide_index=True, use_container_width=True, key="ed_lista")
+            if st.button("🗑️ Excluir Selecionados"):
+                with engine.connect() as conn:
+                    for i in ed_l[ed_l['Exc']==True]['id'].tolist(): 
+                        conn.execute(text("DELETE FROM tarefas WHERE id = :id"), {"id": int(i)})
+                    conn.commit()
+                st.warning("🗑️ Itens excluídos.")
+                st.rerun()
                 
-                if st.button("🗑️ Excluir Selecionados"):
-                    with engine.connect() as conn:
-                        for i in ed_l[ed_l['Exc']==True]['id'].tolist(): 
-                            conn.execute(text("DELETE FROM tarefas WHERE id = :id"), {"id": int(i)})
-                        conn.commit()
-                    st.warning("🗑️ Itens excluídos.")
-                    st.rerun()
-                    
-                if st.session_state.ed_lista["edited_rows"]:
-                    with engine.connect() as conn:
-                        for idx, changes in st.session_state.ed_lista["edited_rows"].items():
-                            rid = int(df_lista.iloc[idx]['id'])
-                            for col, val in changes.items():
-                                if col != 'Exc': 
-                                    conn.execute(text(f"UPDATE tarefas SET {col} = :v WHERE id = :i"), {"v": str(val), "i": rid})
-                        conn.commit()
-                    st.rerun()
+            if st.session_state.ed_lista["edited_rows"]:
+                with engine.connect() as conn:
+                    for idx, changes in st.session_state.ed_lista["edited_rows"].items():
+                        rid = int(df_lista.iloc[idx]['id'])
+                        for col, val in changes.items():
+                            if col != 'Exc': 
+                                conn.execute(text(f"UPDATE tarefas SET {col} = :v WHERE id = :i"), {"v": str(val), "i": rid})
+                    conn.commit()
+                st.rerun()
 
- if aba_ativa == "📥 Chamados Oficina":
-            c_tit, c_refresh = st.columns([0.8, 0.2])
-            with c_tit: 
-                st.subheader("📥 Aprovação de Chamados")
-                
-            with st.popover("💡 Como usar os Chamados?"):
-                st.markdown("""
-                    ### 📥 Guia Rápido - Chamados
-                    1. **Triagem:** Veja o que os motoristas relataram. 
-                    2. **Planejamento:** Preencha o Executor e a Data Programada diretamente na tabela.
-                    3. **Aprovação:** Marque a caixa **Aprovar?** e clique no botão **Processar Agendamentos**. 
-                    *O serviço sairá desta lista e irá direto para a Agenda Principal.*
-                """)
+    if aba_ativa == "📥 Chamados Oficina":
+        c_tit, c_refresh = st.columns([0.8, 0.2])
+        with c_tit: 
+            st.subheader("📥 Aprovação de Chamados")
+            
+        with st.popover("💡 Como usar os Chamados?"):
+            st.markdown("""
+                ### 📥 Guia Rápido - Chamados
+                1. **Triagem:** Veja o que os motoristas relataram. 
+                2. **Planejamento:** Preencha o Executor e a Data Programada diretamente na tabela.
+                3. **Aprovação:** Marque a caixa **Aprovar?** e clique no botão **Processar Agendamentos**. 
+                *O serviço sairá desta lista e irá direto para a Agenda Principal.*
+            """)
                 
             with c_refresh:
                 if st.button("🔄 Atualizar Lista", use_container_width=True, key="btn_refresh_chamados"):
