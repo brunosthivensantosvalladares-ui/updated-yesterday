@@ -1095,7 +1095,10 @@ if aba_ativa == "📊 Indicadores":
 
 if aba_ativa == "👥 Minha Equipe":
     st.subheader("👥 Gestão de Equipe e Acessos")
-        st.info("💡 **Dica profissional:** Para editar senhas ou cargos, altere diretamente na tabela. Para excluir, marque 'Exc' e clique no botão abaixo.")
+    st.info("💡 **Dica profissional:** Para editar senhas ou cargos, altere diretamente na tabela. Para excluir, marque 'Exc' e clique no botão abaixo.")
+    
+    # ... O restante do código da sua tabela de equipe continua aqui embaixo ...
+    # Lembre-se de alinhar as próximas linhas deste bloco com os mesmos 4 espaços de recuo na esquerda!
         with st.expander("➕ Novo Integrante", expanded=True):
             with st.form("f_u", clear_on_submit=True):
                 u, s, p = st.text_input("Login"), st.text_input("Senha"), st.selectbox("Cargo", ["motorista", "admin"])
