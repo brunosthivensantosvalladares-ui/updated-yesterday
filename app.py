@@ -945,7 +945,7 @@ else:
                                 st.toast("Alteração salva!", icon="✅")
                                 time_module.sleep(0.5); st.rerun()
 
-elif aba_ativa == "📋 Cadastro Direto":
+if aba_ativa == "📋 Cadastro Direto":
             st.subheader("📝 Agendamento Direto")
             with st.popover("💡 Como usar o Cadastro Direto?"):
                 st.markdown("""
