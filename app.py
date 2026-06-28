@@ -1070,7 +1070,7 @@ else:
                     st.success("✅ Agendamentos processados!"); st.rerun()
         else: st.info("Nenhum chamado pendente no momento.")
 
-elif aba_ativa == "📊 Indicadores":
+    elif aba_ativa == "📊 Indicadores":
     st.subheader("📊 Painel de Performance Operacional")
     st.info("💡 **Dica:** Utilize esses dados para identificar gargalos e planejar a capacidade da oficina.")
     
@@ -1123,7 +1123,7 @@ elif aba_ativa == "📊 Indicadores":
     else:
         st.warning("Sem dados de tarefas disponíveis para calcular indicadores de evolução.")
 
-elif aba_ativa == "👥 Minha Equipe":
+    elif aba_ativa == "👥 Minha Equipe":
     st.subheader("👥 Gestão de Equipe e Acessos")
         st.info("💡 **Dica profissional:** Para editar senhas ou cargos, altere diretamente na tabela. Para excluir, marque 'Exc' e clique no botão abaixo.")
         with st.expander("➕ Novo Integrante", expanded=True):
