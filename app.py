@@ -1046,11 +1046,10 @@ hide_index=False, use_container_width=True, key=f"ed_ted_{d}_{area}"
                                          {"dt": str(r['Data_Programada']), "ex": r['Executor'], "pr": r['prefixo'], "ti": r['Inicio'], "tf": r['Fim'], "ds": r['descricao'], "ar": r['Area_Destino'], "ic": r['id'], "eid": emp_id, "nos": v_os})
                         conn.execute(text("UPDATE chamados SET status = 'Agendado' WHERE id = :id"), {"id": r['id']})
                     conn.commit()
-                st.success("✅ Agendamentos processados!")
+st.success("✅ Agendamentos processados!")
                 st.rerun()
-    else: 
-        st.info("Nenhum chamado pendente no momento.")
-
+        else: 
+            st.info("Nenhum chamado pendente no momento.")
 
     elif aba_ativa == "📊 Indicadores":
         st.subheader("📊 Painel de Performance Operacional")
