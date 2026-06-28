@@ -1052,7 +1052,7 @@ hide_index=False, use_container_width=True, key=f"ed_ted_{d}_{area}"
         st.info("Nenhum chamado pendente no momento.")
 
 
-elif aba_ativa == "📊 Indicadores":
+    elif aba_ativa == "📊 Indicadores":
         st.subheader("📊 Painel de Performance Operacional")
         st.info("💡 **Dica:** Utilize esses dados para identificar gargalos e planejar a capacidade da oficina.")
         
