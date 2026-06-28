@@ -287,9 +287,11 @@ st.markdown(f"""
         background: {COR_BRONZE} !important;
     }}
 
+    /* ... regras anteriores do CSS ... */
+
     /* ESTILIZAÇÃO DA NOVA SIGLA UY */
-    .logo-u { color: {COR_BRONZE} !important; font-weight: bold; }
-    .logo-y { color: {COR_OURO} !important; font-weight: bold; }
+    .logo-u { color: #4A3C31 !important; font-weight: bold; }
+    .logo-y { color: #C5A059 !important; font-weight: bold; }
 
     /* ESTILO EXCLUSIVO DO UY DO LOGIN */
     .login-brand-title {
