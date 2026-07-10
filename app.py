@@ -5,18 +5,19 @@ from sqlalchemy import create_engine, text
 from datetime import datetime, time, timedelta
 from io import BytesIO
 from fpdf import FPDF
-import google.generativeai as genai
-import time as time_module # Importado para evitar conflito com datetime.time
+from google import genai  # Importação corrigida
+import time as time_module
 
-# Certifique-se de ter a sua API KEY configurada nas secrets
-# Tenta configurar a IA, mas não trava o app se a chave faltar
+# --- INICIALIZAÇÃO CORRIGIDA DO CLIENTE ---
 if "GEMINI_API_KEY" in st.secrets:
-    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+    # A nova forma de instanciar o cliente
+    client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
+    st.session_state["gemini_client"] = client
 else:
     st.error("⚠️ Configuração de IA ausente. Cadastre a GEMINI_API_KEY nos Secrets.")
+# ------------------------------------------
 
 def gerar_pdf_manual_oficial_pro():
-    from fpdf import FPDF
     class PDF(FPDF):
         def header(self):
             # Sigla Up 2 Today Colorida
