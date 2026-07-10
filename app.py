@@ -457,29 +457,28 @@ def gerar_pdf_periodo(df_periodo, data_inicio, data_fim):
                 
     return pdf.output(dest='S').encode('latin-1')
 
-# --- 3. LÓGICA DE LOGIN ---
-if "logado" not in st.session_state: st.session_state["logado"] = False
-if "aba_login" not in st.session_state: st.session_state["aba_login"] = "Acessar"
+_state["logado"] = False
 
 if not st.session_state["logado"]:
-    # TUDO AQUI DENTRO É A TELA DE LOGIN
+    # 1. TELA DE LOGIN (Aparece se não logado)
     _, col_login, _ = st.columns([1.2, 1, 1.2])
     with col_login:
-        # ... (seu formulário de login) ...
-        
-    # ATENÇÃO: NÃO coloque o botão da IA aqui!
+        # AQUI FICA SEU FORMULÁRIO DE LOGIN (Acessar/Criar Conta)
+        # NADA DE IA AQUI
+        pass 
 
 else:
-    # TUDO AQUI DENTRO É A TELA LOGADA
+    # 2. TELA LOGADA (Aparece se logado)
     engine = get_engine(); inicializar_banco()
     emp_id = st.session_state["empresa"] 
     usuario_ativo = st.session_state.get("usuario_ativo", "")
-
-    # Mova o botão da IA para cá, dentro deste 'else'
+    
+    # AGORA VOCÊ PODE COLOCAR O BOTÃO DA IA AQUI
+    # Dica: Coloque-o dentro de uma aba específica, como a "👑 Gestão Master"
     if usuario_ativo == "bruno":
         if "gemini_client" in st.session_state:
             if st.button("✨ Sugerir Manutenção com IA"):
-                # ... (sua lógica)
+                # ... lógica da IA
         
         # Cabeçalho da marca UY
         st.markdown("<p class='login-brand-title'>UY</p>", unsafe_allow_html=True)
