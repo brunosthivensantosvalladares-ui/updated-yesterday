@@ -650,12 +650,11 @@ else:
     st.divider()
     aba_ativa = st.session_state.opcao_selecionada
 
-   # --- 3. CONTEÚDO DAS PÁGINAS ---
+# --- 3. CONTEÚDO DAS PÁGINAS ---
     if aba_ativa == "👑 Gestão Master" and usuario_ativo == "bruno":
         st.subheader("👑 Painel de Controle Master")
-        st.info("💡 Bruno, aqui você ativa os pagamentos e define os prazos das empresas.")
         
-        # --- BOTÃO DA IA INSERIDO AQUI ---
+        # O BOTÃO AGORA VIVE APENAS AQUI DENTRO
         if "gemini_client" in st.session_state:
             if st.button("✨ Sugerir Manutenção com IA"):
                 try:
@@ -667,8 +666,9 @@ else:
                     st.write(response.text)
                 except Exception as e:
                     st.error("Erro na comunicação com a IA.")
-        # ----------------------------------
-
+        
+        st.info("💡 Bruno, aqui você ativa os pagamentos e define os prazos das empresas.")
+        # ... (resto do seu código)
         df_empresas = pd.read_sql(text("SELECT id, nome, email, data_cadastro, data_expiracao, status_assinatura FROM empresa ORDER BY id DESC"), engine)
         if not df_empresas.empty:
             for _, row in df_empresas.iterrows():
