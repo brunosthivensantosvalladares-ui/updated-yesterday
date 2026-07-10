@@ -18,19 +18,24 @@ if "GEMINI_API_KEY" in st.secrets:
 else:
     st.sidebar.warning("IA não configurada.")
 
-# --- BOTÃO DE IA COM PROTEÇÃO ---
-if "gemini_client" in st.session_state:
-    if st.button("✨ Sugerir Manutenção com IA"):
-        try:
-            prompt = "O motorista relatou barulho na suspensão do veículo X. O que pode ser?"
-            response = st.session_state["gemini_client"].models.generate_content(
-                model='gemini-1.5-flash', 
-                contents=prompt
-            )
-            st.write(response.text)
-        except Exception as e:
-            st.error("Ops! A IA não respondeu. Tente novamente mais tarde.")
-            # st.code(str(e)) # Mantenha isso apenas para depurar, se quiser ver o erro escondido
+# --- BOTÃO DE IA COM PROTEÇÃO DE USUÁRIO E ERRO ---
+# Verifica se o usuário logado é o 'bruno'
+if st.session_state.get("usuario_ativo") == "bruno":
+    if "gemini_client" in st.session_state:
+        if st.button("✨ Sugerir Manutenção com IA"):
+            try:
+                prompt = "O motorista relatou barulho na suspensão do veículo X. O que pode ser?"
+                
+                # Chamada com modelo 1.5-flash e fechamento correto
+                response = st.session_state["gemini_client"].models.generate_content(
+                    model='gemini-1.5-flash', 
+                    contents=prompt
+                )
+                st.write(response.text)
+            except Exception as e:
+                st.error("Erro na comunicação com a IA.")
+    else:
+        st.sidebar.warning("IA não inicializada.")
 # ------------------------------------------
 
 def gerar_pdf_manual_oficial_pro():
