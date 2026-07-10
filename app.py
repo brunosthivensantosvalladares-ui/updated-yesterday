@@ -18,8 +18,8 @@ if "GEMINI_API_KEY" in st.secrets:
 else:
     st.sidebar.warning("IA não configurada.")
 # --- BOTÃO DE IA COM PROTEÇÃO DE USUÁRIO E ERRO ---
-# Verifica se o usuário logado é o 'bruno'
 if st.session_state.get("usuario_ativo") == "bruno":
+    # ... código do botão ...
     if "gemini_client" in st.session_state:
         if st.button("✨ Sugerir Manutenção com IA"):
             try:
@@ -657,10 +657,25 @@ else:
     st.divider()
     aba_ativa = st.session_state.opcao_selecionada
 
-    # --- 3. CONTEÚDO DAS PÁGINAS ---
+   # --- 3. CONTEÚDO DAS PÁGINAS ---
     if aba_ativa == "👑 Gestão Master" and usuario_ativo == "bruno":
         st.subheader("👑 Painel de Controle Master")
         st.info("💡 Bruno, aqui você ativa os pagamentos e define os prazos das empresas.")
+        
+        # --- BOTÃO DA IA INSERIDO AQUI ---
+        if "gemini_client" in st.session_state:
+            if st.button("✨ Sugerir Manutenção com IA"):
+                try:
+                    prompt = "O motorista relatou barulho na suspensão do veículo X. O que pode ser?"
+                    response = st.session_state["gemini_client"].models.generate_content(
+                        model='gemini-1.5-flash', 
+                        contents=prompt
+                    )
+                    st.write(response.text)
+                except Exception as e:
+                    st.error("Erro na comunicação com a IA.")
+        # ----------------------------------
+
         df_empresas = pd.read_sql(text("SELECT id, nome, email, data_cadastro, data_expiracao, status_assinatura FROM empresa ORDER BY id DESC"), engine)
         if not df_empresas.empty:
             for _, row in df_empresas.iterrows():
