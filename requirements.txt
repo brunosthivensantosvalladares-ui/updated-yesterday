@@ -4,4 +4,4 @@ sqlalchemy
 psycopg2-binary
 fpdf
 xlsxwriter
-google-generativeai
+google-genai
