@@ -8,25 +8,29 @@ from fpdf import FPDF
 from google import genai  # Importação corrigida
 import time as time_module
 
-# --- INICIALIZAÇÃO CORRIGIDA DO CLIENTE ---
+# --- INICIALIZAÇÃO SEGURA DO CLIENTE ---
 if "GEMINI_API_KEY" in st.secrets:
-    # A nova forma de instanciar o cliente
-    client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
-    st.session_state["gemini_client"] = client
+    try:
+        client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
+        st.session_state["gemini_client"] = client
+    except Exception as e:
+        st.sidebar.error("IA indisponível no momento.")
 else:
-    st.error("⚠️ Configuração de IA ausente. Cadastre a GEMINI_API_KEY nos Secrets.")
+    st.sidebar.warning("IA não configurada.")
 
-# O código abaixo fica FORA do if/else para rodar em qualquer lugar da página
+# --- BOTÃO DE IA COM PROTEÇÃO ---
 if "gemini_client" in st.session_state:
     if st.button("✨ Sugerir Manutenção com IA"):
-        prompt = "O motorista relatou barulho na suspensão do veículo X. O que pode ser?"
-        
-        # Chamada corrigida com fechamento de parênteses
-        response = st.session_state["gemini_client"].models.generate_content(
-            model='gemini-1.5-flash', 
-            contents=prompt
-        )
-        st.write(response.text)
+        try:
+            prompt = "O motorista relatou barulho na suspensão do veículo X. O que pode ser?"
+            response = st.session_state["gemini_client"].models.generate_content(
+                model='gemini-1.5-flash', 
+                contents=prompt
+            )
+            st.write(response.text)
+        except Exception as e:
+            st.error("Ops! A IA não respondeu. Tente novamente mais tarde.")
+            # st.code(str(e)) # Mantenha isso apenas para depurar, se quiser ver o erro escondido
 # ------------------------------------------
 
 def gerar_pdf_manual_oficial_pro():
