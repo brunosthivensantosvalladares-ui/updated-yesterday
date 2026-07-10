@@ -462,8 +462,24 @@ if "logado" not in st.session_state: st.session_state["logado"] = False
 if "aba_login" not in st.session_state: st.session_state["aba_login"] = "Acessar"
 
 if not st.session_state["logado"]:
+    # TUDO AQUI DENTRO É A TELA DE LOGIN
     _, col_login, _ = st.columns([1.2, 1, 1.2])
     with col_login:
+        # ... (seu formulário de login) ...
+        
+    # ATENÇÃO: NÃO coloque o botão da IA aqui!
+
+else:
+    # TUDO AQUI DENTRO É A TELA LOGADA
+    engine = get_engine(); inicializar_banco()
+    emp_id = st.session_state["empresa"] 
+    usuario_ativo = st.session_state.get("usuario_ativo", "")
+
+    # Mova o botão da IA para cá, dentro deste 'else'
+    if usuario_ativo == "bruno":
+        if "gemini_client" in st.session_state:
+            if st.button("✨ Sugerir Manutenção com IA"):
+                # ... (sua lógica)
         
         # Cabeçalho da marca UY
         st.markdown("<p class='login-brand-title'>UY</p>", unsafe_allow_html=True)
