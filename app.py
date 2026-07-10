@@ -15,6 +15,18 @@ if "GEMINI_API_KEY" in st.secrets:
     st.session_state["gemini_client"] = client
 else:
     st.error("⚠️ Configuração de IA ausente. Cadastre a GEMINI_API_KEY nos Secrets.")
+
+# O código abaixo fica FORA do if/else para rodar em qualquer lugar da página
+if "gemini_client" in st.session_state:
+    if st.button("✨ Sugerir Manutenção com IA"):
+        prompt = "O motorista relatou barulho na suspensão do veículo X. O que pode ser?"
+        
+        # Chamada corrigida com fechamento de parênteses
+        response = st.session_state["gemini_client"].models.generate_content(
+            model='gemini-2.0-flash', 
+            contents=prompt
+        )
+        st.write(response.text)
 # ------------------------------------------
 
 def gerar_pdf_manual_oficial_pro():
