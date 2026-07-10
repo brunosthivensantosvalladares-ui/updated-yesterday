@@ -17,7 +17,6 @@ if "GEMINI_API_KEY" in st.secrets:
         st.sidebar.error("IA indisponível no momento.")
 else:
     st.sidebar.warning("IA não configurada.")
-
 # --- BOTÃO DE IA COM PROTEÇÃO DE USUÁRIO E ERRO ---
 # Verifica se o usuário logado é o 'bruno'
 if st.session_state.get("usuario_ativo") == "bruno":
