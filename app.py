@@ -23,7 +23,7 @@ if "gemini_client" in st.session_state:
         
         # Chamada corrigida com fechamento de parênteses
         response = st.session_state["gemini_client"].models.generate_content(
-            model='gemini-2.0-flash', 
+            model='gemini-1.5-flash', 
             contents=prompt
         )
         st.write(response.text)
