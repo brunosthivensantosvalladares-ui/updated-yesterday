@@ -456,6 +456,7 @@ else:
     usuario_ativo = st.session_state.get("usuario_ativo", "")
     
     # AGORA VOCÊ PODE COLOCAR O BOTÃO DA IA AQUIif usuario_ativo == "bruno":
+if usuario_ativo == "bruno":
         if "gemini_client" in st.session_state:
             if st.button("✨ Sugerir Manutenção com IA"):
                 try:
@@ -467,7 +468,6 @@ else:
                     st.write(response.text)
                 except Exception as e:
                     st.error("Erro na comunicação com a IA.")
-
     # --- TELA DE LOGIN ---
     st.markdown("<p class='login-brand-title'>UY</p>", unsafe_allow_html=True)
     st.markdown(f"<p style='text-align: center; font-style: italic; color: #555; margin-top: 0;'>{SLOGAN}</p>", unsafe_allow_html=True)
