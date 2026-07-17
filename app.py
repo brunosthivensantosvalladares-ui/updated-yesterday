@@ -455,13 +455,11 @@ else:
     emp_id = st.session_state["empresa"] 
     usuario_ativo = st.session_state.get("usuario_ativo", "")
     
-    # AGORA VOCÊ PODE COLOCAR O BOTÃO DA IA AQUI
-    # Dica: Coloque-o dentro de uma aba específica, como a "👑 Gestão Master"
-if usuario_ativo == "bruno":
+    # AGORA VOCÊ PODE COLOCAR O BOTÃO DA IA AQUIif usuario_ativo == "bruno":
         if "gemini_client" in st.session_state:
             if st.button("✨ Sugerir Manutenção com IA"):
                 try:
-                    prompt = "Gere uma sugestão rápida de plano de manutenção preventiva de rotina para uma frota de veículos comerciais."
+                    prompt = "Gere uma sugestão rápida de plano de manutenção."
                     response = st.session_state["gemini_client"].models.generate_content(
                         model='gemini-1.5-flash',
                         contents=prompt
@@ -470,6 +468,7 @@ if usuario_ativo == "bruno":
                 except Exception as e:
                     st.error("Erro na comunicação com a IA.")
 
+    # --- TELA DE LOGIN ---
     st.markdown("<p class='login-brand-title'>UY</p>", unsafe_allow_html=True)
     st.markdown(f"<p style='text-align: center; font-style: italic; color: #555; margin-top: 0;'>{SLOGAN}</p>", unsafe_allow_html=True)
     aba = st.radio("Selecione uma opção", ["Acessar", "Criar Conta"], horizontal=True, label_visibility="collapsed")
