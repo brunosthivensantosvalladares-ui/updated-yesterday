@@ -9,7 +9,7 @@ from google import genai  # Importação corrigida
 import time as time_module
 
 # --- INICIALIZAÇÃO SEGURA DO CLIENTE ---
-if "GEMINI_API_KEY" in st.secrets:
+    if "GEMINI_API_KEY" in st.secrets:
     try:
         client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
         st.session_state["gemini_client"] = client
