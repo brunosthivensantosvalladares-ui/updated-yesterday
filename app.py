@@ -9,7 +9,7 @@ from google import genai  # Importação corrigida
 import time as time_module
 
 # --- INICIALIZAÇÃO SEGURA DO CLIENTE ---
-    if "GEMINI_API_KEY" in st.secrets:
+if "GEMINI_API_KEY" in st.secrets:
     try:
         client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
         st.session_state["gemini_client"] = client
@@ -17,17 +17,6 @@ import time as time_module
         st.sidebar.error("IA indisponível no momento.")
 else:
     st.sidebar.warning("IA não configurada.")
-                
-                # Chamada com modelo 1.5-flash e fechamento correto
-                response = st.session_state["gemini_client"].models.generate_content(
-                    model='gemini-1.5-flash', 
-                    contents=prompt
-                )
-                st.write(response.text)
-            except Exception as e:
-                st.error("Erro na comunicação com a IA.")
-    else:
-        st.sidebar.warning("IA não inicializada.")
 # ------------------------------------------
 
 def gerar_pdf_manual_oficial_pro():
