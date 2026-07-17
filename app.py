@@ -469,8 +469,8 @@ if usuario_ativo == "bruno":
                     st.write(response.text)
                 except Exception as e:
                     st.error("Erro na comunicação com a IA.")
-        
-    # --- CABEÇALHO DA TELA DE LOGIN (ALINHADO FORA DO BLOCO DO BRUNO) ---
+
+    # Repare que o st.markdown volta para a mesma linha vertical do primeiro 'if' lá de cima (4 espaços)
     st.markdown("<p class='login-brand-title'>UY</p>", unsafe_allow_html=True)
     st.markdown(f"<p style='text-align: center; font-style: italic; color: #555; margin-top: 0;'>{SLOGAN}</p>", unsafe_allow_html=True)
     
