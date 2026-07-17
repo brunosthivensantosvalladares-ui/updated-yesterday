@@ -457,16 +457,24 @@ else:
     
     # AGORA VOCÊ PODE COLOCAR O BOTÃO DA IA AQUI
     # Dica: Coloque-o dentro de uma aba específica, como a "👑 Gestão Master"
-    if usuario_ativo == "bruno":
+if usuario_ativo == "bruno":
         if "gemini_client" in st.session_state:
             if st.button("✨ Sugerir Manutenção com IA"):
-                # ... lógica da IA
+                try:
+                    prompt = "Gere uma sugestão rápida de plano de manutenção preventiva de rotina para uma frota de veículos comerciais."
+                    response = st.session_state["gemini_client"].models.generate_content(
+                        model='gemini-1.5-flash',
+                        contents=prompt
+                    )
+                    st.write(response.text)
+                except Exception as e:
+                    st.error("Erro na comunicação com a IA.")
         
-        # Cabeçalho da marca UY
-        st.markdown("<p class='login-brand-title'>UY</p>", unsafe_allow_html=True)
-        st.markdown(f"<p style='text-align: center; font-style: italic; color: #555; margin-top: 0;'>{SLOGAN}</p>", unsafe_allow_html=True)
-        
-        aba = st.radio("Selecione uma opção", ["Acessar", "Criar Conta"], horizontal=True, label_visibility="collapsed")
+    # --- CABEÇALHO DA TELA DE LOGIN (ALINHADO FORA DO BLOCO DO BRUNO) ---
+    st.markdown("<p class='login-brand-title'>UY</p>", unsafe_allow_html=True)
+    st.markdown(f"<p style='text-align: center; font-style: italic; color: #555; margin-top: 0;'>{SLOGAN}</p>", unsafe_allow_html=True)
+    
+    aba = st.radio("Selecione uma opção", ["Acessar", "Criar Conta"], horizontal=True, label_visibility="collapsed")
         
         if aba == "Acessar":
             with st.container(border=True):
