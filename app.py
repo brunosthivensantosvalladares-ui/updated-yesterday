@@ -470,10 +470,8 @@ if usuario_ativo == "bruno":
                 except Exception as e:
                     st.error("Erro na comunicação com a IA.")
 
-    # Repare que o st.markdown volta para a mesma linha vertical do primeiro 'if' lá de cima (4 espaços)
     st.markdown("<p class='login-brand-title'>UY</p>", unsafe_allow_html=True)
     st.markdown(f"<p style='text-align: center; font-style: italic; color: #555; margin-top: 0;'>{SLOGAN}</p>", unsafe_allow_html=True)
-    
     aba = st.radio("Selecione uma opção", ["Acessar", "Criar Conta"], horizontal=True, label_visibility="collapsed")
         
         if aba == "Acessar":
