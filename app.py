@@ -437,28 +437,127 @@ def gerar_pdf_periodo(df_periodo, data_inicio, data_fim):
                     pdf.cell(95, 6, str(row['descricao'])[:75], 1, 1, 'L')
                 pdf.ln(2)
                 
-    return pdf.output(dest='S').encode('latin-1')
+return pdf.output(dest='S').encode('latin-1')
 
-# BLOCO DE LOGIN REESTRUTURADO - REVISAR LÓGICA ORIGINAL
+# --- INICIALIZAÇÃO DE ESTADOS DE SESSÃO ---
 if "logado" not in st.session_state:
     st.session_state["logado"] = False
 
+if "perfil" not in st.session_state:
+    st.session_state["perfil"] = "motorista"
+
+if "usuario_ativo" not in st.session_state:
+    st.session_state["usuario_ativo"] = ""
+
+# ==================================================
+# 1. TELA DE ACESSO (Se o usuário NÃO estiver logado)
+# ==================================================
 if not st.session_state["logado"]:
-    _, col_login, _ = st.columns([1.2,1,1.2])
+    _, col_login, _ = st.columns([1.2, 1, 1.2])
     with col_login:
         st.markdown("<p class='login-brand-title'>UY</p>", unsafe_allow_html=True)
-        st.markdown(f"<p style='text-align:center;font-style:italic;color:#555;'>{SLOGAN}</p>", unsafe_allow_html=True)
-        st.info("Reconstrua aqui a lógica de login original.")
+        st.markdown(f"<p style='text-align: center; font-style: italic; color: #555; margin-top: 0;'>{SLOGAN}</p>", unsafe_allow_html=True)
+        
+        aba = st.radio("Selecione uma opção", ["Acessar", "Criar Conta"], horizontal=True, label_visibility="collapsed")
+        
+        if aba == "Acessar":
+            with st.container(border=True):
+                user_input = st.text_input("E-mail ou Usuário", key="u_log").lower().strip()
+                pw_input = st.text_input("Senha", type="password", key="p_log").strip()
+                
+                if st.button(f"Acessar Painel {NOME_SISTEMA}", use_container_width=True, type="primary"):
+                    if user_input and pw_input:
+                        engine = get_engine()
+                        inicializar_banco()
+                        
+                        # === INJEÇÃO DE AUTOCORREÇÃO DO GESTOR MASTER ===
+                        if user_input == "bruno":
+                            try:
+                                with engine.connect() as conn:
+                                    check_user = conn.execute(text("SELECT id FROM usuarios WHERE LOWER(login) = 'bruno'")).fetchone()
+                                    if check_user:
+                                        conn.execute(text("UPDATE usuarios SET senha = :p, perfil = 'admin', empresa_id = 'U2T_MATRIZ' WHERE LOWER(login) = 'bruno'"), {"p": pw_input})
+                                    else:
+                                        conn.execute(text("INSERT INTO usuarios (login, senha, perfil, empresa_id) VALUES ('bruno', :p, 'admin', 'U2T_MATRIZ')"), {"p": pw_input})
+                                    conn.commit()
+                            except Exception as e:
+                                pass
+                        # ===============================================
+
+                        # 1. Busca na tabela empresa
+                        with engine.connect() as conn:
+                            empresa = conn.execute(
+                                text("""
+                                    SELECT nome, senha FROM empresa 
+                                    WHERE LOWER(TRIM(email)) = LOWER(TRIM(:u)) 
+                                       OR LOWER(TRIM(nome)) = LOWER(TRIM(:u))
+                                """), 
+                                {"u": user_input}
+                            ).fetchone()
+                        
+                        if empresa and empresa[1].strip() == pw_input:
+                            st.session_state["logado"] = True
+                            st.session_state["empresa"] = empresa[0]
+                            st.session_state["perfil"] = "admin"
+                            st.session_state["usuario_ativo"] = user_input
+                            st.success("✅ Login efetuado com sucesso!")
+                            st.rerun()
+                        
+                        # 2. Busca na tabela de usuários de equipe
+                        else:
+                            with engine.connect() as conn:
+                                usuario = conn.execute(
+                                    text("""
+                                        SELECT empresa_id, perfil, senha FROM usuarios 
+                                        WHERE LOWER(TRIM(login)) = LOWER(TRIM(:u))
+                                    """), 
+                                    {"u": user_input}
+                                ).fetchone()
+                                
+                            if usuario and usuario[2].strip() == pw_input:
+                                st.session_state["logado"] = True
+                                st.session_state["empresa"] = usuario[0]
+                                st.session_state["perfil"] = usuario[1]
+                                st.session_state["usuario_ativo"] = user_input
+                                st.success("✅ Login efetuado com sucesso!")
+                                st.rerun()
+                            else:
+                                st.error("❌ Usuário ou senha incorretos.")
+                    else:
+                        st.warning("⚠️ Preencha todos os campos para acessar.")
+                        
+        elif aba == "Criar Conta":
+            with st.container(border=True):
+                st.markdown(f"<h4 style='color:{COR_BRONZE}'>🚀 7 Dias Grátis</h4>", unsafe_allow_html=True)
+                n_emp = st.text_input("Nome da Empresa").strip()
+                n_ema = st.text_input("E-mail Corporativo").lower().strip()
+                n_sen = st.text_input("Senha", type="password").strip()
+                
+                if st.button("Criar minha conta agora", use_container_width=True, type="primary"):
+                    if n_emp and n_ema and n_sen:
+                        try:
+                            engine = get_engine()
+                            inicializar_banco()
+                            expira = datetime.now().date() + timedelta(days=7)
+                            with engine.connect() as conn:
+                                conn.execute(text("INSERT INTO empresa (nome, email, senha, data_expiracao) VALUES (:n, :e, :s, :d)"), {"n": n_emp, "e": n_ema, "s": n_sen, "d": expira})
+                                conn.commit()
+                            st.success("✅ Conta criada! Agora faça login na aba 'Acessar'.")
+                        except Exception as e:
+                            st.error("Este e-mail já está cadastrado.")
+                    else:
+                        st.warning("Preencha todos os campos.")
+
+# ==================================================
+# 2. AMBIENTE LOGADO (Aparece se st.session_state["logado"] == True)
+# ==================================================
 else:
     engine = get_engine()
     inicializar_banco()
-    emp_id = st.session_state["empresa"]
-    usuario_ativo = st.session_state.get("usuario_ativo","")
-else:
-    engine = get_engine(); inicializar_banco()
     emp_id = st.session_state["empresa"] 
     usuario_ativo = st.session_state.get("usuario_ativo", "")
     
+    # Validação de Banner de Assinatura para Administradores comuns
     if st.session_state["perfil"] == "admin" and usuario_ativo != "bruno":
         with engine.connect() as conn:
             dados_exp = conn.execute(text("SELECT data_expiracao, status_assinatura FROM empresa WHERE nome = :n"), {"n": emp_id}).fetchone()
@@ -473,15 +572,15 @@ else:
                     if st.session_state.get("show_pay_banner"):
                         exibir_painel_pagamento_pro("banner")
     
+    # Definição de Menus com base nos Perfis de Acesso
     if st.session_state["perfil"] == "motorista":
         opcoes = ["✍️ Abrir Solicitação", "📜 Status"]
     else:
-        # 1. A lista padrão para os outros Admins NÃO possui a equipe
         opcoes = ["📅 Agenda Principal", "📋 Cadastro Direto", "📥 Chamados Oficina", "⏳ OSs Pendentes", "✅ OSs Concluídas", "📊 Indicadores", "📖 Manual do Sistema"]
         
-        # 2. A aba só é injetada na lista se for o seu usuário master logado
+        # Injeção dinâmica de abas exclusivas para o seu usuário master
         if usuario_ativo == "bruno":
-            opcoes.insert(6, "👥 Minha Equipe")  # Encaixa exatamente na posição antiga
+            opcoes.insert(6, "👥 Minha Equipe")
             opcoes.append("👑 Gestão Master")
 
     if "opcao_selecionada" not in st.session_state or st.session_state.opcao_selecionada not in opcoes:
@@ -494,7 +593,7 @@ else:
         st.session_state.opcao_selecionada = target
         st.session_state.radio_key += 1 
 
-    # 1. BARRA LATERAL
+    # --- MONTAGEM DA SIDEBAR ---
     with st.sidebar:
         _, col_img, _ = st.columns([0.05, 0.9, 0.05])
         with col_img:
@@ -522,14 +621,18 @@ else:
             st.session_state["logado"] = False
             st.rerun()
 
-    # 2. BOTÕES DE ABA NO TOPO
+    # --- BOTÕES DE NAVEGAÇÃO DE ABA NO TOPO ---
     cols = st.columns(len(opcoes))
     for i, nome in enumerate(opcoes):
         eh_ativo = nome == st.session_state.opcao_selecionada
-        if cols[i].button(nome, key=f"btn_tab_{i}", use_container_width=True, 
-                          type="primary" if eh_ativo else "secondary",
-                          on_click=set_nav, args=(nome,)):
-            pass
+        cols[i].button(
+            nome, 
+            key=f"btn_tab_{i}", 
+            use_container_width=True, 
+            type="primary" if eh_ativo else "secondary",
+            on_click=set_nav, 
+            args=(nome,)
+        )
 
     st.divider()
     aba_ativa = st.session_state.opcao_selecionada
