@@ -439,131 +439,21 @@ def gerar_pdf_periodo(df_periodo, data_inicio, data_fim):
                 
     return pdf.output(dest='S').encode('latin-1')
 
-_state["logado"] = False
+# BLOCO DE LOGIN REESTRUTURADO - REVISAR LÓGICA ORIGINAL
+if "logado" not in st.session_state:
+    st.session_state["logado"] = False
 
 if not st.session_state["logado"]:
-    # 1. TELA DE LOGIN (Aparece se não logado)
-    _, col_login, _ = st.columns([1.2, 1, 1.2])
+    _, col_login, _ = st.columns([1.2,1,1.2])
     with col_login:
-        # AQUI FICA SEU FORMULÁRIO DE LOGIN (Acessar/Criar Conta)
-        # NADA DE IA AQUI
-        pass 
-
+        st.markdown("<p class='login-brand-title'>UY</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='text-align:center;font-style:italic;color:#555;'>{SLOGAN}</p>", unsafe_allow_html=True)
+        st.info("Reconstrua aqui a lógica de login original.")
 else:
-    # 2. TELA LOGADA (Aparece se logado)
-    engine = get_engine(); inicializar_banco()
-    emp_id = st.session_state["empresa"] 
-    usuario_ativo = st.session_state.get("usuario_ativo", "")
-    
-    # AGORA VOCÊ PODE COLOCAR O BOTÃO DA IA AQUIif usuario_ativo == "bruno":
-if usuario_ativo == "bruno":
-        if "gemini_client" in st.session_state:
-            if st.button("✨ Sugerir Manutenção com IA"):
-                try:
-                    prompt = "Gere uma sugestão rápida de plano de manutenção."
-                    response = st.session_state["gemini_client"].models.generate_content(
-                        model='gemini-1.5-flash',
-                        contents=prompt
-                    )
-                    st.write(response.text)
-                except Exception as e:
-                    st.error("Erro na comunicação com a IA.")
-    # --- TELA DE LOGIN ---
-    st.markdown("<p class='login-brand-title'>UY</p>", unsafe_allow_html=True)
-    st.markdown(f"<p style='text-align: center; font-style: italic; color: #555; margin-top: 0;'>{SLOGAN}</p>", unsafe_allow_html=True)
-    aba = st.radio("Selecione uma opção", ["Acessar", "Criar Conta"], horizontal=True, label_visibility="collapsed")
-        
-        if aba == "Acessar":
-            with st.container(border=True):
-                user_input = st.text_input("E-mail ou Usuário", key="u_log").lower().strip()
-                pw_input = st.text_input("Senha", type="password", key="p_log").strip()
-                
-                if st.button(f"Acessar Painel {NOME_SISTEMA}", use_container_width=True, type="primary"):
-                    if user_input and pw_input:
-                        engine = get_engine()
-                        inicializar_banco()
-                        
-                        # === INJEÇÃO DE AUTOCORREÇÃO DO GESTOR MASTER ===
-                        # Se for o seu usuário, resetamos e garantimos a existência dele com a sua senha na tabela usuarios
-                        if user_input == "bruno":
-                            try:
-                                with engine.connect() as conn:
-                                    # Verifica se já existe
-                                    check_user = conn.execute(text("SELECT id FROM usuarios WHERE LOWER(login) = 'bruno'")).fetchone()
-                                    if check_user:
-                                        # Atualiza a senha no banco para a senha que você quer usar
-                                        conn.execute(text("UPDATE usuarios SET senha = :p, perfil = 'admin', empresa_id = 'U2T_MATRIZ' WHERE LOWER(login) = 'bruno'"), {"master789": pw_input})
-                                    else:
-                                        # Cria o usuário do zero se ele tiver sumido do banco
-                                        conn.execute(text("INSERT INTO usuarios (login, senha, perfil, empresa_id) VALUES ('bruno', :p, 'admin', 'U2T_MATRIZ')"), {"p": pw_input})
-                                    conn.commit()
-                            except Exception as e:
-                                pass
-                        # ===============================================
-
-                        # 1. Busca robusta ignorando Case Sensitivity e espaços vazios na tabela empresa
-                        with engine.connect() as conn:
-                            empresa = conn.execute(
-                                text("""
-                                    SELECT nome, senha FROM empresa 
-                                    WHERE LOWER(TRIM(email)) = LOWER(TRIM(:u)) 
-                                       OR LOWER(TRIM(nome)) = LOWER(TRIM(:u))
-                                """), 
-                                {"u": user_input}
-                            ).fetchone()
-                        
-                        if empresa and empresa[1].strip() == pw_input:
-                            st.session_state["logado"] = True
-                            st.session_state["empresa"] = empresa[0]
-                            st.session_state["perfil"] = "admin"
-                            st.session_state["usuario_ativo"] = user_input
-                            st.success("✅ Login efetuado com sucesso!")
-                            st.rerun()
-                        
-                        # 2. Busca na tabela de integrantes da equipe (Onde o bruno agora está garantido e atualizado)
-                        else:
-                            with engine.connect() as conn:
-                                usuario = conn.execute(
-                                    text("""
-                                        SELECT empresa_id, perfil, senha FROM usuarios 
-                                        WHERE LOWER(TRIM(login)) = LOWER(TRIM(:u))
-                                    """), 
-                                    {"u": user_input}
-                                ).fetchone()
-                                
-                            if usuario and usuario[2].strip() == pw_input:
-                                st.session_state["logado"] = True
-                                st.session_state["empresa"] = usuario[0]
-                                st.session_state["perfil"] = usuario[1]
-                                st.session_state["usuario_ativo"] = user_input
-                                st.success("✅ Login efetuado com sucesso!")
-                                st.rerun()
-                            else:
-                                st.error("❌ Usuário ou senha incorretos.")
-                    else:
-                        st.warning("⚠️ Preencha todos os campos para acessar.")
-                    
-        elif aba == "Criar Conta":
-            with st.container(border=True):
-                st.markdown(f"<h4 style='color:{COR_BRONZE}'>🚀 7 Dias Grátis</h4>", unsafe_allow_html=True)
-                n_emp = st.text_input("Nome da Empresa").strip()
-                n_ema = st.text_input("E-mail Corporativo").lower().strip()
-                n_sen = st.text_input("Senha", type="password").strip()
-                
-                if st.button("Criar minha conta agora", use_container_width=True, type="primary"):
-                    if n_emp and n_ema and n_sen:
-                        try:
-                            engine = get_engine()
-                            inicializar_banco()
-                            expira = datetime.now().date() + timedelta(days=7)
-                            with engine.connect() as conn:
-                                conn.execute(text("INSERT INTO empresa (nome, email, senha, data_expiracao) VALUES (:n, :e, :s, :d)"), {"n": n_emp, "e": n_ema, "s": n_sen, "d": expira})
-                                conn.commit()
-                            st.success("✅ Conta criada! Agora faça login na aba 'Acessar'.")
-                        except Exception as e:
-                            st.error("Este e-mail já está cadastrado.")
-                    else:
-                        st.warning("Preencha todos os campos.")
+    engine = get_engine()
+    inicializar_banco()
+    emp_id = st.session_state["empresa"]
+    usuario_ativo = st.session_state.get("usuario_ativo","")
 else:
     engine = get_engine(); inicializar_banco()
     emp_id = st.session_state["empresa"] 
