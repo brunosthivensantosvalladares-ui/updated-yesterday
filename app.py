@@ -437,10 +437,7 @@ def gerar_pdf_periodo(df_periodo, data_inicio, data_fim):
                     pdf.cell(95, 6, str(row['descricao'])[:75], 1, 1, 'L')
                 pdf.ln(2)
                 
-pdf.ln(2)
-                
-    return pdf.output(dest='S').encode('latin-1') # <--- EXATAMENTE 4 ESPAÇOS AQUI!
-
+    return pdf.output(dest='S').encode('latin-1')
 # --- INICIALIZAÇÃO DE ESTADOS DE SESSÃO ---
 if "logado" not in st.session_state:
     st.session_state["logado"] = False
