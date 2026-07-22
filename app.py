@@ -5,8 +5,100 @@ from sqlalchemy import create_engine, text
 from datetime import datetime, time, timedelta
 from io import BytesIO
 from fpdf import FPDF
-from google import genai  # Importação corrigida
+from google import genai
 import time as time_module
+import requests
+
+# --- 1. CONFIGURAÇÕES E ESTILOS ---
+NOME_SISTEMA = "Updated Yesterday"
+SLOGAN = "Seu Controle. Nossa Prioridade."
+LOGO_URL = "https://i.postimg.cc/6Q7dyFgs/Gemini-Generated-Image.png"
+ORDEM_AREAS = ["Motorista", "Borracharia", "Mecânica", "Elétrica", "Chapeamento", "Limpeza"]
+LISTA_TURNOS = ["Não definido", "Dia", "Noite"]
+
+# --- 2. FUNÇÕES DE SUPORTE E BANCO ---
+@st.cache_resource
+def get_engine():
+    db_url = st.secrets.get("database_url") or os.environ.get("database_url")
+    if not db_url:
+        st.error("Erro crítico: Configuração do banco de dados não encontrada.")
+        st.stop()
+    return create_engine(db_url.replace("postgres://", "postgresql://", 1), pool_pre_ping=True)
+
+# --- BUSCA DE HISTÓRICO LOCAL (RAG DO MR. HALLEY) ---
+def buscar_historico_relevante(sintoma_motorista, emp_id):
+    """ Varre as OSs concluídas da empresa procurando termos semelhantes ao sintoma relatado. """
+    engine = get_engine()
+    palavras = [p for p in sintoma_motorista.lower().split() if len(p) > 3]
+    
+    if not palavras:
+        return "Nenhum histórico prévio encontrado para termos genéricos."
+        
+    condicoes = " OR ".join([f"LOWER(descricao) LIKE '%{p}%'" for p in palavras])
+    query = text(f"""
+        SELECT prefixo, descricao 
+        FROM tarefas 
+        WHERE empresa_id = :eid AND realizado = True AND ({condicoes})
+        ORDER BY id DESC LIMIT 3
+    """)
+    
+    try:
+        with engine.connect() as conn:
+            resultados = conn.execute(query, {"eid": str(emp_id)}).fetchall()
+        if not resultados:
+            return "Nenhuma Ordem de Serviço concluída anteriormente com sintomas parecidos."
+            
+        historico_formatado = ""
+        for row in resultados:
+            historico_formatado += f"- Veículo {row[0]}: {row[1]}\n"
+        return historico_formatado
+    except Exception as e:
+        return f"Sem histórico disponível ({e})."
+
+# --- CONSULTA AO CÉREBRO DO MR. HALLEY VIA INFERENCE API ---
+def triagem_mr_halley(sintoma, emp_id):
+    """ Combina a busca de histórico local (RAG) com o modelo Phi-3 para sugerir diagnósticos. """
+    historico = buscar_historico_relevante(sintoma, emp_id)
+    
+    token = st.secrets.get("HF_TOKEN") or os.environ.get("HF_TOKEN")
+    if not token:
+        return "⚠️ Chave 'HF_TOKEN' não configurada nos Secrets do Streamlit."
+
+    API_URL = "https://api-inference.huggingface.co/models/microsoft/Phi-3-mini-4k-instruct"
+    headers = {"Authorization": f"Bearer {token}"}
+
+    prompt = f"""<|system|>
+Você é o Mr. Halley, o assistente inteligente de manutenção do sistema Updated Yesterday.
+Seu papel é analisar o relato do motorista com base no histórico de Ordens de Serviço (OS) e sugerir um diagnóstico prévio direto, focado e técnico.
+
+Histórico relevante da frota:
+{historico}
+<|user|>
+Sintoma relatado pelo motorista: {sintoma}
+<|assistant|>"""
+
+    payload = {
+        "inputs": prompt,
+        "parameters": {
+            "max_new_tokens": 200,
+            "temperature": 0.3,
+            "return_full_text": False
+        }
+    }
+
+    try:
+        response = requests.post(API_URL, headers=headers, json=payload, timeout=20)
+        if response.status_code == 200:
+            resultado = response.json()
+            if isinstance(resultado, list) and len(resultado) > 0:
+                return resultado[0].get("generated_text", "").strip()
+            return "Diagnóstico concluído pelo Mr. Halley."
+        elif response.status_code == 503:
+            return "⚙️ O Mr. Halley está aquecendo os motores no servidor. Tente novamente em 20 segundos."
+        else:
+            return f"Erro na consulta ao Mr. Halley: Status {response.status_code}"
+    except Exception as e:
+        return f"Falha na comunicação com o Mr. Halley: {e}"
 
 # --- INICIALIZAÇÃO SEGURA DO CLIENTE ---
 if "GEMINI_API_KEY" in st.secrets:
@@ -719,18 +811,41 @@ else:
                                 conn.commit()
                             st.rerun()
 
-    elif aba_ativa == "✍️ Abrir Solicitação":
+elif aba_ativa == "✍️ Abrir Solicitação":
         st.subheader("✍️ Nova Solicitação de Manutenção")
-        st.info("💡 **Dica:** Informe o prefixo e detalhe o problem para que a oficina possa se programar.")
+        st.info("💡 **Dica:** Informe o prefixo e detalhe o problema para que o Mr. Halley e a oficina possam se programar.")
+        
         with st.form("f_ch", clear_on_submit=True):
-            p, d = st.text_input("Prefixo do Veículo"), st.text_area("Descrição do Problema")
-            if st.form_submit_button("Enviar para Oficina"):
+            p = st.text_input("Prefixo do Veículo")
+            d = st.text_area("Descrição do Problema")
+            
+            if st.form_submit_button("Enviar para Oficina com Triagem do Mr. Halley"):
                 if p and d:
                     nome_motorista = st.session_state.get("usuario_ativo", "Motorista")
+                    
+                    # 1. Mr. Halley realiza a triagem instantânea
+                    with st.spinner("🤖 Mr. Halley está consultando o histórico e gerando o diagnóstico..."):
+                        diag_mr_halley = triagem_mr_halley(d, emp_id)
+                    
+                    # 2. Junta o relato original com a nota técnica da IA para o PCM
+                    descricao_completa = f"{d} | [Nota do Mr. Halley: {diag_mr_halley}]"
+                    
+                    # 3. Salva no banco de chamados
                     with engine.connect() as conn:
-                        conn.execute(text("INSERT INTO chamados (motorista, prefixo, descricao, data_solicitacao, status, empresa_id) VALUES (:m, :p, :d, :dt, 'Pendente', :eid)"), {"m": nome_motorista, "p": p, "d": d, "dt": str(datetime.now().date()), "eid": emp_id})
+                        conn.execute(text("""
+                            INSERT INTO chamados (motorista, prefixo, descricao, data_solicitacao, status, empresa_id) 
+                            VALUES (:m, :p, :d, :dt, 'Pendente', :eid)
+                        """), {
+                            "m": nome_motorista, 
+                            "p": p, 
+                            "d": descricao_completa, 
+                            "dt": str(datetime.now().date()), 
+                            "eid": emp_id
+                        })
                         conn.commit()
-                        st.success("✅ Solicitação enviada com sucesso! Acompanhe o status na aba ao lado.")
+                    
+                    st.success("✅ Solicitação enviada com sucesso!")
+                    st.chat_message("assistant").markdown(f"**Análise do Mr. Halley:**\n{diag_mr_halley}")
 
     elif aba_ativa == "📜 Status":
         st.subheader("📜 Status dos Meus Veículos")
