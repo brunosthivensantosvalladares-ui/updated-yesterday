@@ -438,6 +438,47 @@ def gerar_pdf_periodo(df_periodo, data_inicio, data_fim):
                 pdf.ln(2)
                 
     return pdf.output(dest='S').encode('latin-1')
+# --- BUSCA DE HISTÓRICO PARA O MR. HALLEY (RAG LOCAL) ---
+def buscar_historico_relevante(sintoma_motorista, emp_id):
+    """
+    Varre as OSs concluídas da empresa procurando termos semelhantes ao sintoma relatado.
+    """
+    engine = get_engine()
+    
+    # Extrai palavras-chave relevantes (descarta palavras curtas como 'de', 'com', 'no')
+    palavras = [p for p in sintoma_motorista.lower().split() if len(p) > 3]
+    
+    if not palavras:
+        return "Nenhum histórico prévio encontrado para termos genéricos."
+        
+    # Monta a busca dinâmica por palavras no histórico de tarefas já concluídas
+    condicoes = " OR ".join([f"LOWER(descricao) LIKE '%{p}%'" for p in palavras])
+    
+    query = text(f"""
+        SELECT prefixo, descricao 
+        FROM tarefas 
+        WHERE empresa_id = :eid 
+          AND realizado = True 
+          AND ({condicoes})
+        ORDER BY id DESC
+        LIMIT 3
+    """)
+    
+    try:
+        with engine.connect() as conn:
+            resultados = conn.execute(query, {"eid": str(emp_id)}).fetchall()
+            
+        if not resultados:
+            return "Nenhuma Ordem de Serviço concluída anteriormente com sintomas parecidos."
+            
+        historico_formatado = ""
+        for row in resultados:
+            historico_formatado += f"- Veículo {row[0]}: {row[1]}\n"
+            
+        return historico_formatado
+    except Exception as e:
+        return f"Sem histórico disponível ({e})."
+
 # --- INICIALIZAÇÃO DE ESTADOS DE SESSÃO ---
 if "logado" not in st.session_state:
     st.session_state["logado"] = False
