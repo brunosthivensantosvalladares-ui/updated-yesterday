@@ -57,31 +57,23 @@ def buscar_historico_relevante(sintoma_motorista, emp_id):
 
 # --- CONSULTA AO CÉREBRO DO MR. HALLEY VIA INFERENCE API ---
 def triagem_mr_halley(sintoma, emp_id):
-    """ Combina a busca de histórico local (RAG) com o modelo Phi-3 para sugerir diagnósticos. """
     historico = buscar_historico_relevante(sintoma, emp_id)
     
     token = st.secrets.get("HF_TOKEN") or os.environ.get("HF_TOKEN")
     if not token:
-        return "⚠️ Chave 'HF_TOKEN' não configurada nos Secrets do Streamlit."
+        return "⚠️ Chave 'HF_TOKEN' não configurada."
 
     API_URL = "https://api-inference.huggingface.co/models/microsoft/Phi-3-mini-4k-instruct"
     headers = {"Authorization": f"Bearer {token}"}
 
-    prompt = f"""<|system|>
-Você é o Mr. Halley, o assistente inteligente de manutenção do sistema Updated Yesterday.
-Seu papel é analisar o relato do motorista com base no histórico de Ordens de Serviço (OS) e sugerir um diagnóstico prévio direto, focado e técnico.
-
-Histórico relevante da frota:
-{historico}
-<|user|>
-Sintoma relatado pelo motorista: {sintoma}
-<|assistant|>"""
+    # Prompt simplificado para evitar bugs de interpretação do modelo
+    prompt = f"Instrução: Você é o Mr. Halley, assistente de manutenção do Up 2 Today. Com base no histórico de manutenções parecidas: '{historico}', analise o novo problema relatado: '{sintoma}' e sugira o diagnóstico provável de forma curta e técnica.\nResposta do Mr. Halley:"
 
     payload = {
         "inputs": prompt,
         "parameters": {
-            "max_new_tokens": 200,
-            "temperature": 0.3,
+            "max_new_tokens": 150,
+            "temperature": 0.2,
             "return_full_text": False
         }
     }
@@ -91,14 +83,16 @@ Sintoma relatado pelo motorista: {sintoma}
         if response.status_code == 200:
             resultado = response.json()
             if isinstance(resultado, list) and len(resultado) > 0:
-                return resultado[0].get("generated_text", "").strip()
+                return resultado[0].get("generated_text", "").replace("Resposta do Mr. Halley:", "").strip()
+            elif isinstance(resultado, dict) and "generated_text" in resultado:
+                return resultado["generated_text"].strip()
             return "Diagnóstico concluído pelo Mr. Halley."
         elif response.status_code == 503:
-            return "⚙️ O Mr. Halley está aquecendo os motores no servidor. Tente novamente em 20 segundos."
+            return "⚙️ O Mr. Halley está carregando o histórico espacial no servidor. Aguarde 15 segundos e clique novamente."
         else:
-            return f"Erro na consulta ao Mr. Halley: Status {response.status_code}"
+            return f"O Mr. Halley encontrou uma instabilidade no sinal (Status {response.status_code})."
     except Exception as e:
-        return f"Falha na comunicação com o Mr. Halley: {e}"
+        return f"Falha na telemetria: {e}"
 
 # --- INICIALIZAÇÃO SEGURA DO CLIENTE ---
 if "GEMINI_API_KEY" in st.secrets:
