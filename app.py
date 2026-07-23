@@ -1239,7 +1239,7 @@ with st.form("f_ch", clear_on_submit=True):
                     conn.commit()
                 st.rerun()
 
- elif aba_ativa == "📥 Chamados Oficina":
+elif aba_ativa == "📥 Chamados Oficina":
         c_tit, c_refresh = st.columns([0.8, 0.2])
         with c_tit: 
             st.subheader("📥 Aprovação de Chamados")
@@ -1248,66 +1248,97 @@ with st.form("f_ch", clear_on_submit=True):
             st.markdown("""
                 ### 📥 Guia Rápido - Chamados
                 1. **Triagem:** Veja o que os motoristas relataram. 
-                2. **Planejamento:** Preencha o Executor e a Data Programada diretamente na tabela.
-                3. **Aprovação:** Marque a caixa **Aprovar?** e clique no botão **Processar Agendamentos**. 
-                *O serviço sairá desta lista e irá direto para a Agenda Principal.*
+                2. **Aprovação:** Marque a caixa **Aprovar?** e o Mr. Halley dará o diagnóstico na hora!
+                3. **Planejamento:** Defina o Executor e a Área com base no parecer da IA.
+                4. **Finalizar:** Clique em **Processar Agendamentos**.
             """)
             
         with c_refresh:
             if st.button("🔄 Atualizar Lista", use_container_width=True, key="btn_refresh_chamados"):
                 if 'df_ap_work' in st.session_state: 
                     del st.session_state.df_ap_work
+                if 'analise_imediata_halley' in st.session_state:
+                    del st.session_state.analise_imediata_halley
                 st.rerun()
             
-        st.info("💡 Preencha os campos e marque 'Aprovar' na última coluna para enviar à agenda.")
-        
         df_p = pd.read_sql(text("SELECT id, data_solicitacao, motorista, prefixo, descricao FROM chamados WHERE status = 'Pendente' AND empresa_id = :eid ORDER BY id DESC"), engine, params={"eid": emp_id})
         
         if not df_p.empty:
             if 'df_ap_work' not in st.session_state:
                 df_p['Executor'], df_p['Area_Destino'], df_p['Data_Programada'], df_p['Inicio'], df_p['Fim'], df_p['Aprovar'] = "", "Mecânica", datetime.now().date(), "00:00", "00:00", False
                 st.session_state.df_ap_work = df_p
-                
-            ed_c = st.data_editor(st.session_state.df_ap_work, hide_index=True, use_container_width=True, column_config={"data_solicitacao": "Aberto em", "motorista": "Solicitante", "Data_Programada": st.column_config.DateColumn("Data Programada"), "Area_Destino": st.column_config.SelectboxColumn("Área", options=ORDEM_AREAS), "Aprovar": st.column_config.CheckboxColumn("Aprovar?"), "id": None}, key="editor_chamados")
             
-            # --- 🤖 CENTRAL DO MR. HALLEY ---
-            st.markdown("---")
-            st.markdown("### 🤖 Consultar Telemetria do Mr. Halley")
-            
-            # Cria opções limpas para o PCM escolher qual chamado quer que a IA analise
-            opcoes_chamados = {f"ID {row['id']} - Veículo {row['prefixo']}: {row['descricao'][:30]}...": row for _, row in df_p.iterrows()}
-            chamado_selecionado = st.selectbox("Selecione um chamado para triagem da IA:", list(opcoes_chamados.keys()), key="sb_mr_halley")
-            
-            if st.button("🤖 Solicitar Análise ao Mr. Halley", type="secondary", use_container_width=True):
-                dados_chamado = opcoes_chamados[chamado_selecionado]
-                with st.spinner("Mr. Halley está consultando os prontuários da biosfera... ⚙️"):
-                    diagnostico = triagem_mr_halley(dados_chamado['descricao'], emp_id)
-                    st.session_state["resultado_mr_halley"] = diagnostico
-            
-            # Mostra o balão de chat se a resposta existir
-            if "resultado_mr_halley" in st.session_state:
+            # --- LÓGICA DE DETECÇÃO EM TEMPO REAL ---
+            # Se o usuário interagiu com o editor, descobrimos qual linha foi marcada
+            if "editor_chamados" in st.session_state and st.session_state.editor_chamados.get("edited_rows"):
+                alteracoes = st.session_state.editor_chamados["edited_rows"]
+                for c_idx, campos in alteracoes.items():
+                    # Se a caixinha 'Aprovar' mudou para True
+                    if campos.get("Aprovar") is True:
+                        # Mapeia o índice do editor de volta para o DataFrame de trabalho
+                        idx_real = int(c_idx)
+                        if idx_real < len(st.session_state.df_ap_work):
+                            dados_linha = st.session_state.df_ap_work.iloc[idx_real]
+                            id_chamado = dados_linha['id']
+                            
+                            # Evita re-chamar a IA se já avaliou esse mesmo chamado neste clique
+                            if st.session_state.get("last_analised_id") != id_chamado:
+                                with st.spinner("🤖 Mr. Halley analisando prontuários para esta seleção..."):
+                                    diag = triagem_mr_halley(dados_linha['descricao'], emp_id)
+                                    st.session_state["analise_imediata_halley"] = {
+                                        "veiculo": dados_linha['prefixo'],
+                                        "relato": dados_linha['descricao'],
+                                        "parecer": diag
+                                    }
+                                    st.session_state["last_analised_id"] = id_chamado
+
+            # --- EXIBIÇÃO DO CHAT DO MR. HALLEY EM TEMPO REAL ---
+            if "analise_imediata_halley" in st.session_state:
+                res = st.session_state["analise_imediata_halley"]
                 with st.chat_message("assistant", avatar="🤖"):
-                    st.markdown(f"**Mr. Halley Informa:**\n\n{st.session_state['resultado_mr_halley']}")
-            st.markdown("---")
-            # ---------------------------------
+                    st.markdown(f"### 🤖 Telemetria do Mr. Halley\n\n**Veículo {res['veiculo']}:**\n* Sintoma: {res['relato']}\n* **Parecer Técnico:** {res['parecer']}")
+                st.markdown("---")
+            
+            # Renderiza o editor de dados normalmente
+            ed_c = st.data_editor(
+                st.session_state.df_ap_work, 
+                hide_index=True, 
+                use_container_width=True, 
+                column_config={
+                    "data_solicitacao": "Aberto em", 
+                    "motorista": "Solicitante", 
+                    "Data_Programada": st.column_config.DateColumn("Data Programada"), 
+                    "Area_Destino": st.column_config.SelectboxColumn("Área", options=ORDEM_AREAS), 
+                    "Aprovar": st.column_config.CheckboxColumn("Aprovar?"), 
+                    "id": None
+                }, 
+                key="editor_chamados"
+            )
             
             if st.button("Processar Agendamentos", type="primary", key="btn_proc_agendamentos"):
+                # Captura o estado atualizado do editor antes de salvar
                 selecionados = ed_c[ed_c['Aprovar'] == True]
+                
                 if not selecionados.empty:
                     with engine.connect() as conn:
                         for _, r in selecionados.iterrows():
                             v_os = obter_proxima_os(engine, emp_id)
-                            conn.execute(text("INSERT INTO tarefas (data, executor, prefixo, inicio_disp, fim_disp, descricao, area, turno, id_chamado, origem, empresa_id, numero_os) VALUES (:dt, :ex, :pr, :ti, :tf, :ds, :ar, 'Não definido', :ic, 'Chamado', :eid, :nos)"), 
-                                         {"dt": str(r['Data_Programada']), "ex": r['Executor'], "pr": r['prefixo'], "ti": r['Inicio'], "tf": r['Fim'], "ds": r['descricao'], "ar": r['Area_Destino'], "ic": r['id'], "eid": emp_id, "nos": v_os})
+                            conn.execute(
+                                text("INSERT INTO tarefas (data, executor, prefixo, inicio_disp, fim_disp, descricao, area, turno, id_chamado, origem, empresa_id, numero_os) VALUES (:dt, :ex, :pr, :ti, :tf, :ds, :ar, 'Não definido', :ic, 'Chamado', :eid, :nos)"), 
+                                {"dt": str(r['Data_Programada']), "ex": r['Executor'], "pr": r['prefixo'], "ti": r['Inicio'], "tf": r['Fim'], "ds": r['descricao'], "ar": r['Area_Destino'], "ic": r['id'], "eid": emp_id, "nos": v_os}
+                            )
                             conn.execute(text("UPDATE chamados SET status = 'Agendado' WHERE id = :id"), {"id": r['id']})
                         conn.commit()
                     
-                    # Limpa a resposta antiga da IA após processar para não bugar no próximo chamado
-                    if "resultado_mr_halley" in st.session_state:
-                        del st.session_state["resultado_mr_halley"]
+                    # Limpa os estados da IA para a próxima rodada
+                    if 'df_ap_work' in st.session_state: del st.session_state.df_ap_work
+                    if 'analise_imediata_halley' in st.session_state: del st.session_state.analise_imediata_halley
+                    if 'last_analised_id' in st.session_state: del st.session_state.last_analised_id
                         
-                    st.success("✅ Agendamentos processados!")
+                    st.success("✅ Agendamentos processados e enviados à Agenda Principal!")
                     st.rerun()
+                else:
+                    st.warning("⚠️ Selecione ao menos um chamado na coluna 'Aprovar?' antes de processar.")
         else: 
             st.info("Nenhum chamado pendente no momento.")
 
