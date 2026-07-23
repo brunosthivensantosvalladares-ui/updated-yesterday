@@ -818,46 +818,25 @@ elif aba_ativa == "✍️ Abrir Solicitação":
         # Obtém o ID da empresa ativo com segurança
         emp_id = st.session_state.get("empresa", "U2T_MATRIZ")
         
-        with st.form("f_ch", clear_on_submit=True):
-            p = st.text_input("Prefixo do Veículo")
-            d = st.text_area("Descrição do Problema")
+with st.form("f_ch", clear_on_submit=True):
+    p = st.text_input("Prefixo do Veículo")
+    d = st.text_area("Descrição do Problema")
+    
+    if st.form_submit_button("Enviar Solicitação"):
+        if p and d:
+            nome_motorista = st.session_state.get("usuario_ativo", "Motorista")
+            emp_id = st.session_state.get("empresa", "U2T_MATRIZ")
             
-            # Botão oficial do formulário
-            submetido = st.form_submit_button("Enviar para Oficina com Triagem do Mr. Halley")
-            
-            if submetido:
-                if p and d:
-                    nome_motorista = st.session_state.get("usuario_ativo", "Motorista")
-                    
-                    # 1. O Mr. Halley acorda e faz a busca inteligente + IA
-                    with st.spinner("🤖 Mr. Halley está a consultar o histórico e a gerar o diagnóstico..."):
-                        diag_mr_halley = triagem_mr_halley(d, emp_id)
-                    
-                    # 2. Junção crucial do relato original com o parecer do Mr. Halley
-                    descricao_completa = f"{d} | [Nota do Mr. Halley: {diag_mr_halley}]"
-                    
-                    # 3. Inserção segura no Banco de Dados
-                    try:
-                        engine = get_engine()
-                        with engine.connect() as conn:
-                            conn.execute(text("""
-                                INSERT INTO chamados (motorista, prefixo, descricao, data_solicitacao, status, empresa_id) 
-                                VALUES (:m, :p, :d, :dt, 'Pendente', :eid)
-                            """), {
-                                "m": nome_motorista, 
-                                "p": p, 
-                                "d": descricao_completa, # Usa a descrição com a nota da IA!
-                                "dt": str(datetime.now().date()), 
-                                "eid": str(emp_id)
-                            })
-                            conn.commit()
-                        
-                        st.success("✅ Solicitação enviada com sucesso!")
-                        st.chat_message("assistant").markdown(f"**Análise instantânea do Mr. Halley:**\n{diag_mr_halley}")
-                    except Exception as err:
-                        st.error(f"Erro ao gravar o chamado: {err}")
-                else:
-                    st.warning("⚠️ Por favor, preencha o Prefixo e a Descrição do problema.")
+            with engine.connect() as conn:
+                conn.execute(text("""
+                    INSERT INTO chamados (motorista, prefixo, descricao, data_solicitacao, status, empresa_id) 
+                    VALUES (:m, :p, :d, :dt, 'Pendente', :eid)
+                """), {
+                    "m": nome_motorista, "p": p, "d": d, 
+                    "dt": str(datetime.now().date()), "eid": str(emp_id)
+                })
+                conn.commit()
+            st.success("✅ Solicitação enviada com sucesso!")
 
     elif aba_ativa == "📜 Status":
         st.subheader("📜 Status dos Meus Veículos")
