@@ -1245,7 +1245,7 @@ with st.form("f_ch", clear_on_submit=True):
                     conn.commit()
                 st.rerun()
 
-    elif aba_ativa == "📥 Chamados Oficina":
+ elif aba_ativa == "📥 Chamados Oficina":
         c_tit, c_refresh = st.columns([0.8, 0.2])
         with c_tit: 
             st.subheader("📥 Aprovação de Chamados")
@@ -1276,6 +1276,27 @@ with st.form("f_ch", clear_on_submit=True):
                 
             ed_c = st.data_editor(st.session_state.df_ap_work, hide_index=True, use_container_width=True, column_config={"data_solicitacao": "Aberto em", "motorista": "Solicitante", "Data_Programada": st.column_config.DateColumn("Data Programada"), "Area_Destino": st.column_config.SelectboxColumn("Área", options=ORDEM_AREAS), "Aprovar": st.column_config.CheckboxColumn("Aprovar?"), "id": None}, key="editor_chamados")
             
+            # --- 🤖 CENTRAL DO MR. HALLEY ---
+            st.markdown("---")
+            st.markdown("### 🤖 Consultar Telemetria do Mr. Halley")
+            
+            # Cria opções limpas para o PCM escolher qual chamado quer que a IA analise
+            opcoes_chamados = {f"ID {row['id']} - Veículo {row['prefixo']}: {row['descricao'][:30]}...": row for _, row in df_p.iterrows()}
+            chamado_selecionado = st.selectbox("Selecione um chamado para triagem da IA:", list(opcoes_chamados.keys()), key="sb_mr_halley")
+            
+            if st.button("🤖 Solicitar Análise ao Mr. Halley", type="secondary", use_container_width=True):
+                dados_chamado = opcoes_chamados[chamado_selecionado]
+                with st.spinner("Mr. Halley está consultando os prontuários da biosfera... ⚙️"):
+                    diagnostico = triagem_mr_halley(dados_chamado['descricao'], emp_id)
+                    st.session_state["resultado_mr_halley"] = diagnostico
+            
+            # Mostra o balão de chat se a resposta existir
+            if "resultado_mr_halley" in st.session_state:
+                with st.chat_message("assistant", avatar="🤖"):
+                    st.markdown(f"**Mr. Halley Informa:**\n\n{st.session_state['resultado_mr_halley']}")
+            st.markdown("---")
+            # ---------------------------------
+            
             if st.button("Processar Agendamentos", type="primary", key="btn_proc_agendamentos"):
                 selecionados = ed_c[ed_c['Aprovar'] == True]
                 if not selecionados.empty:
@@ -1286,6 +1307,11 @@ with st.form("f_ch", clear_on_submit=True):
                                          {"dt": str(r['Data_Programada']), "ex": r['Executor'], "pr": r['prefixo'], "ti": r['Inicio'], "tf": r['Fim'], "ds": r['descricao'], "ar": r['Area_Destino'], "ic": r['id'], "eid": emp_id, "nos": v_os})
                             conn.execute(text("UPDATE chamados SET status = 'Agendado' WHERE id = :id"), {"id": r['id']})
                         conn.commit()
+                    
+                    # Limpa a resposta antiga da IA após processar para não bugar no próximo chamado
+                    if "resultado_mr_halley" in st.session_state:
+                        del st.session_state["resultado_mr_halley"]
+                        
                     st.success("✅ Agendamentos processados!")
                     st.rerun()
         else: 
