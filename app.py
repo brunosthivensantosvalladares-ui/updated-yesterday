@@ -1188,10 +1188,14 @@ else:
                                     }
                                     st.session_state["last_analised_id"] = id_chamado
 
-            # --- EXIBIÇÃO DO CHAT DO MR. HALLEY EM TEMPO REAL ---
+# --- EXIBIÇÃO DO CHAT DO MR. HALLEY EM TEMPO REAL ---
             if "analise_imediata_halley" in st.session_state:
                 res = st.session_state["analise_imediata_halley"]
-                with st.chat_message("assistant", avatar="🤖"):
+                
+                # URL da imagem oficial do Mr. Halley
+                URL_AVATAR_HALLEY = "https://i.postimg.cc/6Q7dyFgs/Gemini-Generated-Image.png"
+                
+                with st.chat_message("assistant", avatar=URL_AVATAR_HALLEY):
                     st.markdown(f"### 🤖 Telemetria do Mr. Halley\n\n**Veículo {res['veiculo']}:**\n* Sintoma: {res['relato']}\n* **Parecer Técnico:** {res['parecer']}")
                 st.markdown("---")
             
