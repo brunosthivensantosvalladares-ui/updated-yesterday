@@ -53,87 +53,74 @@ def get_engine():
         st.stop()
     return create_engine(db_url.replace("postgres://", "postgresql://", 1), pool_pre_ping=True)
 
-# --- BUSCA SEMÂNTICA POR SIGNIFICADO (NÃO POR PALAVRA-CHAVE) ---
-def buscar_historico_por_significado(sintoma_motorista, emp_id):
+# --- BUSCA NO BANCO POR TERMOS DO SINTOMA ---
+def buscar_historico_relevante(sintoma_motorista, emp_id):
     engine = get_engine()
+    sintoma_limpo = sintoma_motorista.lower().strip()
     
-    # 1. Busca as últimas OSs concluídas da empresa para comparar significado
-    query = text("""
+    # Palavras irrelevantes que não definem o defeito
+    stop_words = {'carro', 'veiculo', 'caminhao', 'esta', 'estao', 'muita', 'muito', 'problema', 'com', 'para', 'nao', 'sem', 'lado', 'pro'}
+    palavras = [p for p in sintoma_limpo.split() if len(p) > 3 and p not in stop_words]
+    
+    if not palavras:
+        return []
+
+    condicoes = " OR ".join([f"LOWER(descricao) LIKE '%{p}%'" for p in palavras])
+    
+    query = text(f"""
         SELECT descricao 
         FROM tarefas 
-        WHERE empresa_id = :eid AND realizado = True 
-        ORDER BY id DESC LIMIT 15
+        WHERE empresa_id = :eid AND realizado = True AND ({condicoes})
+        ORDER BY id DESC LIMIT 5
     """)
     
     try:
         with engine.connect() as conn:
             resultados = conn.execute(query, {"eid": str(emp_id)}).fetchall()
-        
+            
         if not resultados:
             return []
-            
-        todas_oss = [str(r[0]).strip() for r in resultados]
-        
-        # 2. Se a IA estiver ativa, ela faz o filtro de similaridade semântica
-        gemini_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
-        if gemini_key:
-            try:
-                genai.configure(api_key=gemini_key)
-                model = genai.GenerativeModel('gemini-1.5-flash')
-                
-                prompt = f"""
-Você é um especialista em triagem de manutenção automotiva.
-Análise de Sintoma Atual: '{sintoma_motorista}'
 
-Lista de Ordens de Serviço (OS) passadas no banco:
-{todas_oss}
-
-Sua tarefa:
-Selecione APENAS as OSs passadas que possuem o MESMO SIGNIFICADO TÉCNICO ou SINTOMA SIMILAR/SINÔNIMO ao sintoma atual.
-Descarte qualquer OS que cite palavras coincidentes mas trate de sistemas diferentes (ex: se o problema é direção puxando, descarte buzina, rádio ou pneu furado).
-
-Retorne apenas o texto da OS equivalente encontrada. Se nenhuma tiver o mesmo significado técnico, responda apenas: "NENHUMA".
-"""
-                response = model.generate_content(prompt)
-                txt_resp = response.text.strip()
-                
-                if "NENHUMA" in txt_resp:
-                    return []
-                return [txt_resp]
-            except Exception:
-                pass
-
-        return todas_oss[:2]
+        return [str(r[0]).strip() for r in resultados]
     except Exception:
         return []
 
-# --- TRIAGEM DO MR. HALLEY ---
+# --- TRIAGEM DO MR. HALLEY (SÍNTESE DINÂMICA VIA IA) ---
 def triagem_mr_halley(sintoma, emp_id):
-    historico_relevante = buscar_historico_por_significado(sintoma, emp_id)
+    historicos = buscar_historico_relevante(sintoma, emp_id)
     PREAMBULO = "Baseado no histórico"
     
-    # Se a avaliação de significado não encontrou nenhuma falha sinônima
-    if not historico_relevante:
+    # 1. Se a consulta SQL não encontrou nenhuma OS relacionada
+    if not historicos:
         return f"{PREAMBULO} da frota, não há registros anteriores para este sintoma."
         
     gemini_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
     
+    # 2. Avaliação e síntese inteligente via Gemini
     if gemini_key:
         try:
             genai.configure(api_key=gemini_key)
             model = genai.GenerativeModel('gemini-1.5-flash')
             
+            historico_formatado = "\n".join([f"- {h}" for h in historicos])
+            
             prompt = f"""
-Você é o assistente técnico Mr. Halley.
-Com base no histórico equivalente encontrado:
-{historico_relevante[0]}
+Você é o assistente técnico de manutenção Mr. Halley.
+Sua tarefa é analisar o sintoma atual de um veículo e verificar se existe um histórico com o MESMO defeito ou defeito equivalente.
 
-Sintoma atual: '{sintoma}'
+Sintoma Atual: "{sintoma}"
 
-Gere a recomendação técnica final:
-1. Inicie obrigatoriamente com "Baseado no histórico".
-2. Use VERBOS NO INFINITIVO para indicar a ação técnica recomendada.
-3. Máximo 1 frase curta e objetiva.
+OSs Encontradas no Banco:
+{historico_formatado}
+
+INSTRUÇÕES OBRIGATÓRIAS:
+1. Avalie se alguma das OSs trata do MESMO defeito/sintoma (ou equivalente/sinônimo).
+2. Se NENHUMA OS tratar do mesmo defeito (ou se forem apenas peças secundárias sem relação, como buzina para direção), responda EXATAMENTE:
+   "Baseado no histórico da frota, não há registros anteriores para este sintoma."
+3. Se HOUVER uma OS com o mesmo defeito:
+   - Inicie OBRIGATORIAMENTE com "Baseado no histórico".
+   - Escreva 1 frase curta usando VERBOS NO INFINITIVO indicando a ação técnica recomendada (ex: "recomenda-se efetuar...", "recomenda-se realizar...").
+   - Ignore serviços não relacionados que foram feitos na mesma OS.
 """
             response = model.generate_content(prompt)
             txt = response.text.strip()
@@ -141,7 +128,12 @@ Gere a recomendação técnica final:
         except Exception:
             pass
 
-    return f"{PREAMBULO} local da frota, recomenda-se a verificação do sistema associado."
+    # 3. Fallback Local (Apenas se a API falhar): Exibe a execução da OS encontrada sem frases genéricas fixas
+    acao_os = historicos[0]
+    if "Execução:" in acao_os:
+        acao_os = acao_os.split("Execução:")[-1].split(";")[0].strip()
+        
+    return f"{PREAMBULO} local da frota, recomenda-se verificar: {acao_os}"
     
 # --- INICIALIZAÇÃO SEGURA DO CLIENTE ---
 if "GEMINI_API_KEY" in st.secrets:
