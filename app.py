@@ -25,13 +25,21 @@ def get_engine():
         st.stop()
     return create_engine(db_url.replace("postgres://", "postgresql://", 1), pool_pre_ping=True)
 
-# --- BUSCA DE HISTÓRICO RETORNANDO TEXTO PURO DO BANCO ---
+# --- BUSCA DE HISTÓRICO FILTRADA (SEM PALAVRAS GENÉRICAS DE POSIÇÃO) ---
 def buscar_historico_relevante(sintoma_motorista, emp_id):
     engine = get_engine()
     
-    palavras_ignoradas = {'carro', 'veiculo', 'caminhao', 'saindo', 'muita', 'muito', 'fazer', 'esta', 'estao', 'direito', 'problema', 'com', 'para', 'nao', 'sem', 'dificuldade'}
+    # Palavras ignoradas expandidas (inclui direções e conectivos comuns)
+    palavras_ignoradas = {
+        'carro', 'veiculo', 'caminhao', 'saindo', 'muita', 'muito', 'fazer', 
+        'esta', 'estao', 'direito', 'direita', 'esquerdo', 'esquerda', 'lado', 
+        'problema', 'com', 'para', 'nao', 'sem', 'dificuldade', 'puxando', 'pro'
+    }
+    
+    # Filtra apenas palavras com mais de 3 letras que sejam termos mecânicos reais (ex: direção, alinhamento)
     palavras = [p for p in sintoma_motorista.lower().split() if len(p) > 3 and p not in palavras_ignoradas]
     
+    # Se só sobrou palavras de posição/genéricas, assume diretamente que não há histórico específico
     if not palavras:
         return []
         
@@ -55,19 +63,19 @@ def buscar_historico_relevante(sintoma_motorista, emp_id):
     except Exception:
         return []
 
-# --- TRIAGEM DO MR. HALLEY (RESPOSTA PADRONIZADA QUANDO SEM HISTÓRICO) ---
+# --- TRIAGEM DO MR. HALLEY (RESPOSTA ULTRA CURTA E LIMPA) ---
 def triagem_mr_halley(sintoma, emp_id):
     historico_lista = buscar_historico_relevante(sintoma, emp_id)
     PREAMBULO = "Baseado no histórico"
     
-    # 1. Resposta padrão combinada quando NÃO HÁ histórico no banco
+    # 1. Quando NÃO HÁ histórico específico para as palavras mecânicas do sintoma
     if not historico_lista:
         return f"{PREAMBULO} da frota, não há registros anteriores para este sintoma."
         
     gemini_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
     historico_texto = "\n".join([f"- {item}" for item in historico_lista])
     
-    # 2. Se a IA estiver ativa, sintetiza o histórico real encontrado
+    # 2. Processamento com IA (se disponível)
     if gemini_key:
         try:
             genai.configure(api_key=gemini_key)
@@ -75,13 +83,13 @@ def triagem_mr_halley(sintoma, emp_id):
             prompt = f"""
 Você é o Mr. Halley, assistente de manutenção do Updated Yesterday.
 Sintoma atual: {sintoma}
-Histórico encontrado no banco:
+Histórico retornado do banco:
 {historico_texto}
 
-Regras:
-1. Comece obrigatoriamente com "Baseado no histórico".
-2. Seja ultra conciso (máximo 12 palavras / 1 frase).
-3. Resuma exatamente a solução técnica aplicada no histórico fornecido.
+Instruções RÍGIDAS:
+1. Inicie com "Baseado no histórico".
+2. Limite a resposta a NO MÁXIMO 10 PALAVRAS.
+3. Resuma estritamente a ação aplicada no histórico.
 """
             response = model.generate_content(prompt)
             txt = response.text.strip()
@@ -89,7 +97,7 @@ Regras:
         except Exception:
             pass
 
-    # 3. Fallback dinâmico para quando HÁ histórico, mas sem IA
+    # 3. Fallback Local Ultra Curto (Sintetiza apenas a primeira ação e limita o texto)
     solucoes_limpas = []
     for item in historico_lista:
         txt = item
@@ -102,8 +110,11 @@ Regras:
             solucoes_limpas.append(txt)
             
     if solucoes_limpas:
-        resumo_final = " | ".join(solucoes_limpas[:2])
-        return f"{PREAMBULO} local das OSs: {resumo_final}"
+        # Pega apenas a 1ª ação encontrada e corta em no máximo 50 caracteres
+        primeira_acao = solucoes_limpas[0]
+        if len(primeira_acao) > 50:
+            primeira_acao = primeira_acao[:50].rstrip() + "..."
+        return f"{PREAMBULO} local das OSs: {primeira_acao}"
         
     return f"{PREAMBULO} da frota, não há registros anteriores para este sintoma."
     
