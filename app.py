@@ -1188,25 +1188,25 @@ else:
                                     }
                                     st.session_state["last_analised_id"] = id_chamado
 
-# --- EXIBIÇÃO DO CHAT DO MR. HALLEY EM TEMPO REAL (ESTILO CUSTOMIZADO) ---
+# --- EXIBIÇÃO DO CHAT DO MR. HALLEY EM TEMPO REAL (AJUSTE DE TAMANHO E CORES) ---
             if "analise_imediata_halley" in st.session_state:
                 res = st.session_state["analise_imediata_halley"]
                 
-                # URL atualizada do mascote oficial Mr. Halley transparente
+                # URL do mascote oficial Mr. Halley transparente
                 URL_AVATAR_HALLEY = "https://i.postimg.cc/5tBtrL6C/Whats-App-Image-2026-07-23-at-22-35-53.png"
                 
-                # Estruturação do layout com a paleta de cores da empresa (#4A3C31 e #C5A059)
+                # HTML com fundo do balão claro (#FFFFFF) e mascote ampliado (110px)
                 html_layout = f"""
-                <div style="display: flex; align-items: flex-start; justify-content: flex-end; margin: 20px 0; font-family: sans-serif;">
-                    <div style="background-color: #4A3C31; border: 2px solid #C5A059; border-radius: 15px; padding: 15px; margin-right: 15px; max-width: 75%; color: #FFFFFF; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.2);">
-                        <strong style="color: #C5A059; font-size: 1.1em; display: block; margin-bottom: 8px;">🤖 Telemetria do Mr. Halley</strong>
-                        <span style="color: #E2DFD2; font-size: 0.85em; display: block; margin-bottom: 5px; opacity: 0.8;">Veículo: {res['veiculo']}</span>
-                        <p style="margin: 0; font-size: 0.95em; line-height: 1.4; color: #FFFFFF;">
-                            <strong>Parecer Técnico:</strong> {res['parecer']}
+                <div style="display: flex; align-items: center; justify-content: flex-end; margin: 25px 0; font-family: sans-serif;">
+                    <div style="background-color: #FFFFFF; border: 2px solid #C5A059; border-radius: 16px; padding: 18px 22px; margin-right: 18px; max-width: 78%; color: #1E293B; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+                        <strong style="color: #4A3C31; font-size: 1.15em; display: block; margin-bottom: 6px;">🤖 Telemetria do Mr. Halley</strong>
+                        <span style="color: #64748B; font-size: 0.88em; display: block; margin-bottom: 8px; font-weight: 600;">Veículo: {res['veiculo']}</span>
+                        <p style="margin: 0; font-size: 0.98em; line-height: 1.5; color: #1E293B;">
+                            <strong style="color: #4A3C31;">Parecer Técnico:</strong> {res['parecer']}
                         </p>
                     </div>
-                    <div style="flex-shrink: 0; text-align: center; margin-top: 5px;">
-                        <img src="{URL_AVATAR_HALLEY}" style="width: 75px; height: auto;" alt="Mr. Halley">
+                    <div style="flex-shrink: 0; text-align: center;">
+                        <img src="{URL_AVATAR_HALLEY}" style="width: 110px; height: auto;" alt="Mr. Halley">
                     </div>
                 </div>
                 """
