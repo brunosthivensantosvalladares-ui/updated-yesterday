@@ -1157,7 +1157,7 @@ else:
                     conn.commit()
                 st.rerun()
 
-elif aba_ativa == "📥 Chamados Oficina":
+    elif aba_ativa == "📥 Chamados Oficina":
         c_tit, c_refresh = st.columns([0.8, 0.2])
         with c_tit: 
             st.subheader("📥 Aprovação de Chamados")
