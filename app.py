@@ -55,7 +55,7 @@ def buscar_historico_relevante(sintoma_motorista, emp_id):
     except Exception as e:
         return f"Sem histórico disponível ({e})."
 
-# --- CONSULTA AO CÉREBRO DO MR. HALLEY VIA INFERENCE API (ATUALIZADO) ---
+# --- CONSULTA AO CÉREBRO DO MR. HALLEY VIA INFERENCE API (CORREÇÃO DE STATUS 403) ---
 def triagem_mr_halley(sintoma, emp_id):
     historico = buscar_historico_relevante(sintoma, emp_id)
     
@@ -63,42 +63,42 @@ def triagem_mr_halley(sintoma, emp_id):
     if not token:
         return "⚠️ Chave 'HF_TOKEN' não configurada."
 
-    # Endpoint atualizado do Router oficial Hugging Face
-    API_URL = "https://router.huggingface.co/hf-inference/v1/chat/completions"
+    # Endpoint direto estável
+    API_URL = "https://api-inference.huggingface.co/models/microsoft/Phi-3-mini-4k-instruct"
     headers = {
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json"
     }
 
+    # Prompt estruturado direto
+    prompt = f"Você é o Mr. Halley, assistente de manutenção. Histórico: {historico}. Sintoma atual: {sintoma}. Diagnóstico provável curto:"
+
     payload = {
-        "model": "microsoft/Phi-3-mini-4k-instruct",
-        "messages": [
-            {
-                "role": "system",
-                "content": "Você é o Mr. Halley, assistente técnico de manutenção da plataforma Updated Yesterday. Analise o sintoma do veículo com base no histórico de manutenções e dê uma resposta curta, direta e técnica com o diagnóstico provável."
-            },
-            {
-                "role": "user",
-                "content": f"Histórico de OSs parecidas:\n{historico}\n\nSintoma atual relatado:\n{sintoma}"
-            }
-        ],
-        "max_tokens": 150,
-        "temperature": 0.3
+        "inputs": prompt,
+        "parameters": {
+            "max_new_tokens": 100,
+            "temperature": 0.2,
+            "return_full_text": False
+        }
     }
 
     try:
         response = requests.post(API_URL, headers=headers, json=payload, timeout=15)
         if response.status_code == 200:
             resultado = response.json()
-            if "choices" in resultado and len(resultado["choices"]) > 0:
-                return resultado["choices"][0]["message"]["content"].strip()
-            return "Diagnóstico concluído pelo Mr. Halley."
+            if isinstance(resultado, list) and len(resultado) > 0:
+                return resultado[0].get("generated_text", "").strip()
+            elif isinstance(resultado, dict) and "generated_text" in resultado:
+                return resultado["generated_text"].strip()
+            return "Diagnóstico gerado com sucesso."
         elif response.status_code == 503:
-            return "⚙️ O Mr. Halley está aquecendo os motores no servidor. Aguarde 10 segundos e tente novamente."
+            return "⚙️ O Mr. Halley está carregando o histórico espacial no servidor. Aguarde 15 segundos e clique no checkbox novamente."
+        elif response.status_code == 403:
+            return "⚠️ Acesso recusado (Status 403). Verifique se o seu HF_TOKEN nos secrets do Streamlit está correto e tem permissão de leitura (Read)."
         else:
-            return f"Sinal oscilando (Status {response.status_code}). Tente novamente."
+            return f"O sinal oscilou com o código {response.status_code}. Tente desmarcar e marcar novamente."
     except Exception as e:
-        return f"Falha temporária na telemetria espacial: {e}"
+        return f"Falha na telemetria: {e}"
 
 # --- INICIALIZAÇÃO SEGURA DO CLIENTE ---
 if "GEMINI_API_KEY" in st.secrets:
