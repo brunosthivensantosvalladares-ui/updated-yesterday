@@ -123,7 +123,7 @@ if "GEMINI_API_KEY" in st.secrets:
         client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
         st.session_state["gemini_client"] = client
     except Exception as e:
-#        st.sidebar.error("IA indisponível no momento.")
+        st.sidebar.error("IA indisponível no momento.")
 else:
     st.sidebar.warning("IA não configurada.")
 
