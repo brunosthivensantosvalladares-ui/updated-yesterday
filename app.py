@@ -80,65 +80,60 @@ def buscar_historico_relevante(sintoma_motorista, emp_id):
     except Exception:
         return []
 
-# --- TRIAGEM DO MR. HALLEY (SDK OFICIAL GOOGLE-GENAI) ---
+# --- TRIAGEM DO MR. HALLEY (HISTÓRICO LOCAL VS CONHECIMENTO EXTERNO) ---
 def triagem_mr_halley(sintoma, emp_id):
     historicos = buscar_historico_relevante(sintoma, emp_id)
-    PREAMBULO = "Baseado no histórico"
-    
-    if not historicos:
-        return f"{PREAMBULO} da frota, não há registros anteriores para este sintoma."
-        
     gemini_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
     
     if not gemini_key:
-        return f"{PREAMBULO} (Chave GEMINI_API_KEY não encontrada nos Secrets do Streamlit)."
+        return "Baseado no histórico da frota (Chave GEMINI_API_KEY não encontrada)."
 
     try:
-        # Inicializa o cliente do novo SDK google-genai
         client = genai.Client(api_key=gemini_key)
         
-        historico_formatado = "\n".join([f"- {h}" for h in historicos])
+        historico_formatado = "\n".join([f"- {h}" for h in historicos]) if historicos else "Nenhum histórico direto encontrado no banco."
         
         prompt = f"""
 Você é o assistente técnico Mr. Halley da plataforma Updated Yesterday.
-Analise a relação entre o problema relatado e as OSs anteriores da frota.
+Analise a relação entre o problema relatado e as OSs da frota.
 
 Sintoma Relatado: "{sintoma}"
 
-Histórico Encontrado no Banco:
+Histórico Encontrado no Banco de Dados:
 {historico_formatado}
 
-REGRAS ESTRITAS DE RESPOSTA:
-1. Verifique se o histórico realmente trata do MESMO defeito ou de um sistema sinônimo.
-2. Se o histórico for de OUTRO sistema (exemplo: trocar pneu/buzina em uma OS de direção), DESCARTE e responda EXATAMENTE:
-   "Baseado no histórico da frota, não há registros anteriores para este sintoma."
-3. Se o histórico for REALMENTE correspondente:
-   - Inicie obrigatoriamente com "Baseado no histórico".
-   - Escreva 1 recomendação técnica curta (10 a 15 palavras).
-   - OBRIGATORIAMENTE use VERBOS NO INFINITIVO (ex: "recomenda-se realizar...", "inspecionar...", "efetuar a troca...").
+DIRETRIZES ESTRITAS DE RESPOSTA:
+
+SITUAÇÃO A: Se existir histórico local correspondente no banco para este sintoma:
+1. Inicie OBRIGATORIAMENTE com: "Baseado no histórico local,"
+2. Escreva 1 recomendação técnica curta (10 a 15 palavras) usando VERBOS NO INFINITIVO.
+3. Ignore serviços/peças secundárias sem relação com o sintoma.
+
+SITUAÇÃO B: Se NÃO existir histórico local correspondente no banco (ou se o histórico for de outro sistema descorrelacionado):
+1. Inicie OBRIGATORIAMENTE com: "Não identificamos registros no histórico local da frota, porém, em análises técnicas externas,"
+2. Forneça uma recomendação técnica preventiva baseada no seu conhecimento automotivo geral para o sintoma "{sintoma}".
+3. Use VERBOS NO INFINITIVO e limite a resposta a 1 frase curta (10 a 15 palavras).
 """
 
-        # Chamada no SDK novo usando gemini-2.5-flash (ou gemini-2.0-flash)
+        # Chamada no SDK oficial google-genai
         response = client.models.generate_content(
             model='gemini-2.5-flash',
             contents=prompt,
         )
         
-        txt = response.text.strip()
-        return txt if txt.lower().startswith("baseado no histórico") else f"{PREAMBULO}, {txt.lower()}"
+        return response.text.strip()
         
     except Exception as e:
-        # Fallback de segurança tentando o modelo 2.0 caso o 2.5 não esteja liberado na sua cota
+        # Fallback tentando o modelo 2.0 caso o 2.5 não responda
         try:
             client = genai.Client(api_key=gemini_key)
             response = client.models.generate_content(
                 model='gemini-2.0-flash',
                 contents=prompt,
             )
-            txt = response.text.strip()
-            return txt if txt.lower().startswith("baseado no histórico") else f"{PREAMBULO}, {txt.lower()}"
-        except Exception as e2:
-            return f"Erro na chamada da IA: {str(e2)}"
+            return response.text.strip()
+        except Exception:
+            return f"Erro de conexão com a IA: {str(e)}"
     
 # --- INICIALIZAÇÃO SEGURA DO CLIENTE ---
 if "GEMINI_API_KEY" in st.secrets:
