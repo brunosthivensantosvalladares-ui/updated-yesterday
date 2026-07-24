@@ -80,26 +80,37 @@ def buscar_historico_relevante(sintoma_motorista, emp_id):
     except Exception:
         return []
 
-# --- TRIAGEM EXCLUSIVAMENTE VIA GEMINI (IA REAL) ---
+# --- TRIAGEM COM RESOLUÇÃO DE MODELO (GEMINI) ---
 def triagem_mr_halley(sintoma, emp_id):
     historicos = buscar_historico_relevante(sintoma, emp_id)
     PREAMBULO = "Baseado no histórico"
     
-    # 1. Se o banco zerar
     if not historicos:
         return f"{PREAMBULO} da frota, não há registros anteriores para este sintoma."
         
     gemini_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
     
-    # Se não achar a chave nos Secrets
     if not gemini_key:
-        return f"{PREAMBULO} (Chave GEMINI_API_KEY não configurada nos Secrets do Streamlit)."
+        return f"{PREAMBULO} (Chave GEMINI_API_KEY não encontrada nos Secrets)."
 
     try:
-        # Configuração da API
         genai.configure(api_key=gemini_key)
-        model = genai.GenerativeModel('gemini-1.5-flash')
         
+        # Testa a lista de modelos suportados para evitar o erro 404 da v1beta
+        modelos_para_testar = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-2.0-flash']
+        model = None
+        
+        # Tenta instanciar o modelo compatível
+        for nome_modelo in modelos_para_testar:
+            try:
+                model = genai.GenerativeModel(nome_modelo)
+                break
+            except Exception:
+                continue
+                
+        if not model:
+            model = genai.GenerativeModel('gemini-1.5-flash')
+
         historico_formatado = "\n".join([f"- {h}" for h in historicos])
         
         prompt = f"""
@@ -113,10 +124,10 @@ Histórico Encontrado no Banco:
 
 REGRAS ESTRITAS:
 1. Verifique se o histórico realmente trata do MESMO defeito ou de um sistema sinônimo.
-2. Se o histórico for de OUTRO sistema (exemplo: trocar pneu em uma OS de direção, ou buzina), DESCARTE e responda EXATAMENTE:
+2. Se o histórico for de OUTRO sistema (exemplo: trocar pneu/buzina em uma OS de direção), DESCARTE e responda EXATAMENTE:
    "Baseado no histórico da frota, não há registros anteriores para este sintoma."
 3. Se o histórico for REALMENTE correspondente:
-   - Inicie com "Baseado no histórico".
+   - Inicie obrigatoriamente com "Baseado no histórico".
    - Escreva 1 recomendação técnica curta (10 a 15 palavras).
    - OBRIGATORIAMENTE use VERBOS NO INFINITIVO (ex: "recomenda-se realizar...", "inspecionar...", "efetuar a troca...").
 """
@@ -126,7 +137,6 @@ REGRAS ESTRITAS:
         return txt if txt.lower().startswith("baseado no histórico") else f"{PREAMBULO}, {txt.lower()}"
         
     except Exception as e:
-        # Mostra o erro EXATO da API na tela em vez de fingir uma resposta
         return f"Erro na chamada da IA: {str(e)}"
     
 # --- INICIALIZAÇÃO SEGURA DO CLIENTE ---
