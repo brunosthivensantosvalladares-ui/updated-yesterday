@@ -25,18 +25,17 @@ def get_engine():
         st.stop()
     return create_engine(db_url.replace("postgres://", "postgresql://", 1), pool_pre_ping=True)
 
-# --- BUSCA SEMÂNTICA GENÉRICA (SEM REGRAS DE NEGÓCIO) ---
+# --- BUSCA DE HISTÓRICO LIMPO NO BANCO ---
 def buscar_historico_relevante(sintoma_motorista, emp_id):
     engine = get_engine()
+    sintoma_limpo = sintoma_motorista.lower().strip()
     
-    # Descarta termos ultra-comuns e conectivos básicos
     stop_words = {'carro', 'veiculo', 'caminhao', 'esta', 'estao', 'muita', 'muito', 'problema', 'com', 'para', 'nao', 'sem', 'lado', 'pro'}
-    palavras_chave = [p for p in sintoma_motorista.lower().split() if len(p) > 3 and p not in stop_words]
+    palavras_chave = [p for p in sintoma_limpo.split() if len(p) > 3 and p not in stop_words]
     
     if not palavras_chave:
         return []
 
-    # Cria condições genéricas para verificar termos relevantes
     condicoes = " OR ".join([f"LOWER(descricao) LIKE '%{p}%'" for p in palavras_chave])
     
     query = text(f"""
@@ -53,39 +52,41 @@ def buscar_historico_relevante(sintoma_motorista, emp_id):
         if not resultados:
             return []
 
-        # Ranks genéricos por sobreposição de palavras (Pontuação de relevância)
-        historicos_pontuados = []
+        # Filtra e extrai a melhor correspondência
+        historicos = []
         for row in resultados:
-            texto_os = str(row[0]).strip()
-            texto_os_low = texto_os.lower()
-            
-            # Conta quantas palavras do sintoma aparecem na OS
-            pontuacao = sum(1 for p in palavras_chave if p in texto_os_low)
-            
-            # Só aceita históricos que compartilhem relevância real (evita ruídos isolados)
-            if pontuacao >= 1:
-                historicos_pontuados.append((pontuacao, texto_os))
+            txt = str(row[0]).strip()
+            # Se a OS contiver o registro de execução, prioriza a solução real
+            if "Execução:" in txt:
+                solucao = txt.split("Execução:")[-1].split(";")[0].strip()
+                if len(solucao) > 4:
+                    historicos.append(solucao)
+            elif "Serviço:" in txt:
+                servico = txt.split("Serviço:")[-1].split(";")[0].strip()
+                if len(servico) > 4:
+                    historicos.append(servico)
+            else:
+                # Remove prefixos brutos de horários se houver
+                txt_limpo = txt.split(";")[-1].strip() if ";" in txt else txt
+                historicos.append(txt_limpo)
 
-        # Ordena do mais relevante para o menos relevante
-        historicos_pontuados.sort(key=lambda x: x[0], reverse=True)
-        
-        return [item[1] for item in historicos_pontuados[:2]]
+        return historicos
     except Exception:
         return []
-        
-# --- TRIAGEM 100% DINÂMICA E NEUTRA ---
+
+# --- TRIAGEM DO MR. HALLEY (PARECER CURTO E SEM RUÍDOS DE LOG) ---
 def triagem_mr_halley(sintoma, emp_id):
     historico_lista = buscar_historico_relevante(sintoma, emp_id)
     PREAMBULO = "Baseado no histórico"
     
-    # 1. Quando o banco de dados não encontra histórico com relevância
+    # 1. Quando não há registro para o sintoma
     if not historico_lista:
         return f"{PREAMBULO} da frota, não há registros anteriores para este sintoma."
         
     gemini_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
     historico_texto = "\n".join([f"- {item}" for item in historico_lista])
     
-    # 2. Execução via LLM (Interpretação contextual e síntese)
+    # 2. Processamento via IA
     if gemini_key:
         try:
             genai.configure(api_key=gemini_key)
@@ -93,16 +94,16 @@ def triagem_mr_halley(sintoma, emp_id):
             
             prompt = f"""
 Você é o assistente técnico de manutenção Mr. Halley.
-Analise a relação entre o problema atual e as Ordens de Serviço (OS) resolvidas no passado.
+Analise a relação entre o problema atual e as intervenções passadas da frota.
 
 Sintoma atual: {sintoma}
-OSs encontradas no banco:
+Ações registradas no histórico:
 {historico_texto}
 
-Regras:
-1. Comece a resposta estritamente com "Baseado no histórico".
-2. Sintetize em 1 frase curta a intervenção técnica aplicada para resolver o sintoma relatado.
-3. Se o histórico contiver serviços não relacionados ao sintoma (ex: itens secundários executados na mesma OS), ignore-os e foca apenas na causa do sintoma.
+Regras estritas:
+1. Comece obrigatoriamente com "Baseado no histórico".
+2. Resuma a recomendação em no MÁXIMO 1 frase curta (10 a 14 palavras).
+3. Seja direto e objetivo, recomendando apenas a intervenção necessária.
 """
             response = model.generate_content(prompt)
             txt = response.text.strip()
@@ -110,10 +111,14 @@ Regras:
         except Exception:
             pass
 
-    # 3. Fallback neutro e seguro (Sem IA conectada)
-    # Exibe o histórico do banco diretamente, sem tentar adivinhar peças
-    resumo_banco = " | ".join(historico_lista)
-    return f"{PREAMBULO} local das OSs: {resumo_banco}"
+    # 3. Fallback Local Sintetizado (Elimina logs longos, mecânicos e horários)
+    # Pega apenas a primeira intervenção válida e formata de forma limpa
+    acao_principal = historico_lista[0]
+    
+    # Limpa possíveis pontuações duplas
+    acao_principal = acao_principal.rstrip('.').strip()
+    
+    return f"{PREAMBULO} local da frota, recomenda-se: {acao_principal}."
     
 # --- INICIALIZAÇÃO SEGURA DO CLIENTE ---
 if "GEMINI_API_KEY" in st.secrets:
