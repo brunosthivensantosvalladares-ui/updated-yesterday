@@ -25,28 +25,25 @@ def get_engine():
         st.stop()
     return create_engine(db_url.replace("postgres://", "postgresql://", 1), pool_pre_ping=True)
 
-# --- BUSCA DE HISTÓRICO INTELIGENTE POR CONTEXTO E FRASES ---
+# --- BUSCA SEMÂNTICA GENÉRICA (SEM REGRAS DE NEGÓCIO) ---
 def buscar_historico_relevante(sintoma_motorista, emp_id):
     engine = get_engine()
-    sintoma_limpo = sintoma_motorista.lower().strip()
     
-    # 1. Tenta encontrar frases ou pares de palavras compostas primeiro (Busca Semântica Local)
-    palavras_chave = [p for p in sintoma_limpo.split() if len(p) > 3 and p not in {'carro', 'veiculo', 'caminhao', 'esta', 'estao', 'muita', 'muito', 'problema', 'lado'}]
+    # Descarta termos ultra-comuns e conectivos básicos
+    stop_words = {'carro', 'veiculo', 'caminhao', 'esta', 'estao', 'muita', 'muito', 'problema', 'com', 'para', 'nao', 'sem', 'lado', 'pro'}
+    palavras_chave = [p for p in sintoma_motorista.lower().split() if len(p) > 3 and p not in stop_words]
     
     if not palavras_chave:
         return []
-        
-    # Constrói busca por frases/pares de termos (ex: "direção" AND "puxando")
-    if len(palavras_chave) >= 2:
-        condicao_contexto = f"LOWER(descricao) LIKE '%{palavras_chave[0]}%' AND LOWER(descricao) LIKE '%{palavras_chave[1]}%'"
-    else:
-        condicao_contexto = f"LOWER(descricao) LIKE '%{palavras_chave[0]}%'"
-        
+
+    # Cria condições genéricas para verificar termos relevantes
+    condicoes = " OR ".join([f"LOWER(descricao) LIKE '%{p}%'" for p in palavras_chave])
+    
     query = text(f"""
-        SELECT prefixo, descricao 
+        SELECT descricao 
         FROM tarefas 
-        WHERE empresa_id = :eid AND realizado = True AND ({condicao_contexto})
-        ORDER BY id DESC LIMIT 3
+        WHERE empresa_id = :eid AND realizado = True AND ({condicoes})
+        ORDER BY id DESC LIMIT 5
     """)
     
     try:
@@ -55,39 +52,57 @@ def buscar_historico_relevante(sintoma_motorista, emp_id):
         
         if not resultados:
             return []
+
+        # Ranks genéricos por sobreposição de palavras (Pontuação de relevância)
+        historicos_pontuados = []
+        for row in resultados:
+            texto_os = str(row[0]).strip()
+            texto_os_low = texto_os.lower()
             
-        return [str(r[1]).strip() for r in resultados]
+            # Conta quantas palavras do sintoma aparecem na OS
+            pontuacao = sum(1 for p in palavras_chave if p in texto_os_low)
+            
+            # Só aceita históricos que compartilhem relevância real (evita ruídos isolados)
+            if pontuacao >= 1:
+                historicos_pontuados.append((pontuacao, texto_os))
+
+        # Ordena do mais relevante para o menos relevante
+        historicos_pontuados.sort(key=lambda x: x[0], reverse=True)
+        
+        return [item[1] for item in historicos_pontuados[:2]]
     except Exception:
         return []
-
-# --- SÍNTESE INTELIGENTE DO PARECER TÉCNICO ---
+        
+# --- TRIAGEM 100% DINÂMICA E NEUTRA ---
 def triagem_mr_halley(sintoma, emp_id):
     historico_lista = buscar_historico_relevante(sintoma, emp_id)
     PREAMBULO = "Baseado no histórico"
     
-    # 1. Quando o contexto não bate com nenhuma OS anterior
+    # 1. Quando o banco de dados não encontra histórico com relevância
     if not historico_lista:
         return f"{PREAMBULO} da frota, não há registros anteriores para este sintoma."
         
     gemini_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
     historico_texto = "\n".join([f"- {item}" for item in historico_lista])
     
-    # 2. Se a IA estiver ativa, exige síntese lógica focada
+    # 2. Execução via LLM (Interpretação contextual e síntese)
     if gemini_key:
         try:
             genai.configure(api_key=gemini_key)
             model = genai.GenerativeModel('gemini-1.5-flash')
+            
             prompt = f"""
-Você é o Mr. Halley, assistente de manutenção técnica.
-Sintoma atual do veículo: '{sintoma}'
-Histórico das OSs passadas:
+Você é o assistente técnico de manutenção Mr. Halley.
+Analise a relação entre o problema atual e as Ordens de Serviço (OS) resolvidas no passado.
+
+Sintoma atual: {sintoma}
+OSs encontradas no banco:
 {historico_texto}
 
-Instruções:
-1. Inicie OBRIGATORIAMENTE com "Baseado no histórico".
-2. Identifique a AÇÃO TÉCNICA RELEVANTE que resolveu o sintoma '{sintoma}'.
-3. IGNORE completamente manutenções secundárias listadas na mesma OS que não tenham relação com '{sintoma}' (ex: se o problema for direção, ignore buzina, ventilador, ar-condicionado).
-4. Resuma em uma recomendação clara e direta (1 frase amigável).
+Regras:
+1. Comece a resposta estritamente com "Baseado no histórico".
+2. Sintetize em 1 frase curta a intervenção técnica aplicada para resolver o sintoma relatado.
+3. Se o histórico contiver serviços não relacionados ao sintoma (ex: itens secundários executados na mesma OS), ignore-os e foca apenas na causa do sintoma.
 """
             response = model.generate_content(prompt)
             txt = response.text.strip()
@@ -95,35 +110,10 @@ Instruções:
         except Exception:
             pass
 
-    # 3. Processamento Local Inteligente (Filtra apenas a solução relacionada ao sintoma)
-    acoes_relevantes = []
-    sintoma_low = sintoma.lower()
-    
-    for item in historico_lista:
-        txt_item = item
-        if "Execução:" in txt_item:
-            txt_item = txt_item.split("Execução:")[-1].split(";")[0].strip()
-        elif "Serviço:" in txt_item:
-            txt_item = txt_item.split("Serviço:")[-1].split(";")[0].strip()
-            
-        # Filtro de relevância semântica basilar (Impede buzina em direção)
-        if "direção" in sintoma_low or "puxando" in sintoma_low:
-            if any(termo in txt_item.lower() for termo in ["alinhamento", "balanceamento", "terminal", "pneu", "geometria", "caixa", "suspensão"]):
-                acoes_relevantes.append(txt_item)
-        elif "fumaça" in sintoma_low:
-            if any(termo in txt_item.lower() for termo in ["bico", "injetor", "filtro", "válvula", "limpeza"]):
-                acoes_relevantes.append(txt_item)
-        elif "marcha" in sintoma_low or "engatar" in sintoma_low:
-            if any(termo in txt_item.lower() for termo in ["trambulador", "embreagem", "câmbio", "cabo", "óleo"]):
-                acoes_relevantes.append(txt_item)
-        else:
-            acoes_relevantes.append(txt_item)
-
-    if acoes_relevantes:
-        solucao = acoes_relevantes[0].replace(".", "").strip()
-        return f"{PREAMBULO} local da frota, recomenda-se avaliar: {solucao}."
-        
-    return f"{PREAMBULO} da frota, não há registros anteriores para este sintoma."
+    # 3. Fallback neutro e seguro (Sem IA conectada)
+    # Exibe o histórico do banco diretamente, sem tentar adivinhar peças
+    resumo_banco = " | ".join(historico_lista)
+    return f"{PREAMBULO} local das OSs: {resumo_banco}"
     
 # --- INICIALIZAÇÃO SEGURA DO CLIENTE ---
 if "GEMINI_API_KEY" in st.secrets:
@@ -1243,20 +1233,20 @@ else:
                 for id_c, res in st.session_state.analises_halley.items():
                     parecer_limpo = str(res['parecer']).replace('<', '&lt;').replace('>', '&gt;')
                     
-                    html_layout = (
-                        f'<div style="display: flex; align-items: center; justify-content: flex-end; margin: 15px 0; font-family: sans-serif;">'
-                        f'    <div style="background-color: #FFFFFF; border: 2px solid #C5A059; border-radius: 16px; padding: 14px 18px; margin-right: 18px; width: 100%; max-width: 78%; color: #1E293B; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">'
-                        f'        <strong style="color: #4A3C31; font-size: 1.05em; display: block; margin-bottom: 4px;">🤖 Telemetria do Mr. Halley</strong>'
-                        f'        <span style="color: #64748B; font-size: 0.82em; display: block; margin-bottom: 6px; font-weight: 600;">Veículo: {res["veiculo"]} ({res["relato"]})</span>'
-                        f'        <p style="margin: 0; font-size: 0.92em; line-height: 1.4; color: #1E293B; word-wrap: break-word;">'
-                        f'            <strong style="color: #4A3C31;">Parecer Técnico:</strong> {parecer_limpo}'
-                        f'        </p>'
-                        f'    </div>'
-                        f'    <div style="flex-shrink: 0; text-align: center;">'
-                        f'        <img src="{URL_AVATAR_HALLEY}" style="width: 130px; height: auto;" alt="Mr. Halley">'
-                        f'    </div>'
-                        f'</div>'
-                    )
+html_layout = (
+    f'<div style="display: flex; align-items: flex-start; justify-content: flex-end; margin: 15px 0; font-family: sans-serif;">'
+    f'    <div style="background-color: #FFFFFF; border: 2px solid #C5A059; border-radius: 16px; padding: 16px 20px; margin-right: 18px; width: 100%; max-width: 80%; color: #1E293B; box-shadow: 0 4px 12px rgba(0,0,0,0.08); height: auto;">'
+    f'        <strong style="color: #4A3C31; font-size: 1.05em; display: block; margin-bottom: 4px;">🤖 Telemetria do Mr. Halley</strong>'
+    f'        <span style="color: #64748B; font-size: 0.82em; display: block; margin-bottom: 6px; font-weight: 600;">Veículo: {res["veiculo"]} ({res["relato"]})</span>'
+    f'        <p style="margin: 0; font-size: 0.92em; line-height: 1.5; color: #1E293B; word-break: break-word; overflow-wrap: break-word;">'
+    f'            <strong style="color: #4A3C31;">Parecer Técnico:</strong> {parecer_limpo}'
+    f'        </p>'
+    f'    </div>'
+    f'    <div style="flex-shrink: 0; text-align: center;">'
+    f'        <img src="{URL_AVATAR_HALLEY}" style="width: 120px; height: auto;" alt="Mr. Halley">'
+    f'    </div>'
+    f'</div>'
+)
                     st.markdown(html_layout, unsafe_allow_html=True)
                 
                 st.markdown("---")
