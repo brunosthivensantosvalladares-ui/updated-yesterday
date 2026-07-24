@@ -53,33 +53,16 @@ def get_engine():
         st.stop()
     return create_engine(db_url.replace("postgres://", "postgresql://", 1), pool_pre_ping=True)
 
-# --- BUSCA DE HISTÓRICO COM VALIDAÇÃO DO COMPONENTE PRINCIPAL ---
-def buscar_historico_relevante(sintoma_motorista, emp_id):
+# --- BUSCA SEMÂNTICA POR SIGNIFICADO (NÃO POR PALAVRA-CHAVE) ---
+def buscar_historico_por_significado(sintoma_motorista, emp_id):
     engine = get_engine()
-    sintoma_limpo = sintoma_motorista.lower().strip()
     
-    # Termos irrelevantes que geravam falsos positivos (como 'lado', 'direito', 'muita')
-    stop_words = {
-        'carro', 'veiculo', 'caminhao', 'esta', 'estao', 'muita', 'muito', 
-        'problema', 'com', 'para', 'nao', 'sem', 'lado', 'pro', 'direito', 
-        'direita', 'esquerdo', 'esquerda', 'puxando', 'ficando'
-    }
-    
-    # Extrai o componente real (ex: "direção", "porta", "marcha", "embreagem")
-    palavras_componente = [p for p in sintoma_limpo.split() if len(p) > 3 and p not in stop_words]
-    
-    if not palavras_componente:
-        return []
-
-    # Exige que A PALAVRA DO COMPONENTE PRINCIPAL esteja na descrição da OS
-    # Ex: Para "direção puxando", EXIGE a palavra 'direção' no banco
-    condicao_componente = f"LOWER(descricao) LIKE '%{palavras_componente[0]}%'"
-    
-    query = text(f"""
+    # 1. Busca as últimas OSs concluídas da empresa para comparar significado
+    query = text("""
         SELECT descricao 
         FROM tarefas 
-        WHERE empresa_id = :eid AND realizado = True AND ({condicao_componente})
-        ORDER BY id DESC LIMIT 3
+        WHERE empresa_id = :eid AND realizado = True 
+        ORDER BY id DESC LIMIT 15
     """)
     
     try:
@@ -88,37 +71,53 @@ def buscar_historico_relevante(sintoma_motorista, emp_id):
         
         if not resultados:
             return []
+            
+        todas_oss = [str(r[0]).strip() for r in resultados]
+        
+        # 2. Se a IA estiver ativa, ela faz o filtro de similaridade semântica
+        gemini_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
+        if gemini_key:
+            try:
+                genai.configure(api_key=gemini_key)
+                model = genai.GenerativeModel('gemini-1.5-flash')
+                
+                prompt = f"""
+Você é um especialista em triagem de manutenção automotiva.
+Análise de Sintoma Atual: '{sintoma_motorista}'
 
-        historicos = []
-        for row in resultados:
-            txt = str(row[0]).strip()
-            if "Execução:" in txt:
-                solucao = txt.split("Execução:")[-1].split(";")[0].strip()
-                if len(solucao) > 4: historicos.append(solucao)
-            elif "Serviço:" in txt:
-                servico = txt.split("Serviço:")[-1].split(";")[0].strip()
-                if len(servico) > 4: historicos.append(servico)
-            else:
-                txt_limpo = txt.split(";")[-1].strip() if ";" in txt else txt
-                historicos.append(txt_limpo)
+Lista de Ordens de Serviço (OS) passadas no banco:
+{todas_oss}
 
-        return historicos
+Sua tarefa:
+Selecione APENAS as OSs passadas que possuem o MESMO SIGNIFICADO TÉCNICO ou SINTOMA SIMILAR/SINÔNIMO ao sintoma atual.
+Descarte qualquer OS que cite palavras coincidentes mas trate de sistemas diferentes (ex: se o problema é direção puxando, descarte buzina, rádio ou pneu furado).
+
+Retorne apenas o texto da OS equivalente encontrada. Se nenhuma tiver o mesmo significado técnico, responda apenas: "NENHUMA".
+"""
+                response = model.generate_content(prompt)
+                txt_resp = response.text.strip()
+                
+                if "NENHUMA" in txt_resp:
+                    return []
+                return [txt_resp]
+            except Exception:
+                pass
+
+        return todas_oss[:2]
     except Exception:
         return []
 
-# --- TRIAGEM DO MR. HALLEY (PARECER COM VERBOS NO INFINITIVO) ---
+# --- TRIAGEM DO MR. HALLEY ---
 def triagem_mr_halley(sintoma, emp_id):
-    historico_lista = buscar_historico_relevante(sintoma, emp_id)
+    historico_relevante = buscar_historico_por_significado(sintoma, emp_id)
     PREAMBULO = "Baseado no histórico"
     
-    # 1. Se não houver OS que cite especificamente o componente principal
-    if not historico_lista:
+    # Se a avaliação de significado não encontrou nenhuma falha sinônima
+    if not historico_relevante:
         return f"{PREAMBULO} da frota, não há registros anteriores para este sintoma."
         
     gemini_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
-    historico_texto = "\n".join([f"- {item}" for item in historico_lista])
     
-    # 2. Processamento via LLM (Se ativa, exige verbo no infinitivo)
     if gemini_key:
         try:
             genai.configure(api_key=gemini_key)
@@ -126,16 +125,15 @@ def triagem_mr_halley(sintoma, emp_id):
             
             prompt = f"""
 Você é o assistente técnico Mr. Halley.
-Analise a OS passada e dê uma recomendação para o sintoma atual.
+Com base no histórico equivalente encontrado:
+{historico_relevante[0]}
 
-Sintoma atual: {sintoma}
-Ação registrada na OS antiga:
-{historico_texto}
+Sintoma atual: '{sintoma}'
 
-Regras:
-1. Comece com "Baseado no histórico".
-2. Use VERBOS NO INFINITIVO de recomendação técnica (ex: "recomenda-se realizar...", "inspecionar...", "efetuar a troca...").
-3. Máximo 1 frase ultra concisa.
+Gere a recomendação técnica final:
+1. Inicie obrigatoriamente com "Baseado no histórico".
+2. Use VERBOS NO INFINITIVO para indicar a ação técnica recomendada.
+3. Máximo 1 frase curta e objetiva.
 """
             response = model.generate_content(prompt)
             txt = response.text.strip()
@@ -143,11 +141,7 @@ Regras:
         except Exception:
             pass
 
-    # 3. Fallback Local com Formatação no Infinitivo
-    acao_bruta = historico_lista[0]
-    acao_infinitivo = formatar_acao_infinitivo(acao_bruta)
-    
-    return f"{PREAMBULO} local da frota, recomenda-se: {acao_infinitivo}."
+    return f"{PREAMBULO} local da frota, recomenda-se a verificação do sistema associado."
     
 # --- INICIALIZAÇÃO SEGURA DO CLIENTE ---
 if "GEMINI_API_KEY" in st.secrets:
