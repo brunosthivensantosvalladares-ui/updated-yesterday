@@ -64,7 +64,7 @@ def buscar_historico_relevante(sintoma_motorista, emp_id):
     except Exception as e:
         return f"Sem histórico disponível ({e})."
 
-# --- CONSULTA AO CÉREBRO DO MR. HALLEY (DINÂMICO E RESUMIDO) ---
+# --- CONSULTA AO CÉREBRO DO MR. HALLEY (TRATAMENTO DE TEXTO LIMPO) ---
 def triagem_mr_halley(sintoma, emp_id):
     historico = buscar_historico_relevante(sintoma, emp_id)
     
@@ -78,10 +78,10 @@ def triagem_mr_halley(sintoma, emp_id):
             client = genai.Client(api_key=gemini_key)
             prompt = f"""
 Você é o Mr. Halley, assistente de manutenção do Updated Yesterday.
-Com base no histórico: '{historico}' e no sintoma atual: '{sintoma}'.
+Analisando o histórico: '{historico}' para o sintoma: '{sintoma}'.
 
-Gere um parecer técnico EXTREMAMENTE CURTO e direto ao ponto (MÁXIMO 1FRASE / 15 PALAVRAS).
-Não cite códigos de OS ou veículos. Apenas resuma o que o histórico sugere inspecionar.
+Gere um parecer técnico EXTREMAMENTE CURTO (máximo 1 ou 2 frases curtas).
+Não cite números de veículos ou horários ("00:00"). Diga apenas a causa provável e a ação recomendada.
 """
             response = client.models.generate_content(
                 model='gemini-1.5-flash',
@@ -91,13 +91,24 @@ Não cite códigos de OS ou veículos. Apenas resuma o que o histórico sugere i
         except Exception:
             pass
 
-    # Fallback Inteligente caso a IA caia: Resume o histórico local em uma linha sem travar o assunto
-    resumos_passados = [linha.split(":")[-1].strip() for linha in historico.strip().split("\n") if linha]
-    if resumos_passados:
-        texto_resumo = " | ".join(resumos_passados)[:90]
-        return f"Dados locais sugerem avaliar: {texto_resumo}..."
+    # Fallback Limpo: Remove '00', '*', 'Horário' e limpa os caracteres estranhos do SQL
+    linhas_limpas = []
+    for linha in historico.split("\n"):
+        if linha.strip():
+            # Extrai apenas a descrição limpa
+            txt = linha.replace("*", "").replace("00:00", "").replace("00-00", "").strip()
+            # Remove marcadores brutos
+            if ":" in txt:
+                txt = txt.split(":")[-1].strip()
+            if txt and len(txt) > 3:
+                linhas_limpas.append(txt)
+    
+    if linhas_limpas:
+        # Pega as 2 ações mais relevantes do histórico sem cortar palavra
+        parecer_local = " / ".join(linhas_limpas[:2])
+        return f"Histórico local indica intervenções anteriores em: {parecer_local}."
         
-    return "Recomenda-se triagem física no box devido à falta de dados históricos."
+    return "Não detectei históricos anteriores desta falha para sugerir possíveis causas."
     
 # --- INICIALIZAÇÃO SEGURA DO CLIENTE ---
 if "GEMINI_API_KEY" in st.secrets:
@@ -1208,17 +1219,15 @@ else:
             if "analise_imediata_halley" in st.session_state:
                 res = st.session_state["analise_imediata_halley"]
                 
-                # Evita que caracteres especiais quebrem a estrutura HTML
                 parecer_limpo = str(res['parecer']).replace('<', '&lt;').replace('>', '&gt;')
-                
                 URL_AVATAR_HALLEY = "https://i.postimg.cc/5tBtrL6C/Whats-App-Image-2026-07-23-at-22-35-53.png"
                 
                 html_layout = (
                     f'<div style="display: flex; align-items: center; justify-content: flex-end; margin: 20px 0; font-family: sans-serif;">'
-                    f'    <div style="background-color: #FFFFFF; border: 2px solid #C5A059; border-radius: 16px; padding: 14px 18px; margin-right: 18px; max-width: 70%; color: #1E293B; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">'
+                    f'    <div style="background-color: #FFFFFF; border: 2px solid #C5A059; border-radius: 16px; padding: 16px 20px; margin-right: 18px; width: 100%; max-width: 78%; color: #1E293B; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">'
                     f'        <strong style="color: #4A3C31; font-size: 1.05em; display: block; margin-bottom: 4px;">🤖 Telemetria do Mr. Halley</strong>'
                     f'        <span style="color: #64748B; font-size: 0.82em; display: block; margin-bottom: 6px; font-weight: 600;">Veículo: {res["veiculo"]}</span>'
-                    f'        <p style="margin: 0; font-size: 0.9em; line-height: 1.4; color: #1E293B;">'
+                    f'        <p style="margin: 0; font-size: 0.92em; line-height: 1.45; color: #1E293B; word-wrap: break-word;">'
                     f'            <strong style="color: #4A3C31;">Parecer Técnico:</strong> {parecer_limpo}'
                     f'        </p>'
                     f'    </div>'
