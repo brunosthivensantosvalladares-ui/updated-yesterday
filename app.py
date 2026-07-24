@@ -5,7 +5,7 @@ from sqlalchemy import create_engine, text
 from datetime import datetime, time, timedelta
 from io import BytesIO
 from fpdf import FPDF
-import google.generativeai as genai
+from google import genai
 import time as time_module
 import requests
 import re
@@ -80,7 +80,7 @@ def buscar_historico_relevante(sintoma_motorista, emp_id):
     except Exception:
         return []
 
-# --- TRIAGEM DO MR. HALLEY (CORREÇÃO DE MODELO E ENDPOINT) ---
+# --- TRIAGEM DO MR. HALLEY (SDK OFICIAL GOOGLE-GENAI) ---
 def triagem_mr_halley(sintoma, emp_id):
     historicos = buscar_historico_relevante(sintoma, emp_id)
     PREAMBULO = "Baseado no histórico"
@@ -91,21 +91,11 @@ def triagem_mr_halley(sintoma, emp_id):
     gemini_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
     
     if not gemini_key:
-        return f"{PREAMBULO} (Chave GEMINI_API_KEY não encontrada nos Secrets)."
+        return f"{PREAMBULO} (Chave GEMINI_API_KEY não encontrada nos Secrets do Streamlit)."
 
     try:
-        genai.configure(api_key=gemini_key)
-        
-        # Testamos os identificadores estáveis aceitos na v1beta e v1
-        model = None
-        erros_tentativas = []
-        
-        # Lista de aliases válidos para o SDK google-generativeai
-        modelos_suportados = [
-            'gemini-1.5-flash-latest',
-            'gemini-1.5-pro-latest',
-            'gemini-pro'
-        ]
+        # Inicializa o cliente do novo SDK google-genai
+        client = genai.Client(api_key=gemini_key)
         
         historico_formatado = "\n".join([f"- {h}" for h in historicos])
         
@@ -128,21 +118,27 @@ REGRAS ESTRITAS DE RESPOSTA:
    - OBRIGATORIAMENTE use VERBOS NO INFINITIVO (ex: "recomenda-se realizar...", "inspecionar...", "efetuar a troca...").
 """
 
-        # Tenta executar nos modelos estáveis
-        for m_nome in modelos_suportados:
-            try:
-                m_inst = genai.GenerativeModel(m_nome)
-                response = m_inst.generate_content(prompt)
-                txt = response.text.strip()
-                return txt if txt.lower().startswith("baseado no histórico") else f"{PREAMBULO}, {txt.lower()}"
-            except Exception as err_m:
-                erros_tentativas.append(f"{m_nome}: {str(err_m)}")
-                continue
-
-        return f"Erro ao conectar nos modelos da API: {' | '.join(erros_tentativas)}"
+        # Chamada no SDK novo usando gemini-2.5-flash (ou gemini-2.0-flash)
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=prompt,
+        )
+        
+        txt = response.text.strip()
+        return txt if txt.lower().startswith("baseado no histórico") else f"{PREAMBULO}, {txt.lower()}"
         
     except Exception as e:
-        return f"Erro na chamada da IA: {str(e)}"
+        # Fallback de segurança tentando o modelo 2.0 caso o 2.5 não esteja liberado na sua cota
+        try:
+            client = genai.Client(api_key=gemini_key)
+            response = client.models.generate_content(
+                model='gemini-2.0-flash',
+                contents=prompt,
+            )
+            txt = response.text.strip()
+            return txt if txt.lower().startswith("baseado no histórico") else f"{PREAMBULO}, {txt.lower()}"
+        except Exception as e2:
+            return f"Erro na chamada da IA: {str(e2)}"
     
 # --- INICIALIZAÇÃO SEGURA DO CLIENTE ---
 if "GEMINI_API_KEY" in st.secrets:
