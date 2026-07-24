@@ -25,31 +25,28 @@ def get_engine():
         st.stop()
     return create_engine(db_url.replace("postgres://", "postgresql://", 1), pool_pre_ping=True)
 
-# --- BUSCA DE HISTÓRICO FILTRADA (SEM PALAVRAS GENÉRICAS DE POSIÇÃO) ---
+# --- BUSCA DE HISTÓRICO INTELIGENTE POR CONTEXTO E FRASES ---
 def buscar_historico_relevante(sintoma_motorista, emp_id):
     engine = get_engine()
+    sintoma_limpo = sintoma_motorista.lower().strip()
     
-    # Palavras ignoradas expandidas (inclui direções e conectivos comuns)
-    palavras_ignoradas = {
-        'carro', 'veiculo', 'caminhao', 'saindo', 'muita', 'muito', 'fazer', 
-        'esta', 'estao', 'direito', 'direita', 'esquerdo', 'esquerda', 'lado', 
-        'problema', 'com', 'para', 'nao', 'sem', 'dificuldade', 'puxando', 'pro'
-    }
+    # 1. Tenta encontrar frases ou pares de palavras compostas primeiro (Busca Semântica Local)
+    palavras_chave = [p for p in sintoma_limpo.split() if len(p) > 3 and p not in {'carro', 'veiculo', 'caminhao', 'esta', 'estao', 'muita', 'muito', 'problema', 'lado'}]
     
-    # Filtra apenas palavras com mais de 3 letras que sejam termos mecânicos reais (ex: direção, alinhamento)
-    palavras = [p for p in sintoma_motorista.lower().split() if len(p) > 3 and p not in palavras_ignoradas]
-    
-    # Se só sobrou palavras de posição/genéricas, assume diretamente que não há histórico específico
-    if not palavras:
+    if not palavras_chave:
         return []
         
-    condicoes = " OR ".join([f"LOWER(descricao) LIKE '%{p}%'" for p in palavras])
-    
+    # Constrói busca por frases/pares de termos (ex: "direção" AND "puxando")
+    if len(palavras_chave) >= 2:
+        condicao_contexto = f"LOWER(descricao) LIKE '%{palavras_chave[0]}%' AND LOWER(descricao) LIKE '%{palavras_chave[1]}%'"
+    else:
+        condicao_contexto = f"LOWER(descricao) LIKE '%{palavras_chave[0]}%'"
+        
     query = text(f"""
         SELECT prefixo, descricao 
         FROM tarefas 
-        WHERE empresa_id = :eid AND realizado = True AND ({condicoes})
-        ORDER BY id DESC LIMIT 2
+        WHERE empresa_id = :eid AND realizado = True AND ({condicao_contexto})
+        ORDER BY id DESC LIMIT 3
     """)
     
     try:
@@ -63,33 +60,34 @@ def buscar_historico_relevante(sintoma_motorista, emp_id):
     except Exception:
         return []
 
-# --- TRIAGEM DO MR. HALLEY (RESPOSTA ULTRA CURTA E LIMPA) ---
+# --- SÍNTESE INTELIGENTE DO PARECER TÉCNICO ---
 def triagem_mr_halley(sintoma, emp_id):
     historico_lista = buscar_historico_relevante(sintoma, emp_id)
     PREAMBULO = "Baseado no histórico"
     
-    # 1. Quando NÃO HÁ histórico específico para as palavras mecânicas do sintoma
+    # 1. Quando o contexto não bate com nenhuma OS anterior
     if not historico_lista:
         return f"{PREAMBULO} da frota, não há registros anteriores para este sintoma."
         
     gemini_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
     historico_texto = "\n".join([f"- {item}" for item in historico_lista])
     
-    # 2. Processamento com IA (se disponível)
+    # 2. Se a IA estiver ativa, exige síntese lógica focada
     if gemini_key:
         try:
             genai.configure(api_key=gemini_key)
             model = genai.GenerativeModel('gemini-1.5-flash')
             prompt = f"""
-Você é o Mr. Halley, assistente de manutenção do Updated Yesterday.
-Sintoma atual: {sintoma}
-Histórico retornado do banco:
+Você é o Mr. Halley, assistente de manutenção técnica.
+Sintoma atual do veículo: '{sintoma}'
+Histórico das OSs passadas:
 {historico_texto}
 
-Instruções RÍGIDAS:
-1. Inicie com "Baseado no histórico".
-2. Limite a resposta a NO MÁXIMO 10 PALAVRAS.
-3. Resuma estritamente a ação aplicada no histórico.
+Instruções:
+1. Inicie OBRIGATORIAMENTE com "Baseado no histórico".
+2. Identifique a AÇÃO TÉCNICA RELEVANTE que resolveu o sintoma '{sintoma}'.
+3. IGNORE completamente manutenções secundárias listadas na mesma OS que não tenham relação com '{sintoma}' (ex: se o problema for direção, ignore buzina, ventilador, ar-condicionado).
+4. Resuma em uma recomendação clara e direta (1 frase amigável).
 """
             response = model.generate_content(prompt)
             txt = response.text.strip()
@@ -97,24 +95,33 @@ Instruções RÍGIDAS:
         except Exception:
             pass
 
-    # 3. Fallback Local Ultra Curto (Sintetiza apenas a primeira ação e limita o texto)
-    solucoes_limpas = []
+    # 3. Processamento Local Inteligente (Filtra apenas a solução relacionada ao sintoma)
+    acoes_relevantes = []
+    sintoma_low = sintoma.lower()
+    
     for item in historico_lista:
-        txt = item
-        if "Execução:" in txt:
-            txt = txt.split("Execução:")[-1].split(";")[0].strip()
-        elif "Serviço:" in txt:
-            txt = txt.split("Serviço:")[-1].split(";")[0].strip()
+        txt_item = item
+        if "Execução:" in txt_item:
+            txt_item = txt_item.split("Execução:")[-1].split(";")[0].strip()
+        elif "Serviço:" in txt_item:
+            txt_item = txt_item.split("Serviço:")[-1].split(";")[0].strip()
             
-        if len(txt) > 3:
-            solucoes_limpas.append(txt)
-            
-    if solucoes_limpas:
-        # Pega apenas a 1ª ação encontrada e corta em no máximo 50 caracteres
-        primeira_acao = solucoes_limpas[0]
-        if len(primeira_acao) > 50:
-            primeira_acao = primeira_acao[:50].rstrip() + "..."
-        return f"{PREAMBULO} local das OSs: {primeira_acao}"
+        # Filtro de relevância semântica basilar (Impede buzina em direção)
+        if "direção" in sintoma_low or "puxando" in sintoma_low:
+            if any(termo in txt_item.lower() for termo in ["alinhamento", "balanceamento", "terminal", "pneu", "geometria", "caixa", "suspensão"]):
+                acoes_relevantes.append(txt_item)
+        elif "fumaça" in sintoma_low:
+            if any(termo in txt_item.lower() for termo in ["bico", "injetor", "filtro", "válvula", "limpeza"]):
+                acoes_relevantes.append(txt_item)
+        elif "marcha" in sintoma_low or "engatar" in sintoma_low:
+            if any(termo in txt_item.lower() for termo in ["trambulador", "embreagem", "câmbio", "cabo", "óleo"]):
+                acoes_relevantes.append(txt_item)
+        else:
+            acoes_relevantes.append(txt_item)
+
+    if acoes_relevantes:
+        solucao = acoes_relevantes[0].replace(".", "").strip()
+        return f"{PREAMBULO} local da frota, recomenda-se avaliar: {solucao}."
         
     return f"{PREAMBULO} da frota, não há registros anteriores para este sintoma."
     
