@@ -1188,36 +1188,29 @@ else:
                                     }
                                     st.session_state["last_analised_id"] = id_chamado
 
-# --- CONSULTA AO CÉREBRO DO MR. HALLEY (AJUSTADO PARA CASOS SEM HISTÓRICO) ---
-def triagem_mr_halley(sintoma, emp_id):
-    historico = buscar_historico_relevante(sintoma, emp_id)
-    
-    # Se a busca no banco indicar que não há histórico, responde direto sem chamar a IA
-    if not historico or "Nenhuma" in historico or "Sem histórico" in historico:
-        return "Não detectei históricos anteriores dessa falha, para sugerir possíveis causas."
-        
-    gemini_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
-    
-    if gemini_key:
-        try:
-            client = genai.Client(api_key=gemini_key)
-            prompt = f"""
-Você é o Mr. Halley, assistente técnico de manutenção do sistema Up 2 Today.
-Com base nas ordens passadas: '{historico}' e no novo defeito relatado: '{sintoma}'.
-
-Gere um parecer técnico EXTREMAMENTE CURTO (máximo 2 linhas) para o PCM.
-Seja direto ao ponto sobre o que inspecionar com base nos dados históricos.
-"""
-            response = client.models.generate_content(
-                model='gemini-1.5-flash',
-                contents=prompt
-            )
-            return response.text.strip()
-        except Exception:
-            pass
-
-    # Fallback dinâmico seguro caso a API da IA não responda no momento
-    return f"Não detectei históricos anteriores dessa falha, para sugerir possíveis causas."
+            # --- EXIBIÇÃO DO CHAT DO MR. HALLEY EM TEMPO REAL ---
+            if "analise_imediata_halley" in st.session_state:
+                res = st.session_state["analise_imediata_halley"]
+                
+                URL_AVATAR_HALLEY = "https://i.postimg.cc/5tBtrL6C/Whats-App-Image-2026-07-23-at-22-35-53.png"
+                
+                html_layout = f"""
+                <div style="display: flex; align-items: center; justify-content: flex-end; margin: 25px 0; font-family: sans-serif;">
+                    <div style="background-color: #FFFFFF; border: 2px solid #C5A059; border-radius: 16px; padding: 18px 22px; margin-right: 20px; max-width: 75%; color: #1E293B; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+                        <strong style="color: #4A3C31; font-size: 1.15em; display: block; margin-bottom: 6px;">🤖 Telemetria do Mr. Halley</strong>
+                        <span style="color: #64748B; font-size: 0.88em; display: block; margin-bottom: 8px; font-weight: 600;">Veículo: {res['veiculo']}</span>
+                        <p style="margin: 0; font-size: 0.98em; line-height: 1.5; color: #1E293B;">
+                            <strong style="color: #4A3C31;">Parecer Técnico:</strong> {res['parecer']}
+                        </p>
+                    </div>
+                    <div style="flex-shrink: 0; text-align: center;">
+                        <img src="{URL_AVATAR_HALLEY}" style="width: 145px; height: auto;" alt="Mr. Halley">
+                    </div>
+                </div>
+                """
+                
+                st.markdown(html_layout, unsafe_allow_html=True)
+                st.markdown("---")
             
             ed_c = st.data_editor(
                 st.session_state.df_ap_work, 
