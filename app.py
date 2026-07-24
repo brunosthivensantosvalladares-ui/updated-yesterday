@@ -64,21 +64,26 @@ def buscar_historico_relevante(sintoma_motorista, emp_id):
     except Exception as e:
         return f"Sem histórico disponível ({e})."
 
-# --- CONSULTA AO CÉREBRO DO MR. HALLEY (INTEGRADO AO GEMINI FLASH) ---
+# --- CONSULTA AO CÉREBRO DO MR. HALLEY (NOME CORRIGIDO: UPDATED YESTERDAY) ---
 def triagem_mr_halley(sintoma, emp_id):
     historico = buscar_historico_relevante(sintoma, emp_id)
+    
+    # 1. Se a busca local por termos-chave não trouxer nada relevante, avisa na hora
+    if not historico or "Nenhuma" in historico or "Sem histórico" in historico:
+        return "Não detectei históricos anteriores dessa falha, para sugerir possíveis causas."
+        
     gemini_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
     
+    # 2. Se a chave da IA existir, processa o histórico real dinamicamente
     if gemini_key:
         try:
             client = genai.Client(api_key=gemini_key)
             prompt = f"""
-Você é o Mr. Halley, assistente técnico de manutenção do Up 2 Today.
-Com base no histórico: '{historico}' e no sintoma atual: '{sintoma}'.
+Você é o Mr. Halley, assistente técnico de manutenção do sistema Updated Yesterday.
+Com base nas ordens passadas encontradas no banco: '{historico}' e no novo defeito relatado: '{sintoma}'.
 
-Gere uma resposta EXTREMAMENTE CURTA (máximo 2 linhas) para o PCM.
-Exemplo de formato:
-"Histórico indica problema nos bicos injetores. Recomendo teste de vazão e limpeza da alimentação."
+Gere um parecer técnico EXTREMAMENTE CURTO (máximo 2 linhas) para o PCM.
+Seja direto ao ponto sobre o que inspecionar com base nos dados históricos fornecidos. Não invente peças se não estiverem no histórico.
 """
             response = client.models.generate_content(
                 model='gemini-1.5-flash',
@@ -88,11 +93,8 @@ Exemplo de formato:
         except Exception:
             pass
 
-    # Fallback ultra resumido (caso a API não responda)
-    if historico and "Nenhuma" not in historico:
-        return "⚙️ **Histórico indica:** Casos parecidos foram resolvidos com limpeza/troca dos bicos injetores. Recomendo inspeção no sistema de alimentação."
-    
-    return "⚙️ Sem histórico idêntico registrado. Recomenda-se inspeção geral do sistema."
+    # 3. Fallback Seguro: Se a IA falhar na conexão, mostra apenas os dados brutos reais da busca
+    return f"Falta de conexão com o painel espacial. A busca local no Updated Yesterday encontrou registros passados correlacionados: {historico}"
     
 # --- INICIALIZAÇÃO SEGURA DO CLIENTE ---
 if "GEMINI_API_KEY" in st.secrets:
