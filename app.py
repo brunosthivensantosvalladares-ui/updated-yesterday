@@ -80,7 +80,7 @@ def buscar_historico_relevante(sintoma_motorista, emp_id):
     except Exception:
         return []
 
-# --- TRIAGEM DO MR. HALLEY (HISTÓRICO LOCAL VS CONHECIMENTO EXTERNO) ---
+# --- TRIAGEM DO MR. HALLEY (COM AJUSTE DE CONECTOR TÉCNICO) ---
 def triagem_mr_halley(sintoma, emp_id):
     historicos = buscar_historico_relevante(sintoma, emp_id)
     gemini_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
@@ -105,13 +105,13 @@ Histórico Encontrado no Banco de Dados:
 DIRETRIZES ESTRITAS DE RESPOSTA:
 
 SITUAÇÃO A: Se existir histórico local correspondente no banco para este sintoma:
-1. Inicie OBRIGATORIAMENTE com: "Baseado no histórico local,"
-2. Escreva 1 recomendação técnica curta (10 a 15 palavras) usando VERBOS NO INFINITIVO.
+1. Inicie OBRIGATORIAMENTE com: "Baseado no histórico local da frota, recomenda-se"
+2. Complete a frase com uma recomendação curta (10 a 15 palavras) usando VERBOS NO INFINITIVO (ex: "...realizar o alinhamento...").
 3. Ignore serviços/peças secundárias sem relação com o sintoma.
 
 SITUAÇÃO B: Se NÃO existir histórico local correspondente no banco (ou se o histórico for de outro sistema descorrelacionado):
-1. Inicie OBRIGATORIAMENTE com: "Não identificamos registros no histórico local da frota, porém, em análises técnicas externas,"
-2. Forneça uma recomendação técnica preventiva baseada no seu conhecimento automotivo geral para o sintoma "{sintoma}".
+1. Inicie OBRIGATORIAMENTE com: "Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se"
+2. Complete a frase fornecendo uma ação preventiva baseada no seu conhecimento automotivo geral para o sintoma "{sintoma}".
 3. Use VERBOS NO INFINITIVO e limite a resposta a 1 frase curta (10 a 15 palavras).
 """
 
@@ -124,7 +124,6 @@ SITUAÇÃO B: Se NÃO existir histórico local correspondente no banco (ou se o 
         return response.text.strip()
         
     except Exception as e:
-        # Fallback tentando o modelo 2.0 caso o 2.5 não responda
         try:
             client = genai.Client(api_key=gemini_key)
             response = client.models.generate_content(
