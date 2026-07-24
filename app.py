@@ -1192,9 +1192,10 @@ else:
             if "analise_imediata_halley" in st.session_state:
                 res = st.session_state["analise_imediata_halley"]
                 
-                # URL da imagem oficial do Mr. Halley
-                URL_AVATAR_HALLEY = "https://i.postimg.cc/6Q7dyFgs/Gemini-Generated-Image.png"
+                # URL da imagem do mascote Mr. Halley (com fundo transparente)
+                URL_AVATAR_HALLEY = "https://i.postimg.cc/qvsMghXf/mr-halley-mascote-transp.png"
                 
+                # Criamos a mensagem do chat usando o mascote como avatar
                 with st.chat_message("assistant", avatar=URL_AVATAR_HALLEY):
                     st.markdown(f"### 🤖 Telemetria do Mr. Halley\n\n**Veículo {res['veiculo']}:**\n* Sintoma: {res['relato']}\n* **Parecer Técnico:** {res['parecer']}")
                 st.markdown("---")
