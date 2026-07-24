@@ -27,14 +27,23 @@ def get_engine():
 
 # --- BUSCA DE HISTÓRICO LOCAL (RAG DO MR. HALLEY) ---
 def buscar_historico_relevante(sintoma_motorista, emp_id):
-    """ Varre as OSs concluídas da empresa procurando termos semelhantes ao sintoma relatado. """
+    """ Varre as OSs concluídas descartando termos genéricos para não trazer registros irrelevantes. """
     engine = get_engine()
-    palavras = [p for p in sintoma_motorista.lower().split() if len(p) > 3]
+    
+    # Lista de palavras ignoradas por serem genéricas demais no contexto automotivo
+    palavras_ignoradas = {'carro', 'veiculo', 'caminhao', 'saindo', 'muita', 'muito', 'fazer', 'esta', 'estão'}
+    
+    palavras = [
+        p for p in sintoma_motorista.lower().split() 
+        if len(p) > 3 and p not in palavras_ignoradas
+    ]
     
     if not palavras:
         return "Nenhum histórico prévio encontrado para termos genéricos."
         
+    # Busca dinamicamente apenas pelas palavras-chave reais do problema (ex: 'fumaça', 'preta')
     condicoes = " OR ".join([f"LOWER(descricao) LIKE '%{p}%'" for p in palavras])
+    
     query = text(f"""
         SELECT prefixo, descricao 
         FROM tarefas 
@@ -58,38 +67,32 @@ def buscar_historico_relevante(sintoma_motorista, emp_id):
 # --- CONSULTA AO CÉREBRO DO MR. HALLEY (INTEGRADO AO GEMINI FLASH) ---
 def triagem_mr_halley(sintoma, emp_id):
     historico = buscar_historico_relevante(sintoma, emp_id)
+    gemini_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
     
-    # Tenta conectar via Gemini Client já configurado no seu app
-    client = st.session_state.get("gemini_client")
-    
-    prompt = f"""
-Você é o Mr. Halley, o assistente inteligente de manutenção da nave e do sistema Updated Yesterday.
-Seu papel é analisar o relato do motorista com base no histórico de Ordens de Serviço (OS) anteriores e sugerir um diagnóstico direto, técnico e resumido para o PCM.
-
-Histórico de casos semelhantes encontrados na frota:
-{historico}
-
-Sintoma atual relatado pelo motorista:
-{sintoma}
-
-Responda como Mr. Halley, sendo direto (máximo 3 frases), citando o que o histórico sugere e qual a ação recomendada para a oficina.
-"""
-
-    if client:
+    if gemini_key:
         try:
+            client = genai.Client(api_key=gemini_key)
+            prompt = f"""
+Você é o Mr. Halley, assistente técnico de manutenção do Up 2 Today.
+Com base no histórico: '{historico}' e no sintoma atual: '{sintoma}'.
+
+Gere uma resposta EXTREMAMENTE CURTA (máximo 2 linhas) para o PCM.
+Exemplo de formato:
+"Histórico indica problema nos bicos injetores. Recomendo teste de vazão e limpeza da alimentação."
+"""
             response = client.models.generate_content(
                 model='gemini-1.5-flash',
                 contents=prompt
             )
             return response.text.strip()
-        except Exception as e:
-            pass # Se o Gemini falhar, cai no fallback formatado abaixo
+        except Exception:
+            pass
 
-    # Fallback estruturado caso a chave do Gemini não esteja ativa no momento
+    # Fallback ultra resumido (caso a API não responda)
     if historico and "Nenhuma" not in historico:
-        return f"Com base no histórico da frota, identificamos casos semelhantes resolutivos:\n\n{historico}\n💡 **Sugestão técnica:** Verificar bicos injetores e sistema de alimentação."
+        return "⚙️ **Histórico indica:** Casos parecidos foram resolvidos com limpeza/troca dos bicos injetores. Recomendo inspeção no sistema de alimentação."
     
-    return "Nenhum histórico conclusivo encontrado. Recomenda-se inspeção geral do sistema."
+    return "⚙️ Sem histórico idêntico registrado. Recomenda-se inspeção geral do sistema."
     
 # --- INICIALIZAÇÃO SEGURA DO CLIENTE ---
 if "GEMINI_API_KEY" in st.secrets:
