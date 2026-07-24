@@ -1225,28 +1225,28 @@ else:
                             if id_chamado in st.session_state.analises_halley:
                                 del st.session_state.analises_halley[id_chamado]
 
-            # --- EXIBIÇÃO DE MÚLTIPLOS BALÕES DO MR. HALLEY ---
+# --- EXIBIÇÃO DE MÚLTIPLOS BALÕES DO MR. HALLEY ---
             if "analises_halley" in st.session_state and st.session_state.analises_halley:
                 URL_AVATAR_HALLEY = "https://i.postimg.cc/5tBtrL6C/Whats-App-Image-2026-07-23-at-22-35-53.png"
                 
-                # Exibe um balão individual para cada chamado marcado
                 for id_c, res in st.session_state.analises_halley.items():
                     parecer_limpo = str(res['parecer']).replace('<', '&lt;').replace('>', '&gt;')
                     
-html_layout = (
-    f'<div style="display: flex; align-items: flex-start; justify-content: flex-end; margin: 15px 0; font-family: sans-serif;">'
-    f'    <div style="background-color: #FFFFFF; border: 2px solid #C5A059; border-radius: 16px; padding: 16px 20px; margin-right: 18px; width: 100%; max-width: 80%; color: #1E293B; box-shadow: 0 4px 12px rgba(0,0,0,0.08); height: auto;">'
-    f'        <strong style="color: #4A3C31; font-size: 1.05em; display: block; margin-bottom: 4px;">🤖 Telemetria do Mr. Halley</strong>'
-    f'        <span style="color: #64748B; font-size: 0.82em; display: block; margin-bottom: 6px; font-weight: 600;">Veículo: {res["veiculo"]} ({res["relato"]})</span>'
-    f'        <p style="margin: 0; font-size: 0.92em; line-height: 1.5; color: #1E293B; word-break: break-word; overflow-wrap: break-word;">'
-    f'            <strong style="color: #4A3C31;">Parecer Técnico:</strong> {parecer_limpo}'
-    f'        </p>'
-    f'    </div>'
-    f'    <div style="flex-shrink: 0; text-align: center;">'
-    f'        <img src="{URL_AVATAR_HALLEY}" style="width: 120px; height: auto;" alt="Mr. Halley">'
-    f'    </div>'
-    f'</div>'
-)
+                    html_layout = (
+                        f'<div style="display: flex; align-items: flex-start; justify-content: flex-end; margin: 15px 0; font-family: sans-serif;">'
+                        f'    <div style="background-color: #FFFFFF; border: 2px solid #C5A059; border-radius: 16px; padding: 16px 20px; margin-right: 18px; width: 100%; max-width: 80%; color: #1E293B; box-shadow: 0 4px 12px rgba(0,0,0,0.08); height: auto;">'
+                        f'        <strong style="color: #4A3C31; font-size: 1.05em; display: block; margin-bottom: 4px;">🤖 Telemetria do Mr. Halley</strong>'
+                        f'        <span style="color: #64748B; font-size: 0.82em; display: block; margin-bottom: 6px; font-weight: 600;">Veículo: {res["veiculo"]} ({res["relato"]})</span>'
+                        f'        <p style="margin: 0; font-size: 0.92em; line-height: 1.5; color: #1E293B; word-break: break-word; overflow-wrap: break-word;">'
+                        f'            <strong style="color: #4A3C31;">Parecer Técnico:</strong> {parecer_limpo}'
+                        f'        </p>'
+                        f'    </div>'
+                        f'    <div style="flex-shrink: 0; text-align: center;">'
+                        f'        <img src="{URL_AVATAR_HALLEY}" style="width: 120px; height: auto;" alt="Mr. Halley">'
+                        f'    </div>'
+                        f'</div>'
+                    )
+                    # Certifique-se de que esta linha tem o MESMO alinhamento de 'html_layout =' acima
                     st.markdown(html_layout, unsafe_allow_html=True)
                 
                 st.markdown("---")
