@@ -25,12 +25,11 @@ def get_engine():
         st.stop()
     return create_engine(db_url.replace("postgres://", "postgresql://", 1), pool_pre_ping=True)
 
-# --- BUSCA DE HISTÓRICO LOCAL (RETORNA SINTOMA + SOLUÇÃO TÉCNICA) ---
+# --- BUSCA DE HISTÓRICO FILTRADA E RESTRITA ---
 def buscar_historico_relevante(sintoma_motorista, emp_id):
-    """ Varre as OSs concluídas descartando termos genéricos e trazendo a solução real executada. """
     engine = get_engine()
     
-    palavras_ignoradas = {'carro', 'veiculo', 'caminhao', 'saindo', 'muita', 'muito', 'fazer', 'esta', 'estão', 'direito'}
+    palavras_ignoradas = {'carro', 'veiculo', 'caminhao', 'saindo', 'muita', 'muito', 'fazer', 'esta', 'estao', 'direito', 'problema', 'com'}
     palavras = [
         p for p in sintoma_motorista.lower().split() 
         if len(p) > 3 and p not in palavras_ignoradas
@@ -57,51 +56,39 @@ def buscar_historico_relevante(sintoma_motorista, emp_id):
         historico_formatado = ""
         for row in resultados:
             desc = str(row[1])
-            # Se a descrição tiver o relato do mecânico (ex: Execução: ...), prioriza a solução
-            if "Execução:" in desc:
-                solucao = desc.split("Execução:")[-1].split(";")[0].strip()
-                historico_formatado += f"- Veículo {row[0]}: Solução: {solucao}\n"
-            else:
-                historico_formatado += f"- Veículo {row[0]}: {desc}\n"
+            historico_formatado += f"- Veículo {row[0]}: {desc}\n"
         return historico_formatado
     except Exception as e:
         return f"Sem histórico disponível ({e})."
 
-# --- CONSULTA DINÂMICA AO CÉREBRO DO MR. HALLEY (RAG REAL COM GEMINI) ---
+# --- CONSULTA AO MR. HALLEY (MODELO GEMINI CORRIGIDO E BUSCA RESTRITA) ---
 def triagem_mr_halley(sintoma, emp_id):
-    # 1. Busca no banco de dados o histórico real de OSs concluídas
     historico = buscar_historico_relevante(sintoma, emp_id)
     
     PREAMBULO = "Baseado no histórico"
     
-    # Se o banco não encontrar ordens anteriores com os mesmos termos
+    # Se o banco não encontrar ordens anteriores com o mesmo componente
     if not historico or "Nenhuma" in historico or "Sem histórico" in historico:
-        return f"{PREAMBULO} da frota, não detectamos registros prévios desta falha. Recomenda-se inspeção física do sistema."
+        return f"{PREAMBULO} da frota, não detectamos registros prévios desta falha para o componente. Recomenda-se inspeção física do sistema."
         
-    # 2. Captura a chave dos Secrets do Streamlit Cloud
     gemini_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
     
     if gemini_key:
         try:
-            # Conecta usando a biblioteca google.generativeai
             genai.configure(api_key=gemini_key)
-            model = genai.GenerativeModel('gemini-1.5-flash')
+            
+            # Ajuste do nome do modelo para compatibilidade com a v1beta
+            model = genai.GenerativeModel('models/gemini-1.5-flash')
             
             prompt = f"""
-Você é o Mr. Halley, o assistente inteligente de manutenção preditiva da plataforma Updated Yesterday.
-Sua tarefa é analisar o novo defeito relatado pelo motorista e compará-lo com o histórico de Ordens de Serviço (OS) passadas da frota.
+Você é o Mr. Halley, assistente técnico do Updated Yesterday.
+Análise do novo defeito: '{sintoma}'
+Histórico das OSs anteriores: '{historico}'
 
-Histórico real retornado do banco de dados:
-{historico}
-
-Novo defeito relatado pelo motorista:
-{sintoma}
-
-Diretrizes estritas de resposta:
-1. Comece OBRIGATORIAMENTE a resposta com "Baseado no histórico".
-2. Seja ultra conciso: gere uma recomendação técnica de no MÁXIMO 1 frase (10 a 15 palavras).
-3. Seja 100% fiel ao histórico fornecido: analise o componente que falhou (ex: se for limpador/esguicho, recomende checar fusível/bomba/ejetor de água; se for fumaça, bicos de combustível; se for freio, regulagem).
-4. Nunca invente peças ou misture componentes de sistemas diferentes!
+Requisitos da resposta:
+1. Comece OBRIGATORIAMENTE com "Baseado no histórico".
+2. Responda em no MÁXIMO 1 frase curta (10 a 15 palavras).
+3. Seja 100% fiel ao sintoma '{sintoma}'. Fale estritamente do componente relatado.
 """
             response = model.generate_content(prompt)
             txt_resposta = response.text.strip()
@@ -111,13 +98,19 @@ Diretrizes estritas de resposta:
                 
             return txt_resposta
             
-        except Exception as e:
-            # Caso a API reporte erro, exibe a falha sem quebrar a aplicação
-            return f"{PREAMBULO} (Erro de API: {str(e)}). Dados do banco: {historico}"
+        except Exception as e_flash:
+            # Fallback para o modelo alias padrão caso o nome com models/ dê divergência no endpoint
+            try:
+                model_alt = genai.GenerativeModel('gemini-1.5-flash-latest')
+                response = model_alt.generate_content(prompt)
+                return response.text.strip()
+            except Exception as e_final:
+                # Se falhar a conexão com a API, exibe o resumo limpo do banco sem engessar nada
+                linhas = [l.strip() for l in historico.split('\n') if l.strip()]
+                return f"{PREAMBULO} local das OSs: {' | '.join(linhas[:2])}"
 
-    # Fallback Sem IA (apenas se não houver chave cadastrada nos secrets)
     linhas = [l.strip() for l in historico.split('\n') if l.strip()]
-    return f"{PREAMBULO} da frota: {' | '.join(linhas)}"
+    return f"{PREAMBULO} local das OSs: {' | '.join(linhas[:2])}"
     
 # --- INICIALIZAÇÃO SEGURA DO CLIENTE ---
 if "GEMINI_API_KEY" in st.secrets:
