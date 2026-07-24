@@ -25,19 +25,15 @@ def get_engine():
         st.stop()
     return create_engine(db_url.replace("postgres://", "postgresql://", 1), pool_pre_ping=True)
 
-# --- BUSCA DE HISTÓRICO ESTRITA POR COMPONENTE ---
+# --- BUSCA DE HISTÓRICO RETORNANDO TEXTO PURO DO BANCO ---
 def buscar_historico_relevante(sintoma_motorista, emp_id):
     engine = get_engine()
     
     palavras_ignoradas = {'carro', 'veiculo', 'caminhao', 'saindo', 'muita', 'muito', 'fazer', 'esta', 'estao', 'direito', 'problema', 'com', 'para', 'nao', 'sem', 'dificuldade'}
-    
-    palavras = [
-        p for p in sintoma_motorista.lower().split() 
-        if len(p) > 3 and p not in palavras_ignoradas
-    ]
+    palavras = [p for p in sintoma_motorista.lower().split() if len(p) > 3 and p not in palavras_ignoradas]
     
     if not palavras:
-        return "SEM_HISTORICO"
+        return []
         
     condicoes = " OR ".join([f"LOWER(descricao) LIKE '%{p}%'" for p in palavras])
     
@@ -45,51 +41,47 @@ def buscar_historico_relevante(sintoma_motorista, emp_id):
         SELECT prefixo, descricao 
         FROM tarefas 
         WHERE empresa_id = :eid AND realizado = True AND ({condicoes})
-        ORDER BY id DESC LIMIT 3
+        ORDER BY id DESC LIMIT 2
     """)
     
     try:
         with engine.connect() as conn:
             resultados = conn.execute(query, {"eid": str(emp_id)}).fetchall()
-            
+        
         if not resultados:
-            return "SEM_HISTORICO"
+            return []
             
-        historico_formatado = ""
-        for row in resultados:
-            desc = str(row[1])
-            historico_formatado += f"- Veículo {row[0]}: {desc}\n"
-        return historico_formatado
+        return [str(r[1]).strip() for r in resultados]
     except Exception:
-        return "SEM_HISTORICO"
+        return []
 
-# --- CONSULTA AO CÉREBRO DO MR. HALLEY (TRATAMENTO DE LOGS LOCAL) ---
+# --- TRIAGEM DO MR. HALLEY (RESPOSTA PADRONIZADA QUANDO SEM HISTÓRICO) ---
 def triagem_mr_halley(sintoma, emp_id):
-    historico = buscar_historico_relevante(sintoma, emp_id)
+    historico_lista = buscar_historico_relevante(sintoma, emp_id)
     PREAMBULO = "Baseado no histórico"
     
-    # Caso o banco não encontre nenhuma OS com esse sintoma específico
-    if not historico:
+    # 1. Resposta padrão combinada quando NÃO HÁ histórico no banco
+    if not historico_lista:
         return f"{PREAMBULO} da frota, não há registros anteriores para este sintoma."
         
     gemini_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
+    historico_texto = "\n".join([f"- {item}" for item in historico_lista])
     
+    # 2. Se a IA estiver ativa, sintetiza o histórico real encontrado
     if gemini_key:
         try:
             genai.configure(api_key=gemini_key)
             model = genai.GenerativeModel('gemini-1.5-flash')
             prompt = f"""
 Você é o Mr. Halley, assistente de manutenção do Updated Yesterday.
-Sua tarefa é analisar o histórico de OSs passadas e dar um parecer sobre o sintoma atual.
-
 Sintoma atual: {sintoma}
 Histórico encontrado no banco:
-{historico}
+{historico_texto}
 
 Regras:
 1. Comece obrigatoriamente com "Baseado no histórico".
 2. Seja ultra conciso (máximo 12 palavras / 1 frase).
-3. Resuma exatamente a solução que foi aplicada no histórico fornecido.
+3. Resuma exatamente a solução técnica aplicada no histórico fornecido.
 """
             response = model.generate_content(prompt)
             txt = response.text.strip()
@@ -97,15 +89,23 @@ Regras:
         except Exception:
             pass
 
-    # Exibição dinâmica direta do banco (sem nenhuma regra ou frase engessada)
-    solucoes = []
-    for linha in historico.split("\n"):
-        if ":" in linha:
-            # Pega o texto da tarefa/execução do banco
-            solucoes.append(linha.split(":")[-1].strip())
+    # 3. Fallback dinâmico para quando HÁ histórico, mas sem IA
+    solucoes_limpas = []
+    for item in historico_lista:
+        txt = item
+        if "Execução:" in txt:
+            txt = txt.split("Execução:")[-1].split(";")[0].strip()
+        elif "Serviço:" in txt:
+            txt = txt.split("Serviço:")[-1].split(";")[0].strip()
             
-    resumo_banco = " | ".join(solucoes[:2])
-    return f"{PREAMBULO} local das OSs: {resumo_banco}"
+        if len(txt) > 3:
+            solucoes_limpas.append(txt)
+            
+    if solucoes_limpas:
+        resumo_final = " | ".join(solucoes_limpas[:2])
+        return f"{PREAMBULO} local das OSs: {resumo_final}"
+        
+    return f"{PREAMBULO} da frota, não há registros anteriores para este sintoma."
     
 # --- INICIALIZAÇÃO SEGURA DO CLIENTE ---
 if "GEMINI_API_KEY" in st.secrets:
