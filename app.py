@@ -25,14 +25,12 @@ def get_engine():
         st.stop()
     return create_engine(db_url.replace("postgres://", "postgresql://", 1), pool_pre_ping=True)
 
-# --- BUSCA DE HISTÓRICO LOCAL (RAG DO MR. HALLEY) ---
+# --- BUSCA DE HISTÓRICO LOCAL (RETORNA SINTOMA + SOLUÇÃO TÉCNICA) ---
 def buscar_historico_relevante(sintoma_motorista, emp_id):
-    """ Varre as OSs concluídas descartando termos genéricos para não trazer registros irrelevantes. """
+    """ Varre as OSs concluídas descartando termos genéricos e trazendo a solução real executada. """
     engine = get_engine()
     
-    # Lista de palavras ignoradas por serem genéricas demais no contexto automotivo
-    palavras_ignoradas = {'carro', 'veiculo', 'caminhao', 'saindo', 'muita', 'muito', 'fazer', 'esta', 'estão'}
-    
+    palavras_ignoradas = {'carro', 'veiculo', 'caminhao', 'saindo', 'muita', 'muito', 'fazer', 'esta', 'estão', 'direito'}
     palavras = [
         p for p in sintoma_motorista.lower().split() 
         if len(p) > 3 and p not in palavras_ignoradas
@@ -41,7 +39,6 @@ def buscar_historico_relevante(sintoma_motorista, emp_id):
     if not palavras:
         return "Nenhum histórico prévio encontrado para termos genéricos."
         
-    # Busca dinamicamente apenas pelas palavras-chave reais do problema (ex: 'fumaça', 'preta')
     condicoes = " OR ".join([f"LOWER(descricao) LIKE '%{p}%'" for p in palavras])
     
     query = text(f"""
@@ -59,12 +56,18 @@ def buscar_historico_relevante(sintoma_motorista, emp_id):
             
         historico_formatado = ""
         for row in resultados:
-            historico_formatado += f"- Veículo {row[0]}: {row[1]}\n"
+            desc = str(row[1])
+            # Se a descrição tiver o relato do mecânico (ex: Execução: ...), prioriza a solução
+            if "Execução:" in desc:
+                solucao = desc.split("Execução:")[-1].split(";")[0].strip()
+                historico_formatado += f"- Veículo {row[0]}: Solução: {solucao}\n"
+            else:
+                historico_formatado += f"- Veículo {row[0]}: {desc}\n"
         return historico_formatado
     except Exception as e:
         return f"Sem histórico disponível ({e})."
 
-# --- CONSULTA AO CÉREBRO DO MR. HALLEY (TRATAMENTO DE TEXTO LIMPO) ---
+# --- CONSULTA AO CÉREBRO DO MR. HALLEY (SUGESTÃO DE DIAGNÓSTICO GARANTIDA) ---
 def triagem_mr_halley(sintoma, emp_id):
     historico = buscar_historico_relevante(sintoma, emp_id)
     
@@ -78,10 +81,10 @@ def triagem_mr_halley(sintoma, emp_id):
             client = genai.Client(api_key=gemini_key)
             prompt = f"""
 Você é o Mr. Halley, assistente de manutenção do Updated Yesterday.
-Analisando o histórico: '{historico}' para o sintoma: '{sintoma}'.
+Com base no histórico: '{historico}' e no sintoma atual: '{sintoma}'.
 
-Gere um parecer técnico EXTREMAMENTE CURTO (máximo 1 ou 2 frases curtas).
-Não cite números de veículos ou horários ("00:00"). Diga apenas a causa provável e a ação recomendada.
+Gere uma SUGESTÃO DE DIAGNÓSTICO EXTREMAMENTE CURTA (máximo 15 palavras).
+Seja direto ao ponto sugerindo o que a oficina deve testar/inspecionar com base na solução do histórico.
 """
             response = client.models.generate_content(
                 model='gemini-1.5-flash',
@@ -91,22 +94,18 @@ Não cite números de veículos ou horários ("00:00"). Diga apenas a causa prov
         except Exception:
             pass
 
-    # Fallback Limpo: Remove '00', '*', 'Horário' e limpa os caracteres estranhos do SQL
-    linhas_limpas = []
+    # Fallback Inteligente: Extrai a solução real do histórico e faz a sugestão técnica
+    solucoes = []
     for linha in historico.split("\n"):
-        if linha.strip():
-            # Extrai apenas a descrição limpa
-            txt = linha.replace("*", "").replace("00:00", "").replace("00-00", "").strip()
-            # Remove marcadores brutos
-            if ":" in txt:
-                txt = txt.split(":")[-1].strip()
-            if txt and len(txt) > 3:
-                linhas_limpas.append(txt)
-    
-    if linhas_limpas:
-        # Pega as 2 ações mais relevantes do histórico sem cortar palavra
-        parecer_local = " / ".join(linhas_limpas[:2])
-        return f"Histórico local indica intervenções anteriores em: {parecer_local}."
+        if "Solução:" in linha:
+            solucoes.append(linha.split("Solução:")[-1].strip())
+        elif ":" in linha and len(linha.split(":")[-1].strip()) > 5:
+            solucoes.append(linha.split(":")[-1].strip())
+
+    if solucoes:
+        # Pega a principal solução executada e sugere a inspeção
+        sugestao = solucoes[0].replace(".", "").strip()
+        return f"Sugestão de diagnóstico baseada na frota: Avaliar {sugestao}."
         
     return "Não detectei históricos anteriores desta falha para sugerir possíveis causas."
     
