@@ -66,7 +66,6 @@ def triagem_mr_halley(sintoma, emp_id):
     API_URL = "https://api-inference.huggingface.co/models/microsoft/Phi-3-mini-4k-instruct"
     headers = {"Authorization": f"Bearer {token}"}
 
-    # Prompt simplificado para evitar bugs de interpretação do modelo
     prompt = f"Instrução: Você é o Mr. Halley, assistente de manutenção do Up 2 Today. Com base no histórico de manutenções parecidas: '{historico}', analise o novo problema relatado: '{sintoma}' e sugira o diagnóstico provável de forma curta e técnica.\nResposta do Mr. Halley:"
 
     payload = {
@@ -103,12 +102,10 @@ if "GEMINI_API_KEY" in st.secrets:
         st.sidebar.error("IA indisponível no momento.")
 else:
     st.sidebar.warning("IA não configurada.")
-# ------------------------------------------
 
 def gerar_pdf_manual_oficial_pro():
     class PDF(FPDF):
         def header(self):
-            # Sigla Up 2 Today Colorida
             self.set_font("Arial", "B", 25)
             self.set_text_color(27, 34, 76) 
             self.cell(10, 10, "U", 0, 0)
@@ -122,11 +119,9 @@ def gerar_pdf_manual_oficial_pro():
             self.set_text_color(128, 128, 128)
             self.cell(0, 10, f"Página {self.page_no()}", 0, 0, 'C')
 
-    # Criamos o PDF usando latin-1 para compatibilidade padrão
     pdf = PDF()
     pdf.set_auto_page_break(auto=True, margin=15)
     
-    # --- PÁGINA 1: CAPA ---
     pdf.add_page()
     pdf.ln(50)
     pdf.set_font("Arial", "B", 35)
@@ -140,7 +135,6 @@ def gerar_pdf_manual_oficial_pro():
     pdf.set_text_color(80, 80, 80)
     pdf.cell(190, 10, "Seu Controle. Nossa Prioridade.", ln=True, align='C')
     
-    # --- PÁGINA 2: SUMÁRIO ---
     pdf.add_page()
     pdf.set_font("Arial", "B", 18); pdf.set_text_color(27, 34, 76)
     pdf.cell(190, 15, "SUMÁRIO", ln=True); pdf.ln(10)
@@ -166,7 +160,6 @@ def gerar_pdf_manual_oficial_pro():
         pdf.set_font("Arial", "B", 12)
         pdf.cell(10, 10, pagina, 0, 1, 'R')
 
-    # --- PÁGINA 3: INTRODUÇÃO ---
     pdf.add_page()
     pdf.set_font("Arial", "B", 16); pdf.set_text_color(27, 34, 76)
     pdf.cell(190, 10, "1. INTRODUÇÃO E GANHOS ESTRATÉGICOS", ln=True)
@@ -182,7 +175,6 @@ def gerar_pdf_manual_oficial_pro():
         "- Comunicação instantânea entre motorista e oficina."
     ))
 
-    # --- PÁGINA 4: WORKFLOW ---
     pdf.add_page()
     pdf.set_font("Arial", "B", 16); pdf.set_text_color(27, 34, 76)
     pdf.cell(190, 10, "2. FLUXO DE TRABALHO (WORKFLOW)", ln=True)
@@ -194,7 +186,6 @@ def gerar_pdf_manual_oficial_pro():
         "3. Execução: A oficina realiza o serviço dentro da janela programada, garantindo a eficiência."
     ))
 
-    # --- PÁGINA 5: LOGÍSTICA ---
     pdf.add_page()
     pdf.set_font("Arial", "B", 16); pdf.set_text_color(27, 34, 76)
     pdf.cell(190, 10, "3. OPERAÇÃO DA LOGÍSTICA (JANELAS)", ln=True)
@@ -205,7 +196,6 @@ def gerar_pdf_manual_oficial_pro():
         "sabendo exatamente quando o veículo estará livre para o box, evitando ociosidade da equipe."
     ))
 
-    # --- PÁGINA 6: PERFIS ---
     pdf.add_page()
     pdf.set_font("Arial", "B", 16); pdf.set_text_color(27, 34, 76)
     pdf.cell(190, 10, "4. PERFIS DE ACESSO (ADMIN VS MOTORISTA)", ln=True)
@@ -217,7 +207,6 @@ def gerar_pdf_manual_oficial_pro():
         "abrir chamados e acompanhar se o seu veículo já foi liberado, sem acesso a dados sensíveis."
     ))
 
-    # --- PÁGINA 7: CHAMADOS ---
     pdf.add_page()
     pdf.set_font("Arial", "B", 16); pdf.set_text_color(27, 34, 76)
     pdf.cell(190, 10, "5. GUIA: CHAMADOS OFICINA", ln=True)
@@ -229,7 +218,6 @@ def gerar_pdf_manual_oficial_pro():
         "*Importante: Após aprovado, o serviço é migrado instantaneamente para a Agenda Principal.*"
     ))
 
-    # --- PÁGINA 8: AGENDA ---
     pdf.add_page()
     pdf.set_font("Arial", "B", 16); pdf.set_text_color(27, 34, 76)
     pdf.cell(190, 10, "6. GUIA: AGENDA PRINCIPAL", ln=True)
@@ -241,7 +229,6 @@ def gerar_pdf_manual_oficial_pro():
         "- Conclusão: O check no campo 'OK' é obrigatório para encerrar o ciclo e gerar o histórico."
     ))
 
-    # --- PÁGINA 9: PREVENTIVAS ---
     pdf.add_page()
     pdf.set_font("Arial", "B", 16); pdf.set_text_color(27, 34, 76)
     pdf.cell(190, 10, "7. GUIA: CADASTRO DIRETO", ln=True)
@@ -252,7 +239,6 @@ def gerar_pdf_manual_oficial_pro():
         "A lista inferior serve para auditoria e exclusão de registros indevidos."
     ))
 
-    # --- PÁGINA 10: ASSISTENTE ---
     pdf.add_page()
     pdf.set_font("Arial", "B", 16); pdf.set_text_color(27, 34, 76)
     pdf.cell(190, 10, "8. ASSISTENTE VIRTUAL E PENDÊNCIAS", ln=True)
@@ -265,13 +251,6 @@ def gerar_pdf_manual_oficial_pro():
 
     texto_pdf = pdf.output(dest='S')
     return texto_pdf.encode('latin-1', 'replace')
-    
-# --- CONFIGURAÇÕES DE MARCA ---
-NOME_SISTEMA = "Updated Yesterday"
-SLOGAN = "Seu Controle. Nossa Prioridade."
-LOGO_URL = "https://i.postimg.cc/6Q7dyFgs/Gemini-Generated-Image.png"
-ORDEM_AREAS = ["Motorista", "Borracharia", "Mecânica", "Elétrica", "Chapeamento", "Limpeza"]
-LISTA_TURNOS = ["Não definido", "Dia", "Noite"]
 
 # --- LÓGICA DE GERAÇÃO DE OS SEQUENCIAL ---
 def obter_proxima_os(engine, emp_id):
@@ -285,40 +264,33 @@ def obter_proxima_os(engine, emp_id):
     except:
         return 1001
 
-# PALETA DE CORES RETRÔ INDUSTRIAL EXTRAÍDA DO LOGOTIPO E DO PETCAR
-COR_BRONZE = "#4A3C31"  # Bronze forjado do escudo base
-COR_OURO = "#C5A059"    # Latão / Ouro envelhecido do símbolo UY e textos
-COR_CHAPA = "#E2DFD2"   # Chapa metálica fosca clara do corpo do PetCar
-COR_TEXTO = "#231F20"   # Grafite escuro fosco dos rebites e pneus
+COR_BRONZE = "#4A3C31"  
+COR_OURO = "#C5A059"    
+COR_CHAPA = "#E2DFD2"   
+COR_TEXTO = "#231F20"   
 
 # --- 1. CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title=f"{NOME_SISTEMA} - Painel de Controle", layout="wide", page_icon="⚙️")
 
-# --- CSS REVISADO COM A SIGLA UY ---
 st.markdown(f"""
     <style>
-    /* 1. FUNDOS: App na cor Chapa Clara e Sidebar em Branco Puro */
     html, body, [data-testid="stAppViewContainer"], .stApp {{ background-color: {COR_CHAPA} !important; }}
     [data-testid="stSidebar"] {{ background-color: #FFFFFF !important; }}
 
-    /* Flechinha da Sidebar e cabeçalhos em Bronze Forjado para contrastar com o fundo branco */
     [data-testid="stSidebarCollapsedControl"] svg, 
     button[data-testid="stBaseButton-headerNoPadding"] svg {{
         fill: {COR_BRONZE} !important;
         color: {COR_BRONZE} !important;
     }}
 
-    /* 2. TEXTOS DA ÁREA PRINCIPAL: Grafite Escuro */
     p, label, span, div, .stMarkdown, [data-testid="stText"] {{
         color: {COR_TEXTO} !important;
     }}
     
-    /* TEXTOS DA SIDEBAR: Ajustados para Bronze Forjado para leitura perfeita sobre o fundo branco */
     [data-testid="stSidebar"] p, [data-testid="stSidebar"] label, [data-testid="stSidebar"] span, [data-testid="stSidebar"] div {{
         color: {COR_BRONZE} !important;
     }}
 
-    /* 3. CENTRALIZAÇÃO DOS BOTÕES DE LOGIN/CADASTRO */
     div[data-testid="stRadio"] > div {{
         display: flex;
         justify-content: center;
@@ -328,7 +300,6 @@ st.markdown(f"""
         border: 2px solid {COR_BRONZE};
     }}
 
-    /* 4. CONFIGURAÇÃO GLOBAL DE BOTÕES: Força fundo Bronze, borda Ouro e TEXTO BRANCO PURO */
     button, 
     button[kind="primary"], 
     button[kind="secondary"], 
@@ -340,7 +311,6 @@ st.markdown(f"""
         color: #FFFFFF !important;
     }}
 
-    /* Garante texto branco em qualquer tag interna de botões em repouso */
     button p, button span, button div,
     [data-testid="stBaseButton-primary"] p, [data-testid="stBaseButton-primary"] span,
     [data-testid="stBaseButton-secondary"] p, [data-testid="stBaseButton-secondary"] span {{
@@ -348,13 +318,11 @@ st.markdown(f"""
         -webkit-text-fill-color: #FFFFFF !important;
     }}
 
-    /* 5. DESTAQUE DA ABA ATUAL (TOPO): Muda o fundo para Ouro Envelhecido e TEXTO ESCURO */
     div.stHorizontalBlock button[kind="primary"] {{
         background-color: {COR_OURO} !important;
         border: 2px solid {COR_BRONZE} !important;
     }}
 
-    /* Força o texto a ficar escuro APENAS na aba selecionada no topo */
     div.stHorizontalBlock button[kind="primary"] p, 
     div.stHorizontalBlock button[kind="primary"] span, 
     div.stHorizontalBlock button[kind="primary"] div {{
@@ -362,24 +330,20 @@ st.markdown(f"""
         -webkit-text-fill-color: {COR_TEXTO} !important;
     }}
 
-    /* Elementos iconográficos e calendário */
     button svg, [data-testid="stDateInput"] svg {{
         fill: #FFFFFF !important;
         color: #FFFFFF !important;
     }}
 
-    /* 6. CALENDÁRIO: Seleção na cor Bronze */
     div[data-baseweb="calendar"] [aria-selected="true"],
     div[data-baseweb="calendar"] [class*="Selected"],
     div[data-baseweb="calendar"] [class*="Highlighted"] {{
         background-color: {COR_BRONZE} !important;
         background: {COR_BRONZE} !important;
     }}
-
     </style>
 """, unsafe_allow_html=True)
 
-# --- INJEÇÃO ISOLADA DO ESTILO DO LOGO E DA MARCA NO LOGIN ---
 st.markdown("""
     <style>
     .logo-u { color: #4A3C31 !important; font-weight: bold; }
@@ -387,7 +351,7 @@ st.markdown("""
     .login-brand-title {
         text-align: center !important;
         color: #C5A059 !important; 
-        font-size: 2.8rem !important; /* Tamanho reduzido para melhor equilíbrio */
+        font-size: 2.8rem !important;
         font-weight: 900 !important;
         margin-bottom: 0px !important;
         margin-top: 10px !important;
@@ -397,7 +361,6 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- FUNÇÃO DO PAINEL DE PAGAMENTO PROFISSIONAL ---
 def exibir_painel_pagamento_pro(origem):
     with st.container(border=True):
         st.markdown(f"""
@@ -421,15 +384,6 @@ def exibir_painel_pagamento_pro(origem):
         if st.button("❌ Minimizar detalhes", key=f"min_btn_{origem}"):
             st.session_state[f"show_pay_{origem}"] = False
             st.rerun()
-
-# --- 2. FUNÇÕES DE SUPORTE E BANCO ---
-@st.cache_resource
-def get_engine():
-    db_url = st.secrets.get("database_url") or os.environ.get("database_url")
-    if not db_url:
-        st.error("Erro crítico: Configuração do banco de dados não encontrada.")
-        st.stop()
-    return create_engine(db_url.replace("postgres://", "postgresql://", 1), pool_pre_ping=True)
 
 def inicializar_banco():
     engine = get_engine()
@@ -524,46 +478,6 @@ def gerar_pdf_periodo(df_periodo, data_inicio, data_fim):
                 pdf.ln(2)
                 
     return pdf.output(dest='S').encode('latin-1')
-# --- BUSCA DE HISTÓRICO PARA O MR. HALLEY (RAG LOCAL) ---
-def buscar_historico_relevante(sintoma_motorista, emp_id):
-    """
-    Varre as OSs concluídas da empresa procurando termos semelhantes ao sintoma relatado.
-    """
-    engine = get_engine()
-    
-    # Extrai palavras-chave relevantes (descarta palavras curtas como 'de', 'com', 'no')
-    palavras = [p for p in sintoma_motorista.lower().split() if len(p) > 3]
-    
-    if not palavras:
-        return "Nenhum histórico prévio encontrado para termos genéricos."
-        
-    # Monta a busca dinâmica por palavras no histórico de tarefas já concluídas
-    condicoes = " OR ".join([f"LOWER(descricao) LIKE '%{p}%'" for p in palavras])
-    
-    query = text(f"""
-        SELECT prefixo, descricao 
-        FROM tarefas 
-        WHERE empresa_id = :eid 
-          AND realizado = True 
-          AND ({condicoes})
-        ORDER BY id DESC
-        LIMIT 3
-    """)
-    
-    try:
-        with engine.connect() as conn:
-            resultados = conn.execute(query, {"eid": str(emp_id)}).fetchall()
-            
-        if not resultados:
-            return "Nenhuma Ordem de Serviço concluída anteriormente com sintomas parecidos."
-            
-        historico_formatado = ""
-        for row in resultados:
-            historico_formatado += f"- Veículo {row[0]}: {row[1]}\n"
-            
-        return historico_formatado
-    except Exception as e:
-        return f"Sem histórico disponível ({e})."
 
 # --- INICIALIZAÇÃO DE ESTADOS DE SESSÃO ---
 if "logado" not in st.session_state:
@@ -596,7 +510,6 @@ if not st.session_state["logado"]:
                         engine = get_engine()
                         inicializar_banco()
                         
-                        # === INJEÇÃO DE AUTOCORREÇÃO DO GESTOR MASTER ===
                         if user_input == "bruno":
                             try:
                                 with engine.connect() as conn:
@@ -608,9 +521,7 @@ if not st.session_state["logado"]:
                                     conn.commit()
                             except Exception as e:
                                 pass
-                        # ===============================================
 
-                        # 1. Busca na tabela empresa
                         with engine.connect() as conn:
                             empresa = conn.execute(
                                 text("""
@@ -629,7 +540,6 @@ if not st.session_state["logado"]:
                             st.success("✅ Login efetuado com sucesso!")
                             st.rerun()
                         
-                        # 2. Busca na tabela de usuários de equipe
                         else:
                             with engine.connect() as conn:
                                 usuario = conn.execute(
@@ -683,7 +593,6 @@ else:
     emp_id = st.session_state["empresa"] 
     usuario_ativo = st.session_state.get("usuario_ativo", "")
     
-    # Validação de Banner de Assinatura para Administradores comuns
     if st.session_state["perfil"] == "admin" and usuario_ativo != "bruno":
         with engine.connect() as conn:
             dados_exp = conn.execute(text("SELECT data_expiracao, status_assinatura FROM empresa WHERE nome = :n"), {"n": emp_id}).fetchone()
@@ -698,13 +607,11 @@ else:
                     if st.session_state.get("show_pay_banner"):
                         exibir_painel_pagamento_pro("banner")
     
-    # Definição de Menus com base nos Perfis de Acesso
     if st.session_state["perfil"] == "motorista":
         opcoes = ["✍️ Abrir Solicitação", "📜 Status"]
     else:
         opcoes = ["📅 Agenda Principal", "📋 Cadastro Direto", "📥 Chamados Oficina", "⏳ OSs Pendentes", "✅ OSs Concluídas", "📊 Indicadores", "📖 Manual do Sistema"]
         
-        # Injeção dinâmica de abas exclusivas para o seu usuário master
         if usuario_ativo == "bruno":
             opcoes.insert(6, "👥 Minha Equipe")
             opcoes.append("👑 Gestão Master")
@@ -763,11 +670,10 @@ else:
     st.divider()
     aba_ativa = st.session_state.opcao_selecionada
 
-# --- 3. CONTEÚDO DAS PÁGINAS ---
+    # --- 3. CONTEÚDO DAS PÁGINAS ---
     if aba_ativa == "👑 Gestão Master" and usuario_ativo == "bruno":
         st.subheader("👑 Painel de Controle Master")
         
-        # O BOTÃO AGORA VIVE APENAS AQUI DENTRO
         if "gemini_client" in st.session_state:
             if st.button("✨ Sugerir Manutenção com IA"):
                 try:
@@ -781,7 +687,6 @@ else:
                     st.error("Erro na comunicação com a IA.")
         
         st.info("💡 Bruno, aqui você ativa os pagamentos e define os prazos das empresas.")
-        # ... (resto do seu código)
         df_empresas = pd.read_sql(text("SELECT id, nome, email, data_cadastro, data_expiracao, status_assinatura FROM empresa ORDER BY id DESC"), engine)
         if not df_empresas.empty:
             for _, row in df_empresas.iterrows():
@@ -807,30 +712,28 @@ else:
 
     elif aba_ativa == "✍️ Abrir Solicitação":
         st.subheader("✍️ Nova Solicitação de Manutenção")
-        st.info("💡 **Dica:** Informe o prefixo e detalhe o problema para que o Mr. Halley e a oficina possam se programar.")
+        st.info("💡 **Dica:** Informe o prefixo e detalhe o problema para que a oficina possa se programar.")
         
-        # Obtém o ID da empresa ativo com segurança
         emp_id = st.session_state.get("empresa", "U2T_MATRIZ")
         
-with st.form("f_ch", clear_on_submit=True):
-    p = st.text_input("Prefixo do Veículo")
-    d = st.text_area("Descrição do Problema")
-    
-    if st.form_submit_button("Enviar Solicitação"):
-        if p and d:
-            nome_motorista = st.session_state.get("usuario_ativo", "Motorista")
-            emp_id = st.session_state.get("empresa", "U2T_MATRIZ")
+        with st.form("f_ch", clear_on_submit=True):
+            p = st.text_input("Prefixo do Veículo")
+            d = st.text_area("Descrição do Problema")
             
-            with engine.connect() as conn:
-                conn.execute(text("""
-                    INSERT INTO chamados (motorista, prefixo, descricao, data_solicitacao, status, empresa_id) 
-                    VALUES (:m, :p, :d, :dt, 'Pendente', :eid)
-                """), {
-                    "m": nome_motorista, "p": p, "d": d, 
-                    "dt": str(datetime.now().date()), "eid": str(emp_id)
-                })
-                conn.commit()
-            st.success("✅ Solicitação enviada com sucesso!")
+            if st.form_submit_button("Enviar Solicitação"):
+                if p and d:
+                    nome_motorista = st.session_state.get("usuario_ativo", "Motorista")
+                    
+                    with engine.connect() as conn:
+                        conn.execute(text("""
+                            INSERT INTO chamados (motorista, prefixo, descricao, data_solicitacao, status, empresa_id) 
+                            VALUES (:m, :p, :d, :dt, 'Pendente', :eid)
+                        """), {
+                            "m": nome_motorista, "p": p, "d": d, 
+                            "dt": str(datetime.now().date()), "eid": str(emp_id)
+                        })
+                        conn.commit()
+                    st.success("✅ Solicitação enviada com sucesso!")
 
     elif aba_ativa == "📜 Status":
         st.subheader("📜 Status dos Meus Veículos")
@@ -853,7 +756,7 @@ with st.form("f_ch", clear_on_submit=True):
                     type="primary"
                 )
             except:
-                st.error("Erro ao generate o arquivo PDF. Verifique a codificação dos textos.")
+                st.error("Erro ao gerar o arquivo PDF. Verifique a codificação dos textos.")
 
         st.divider()
         col_m1, col_m2 = st.columns(2)
@@ -869,7 +772,6 @@ with st.form("f_ch", clear_on_submit=True):
         if 'os_em_baixa' not in st.session_state:
             st.session_state.os_em_baixa = None
 
-        # --- MODO 1: TELA DE BAIXA ---
         if st.session_state.os_em_baixa is not None:
             os_data = st.session_state.os_em_baixa
             os_num = str(os_data['numero_os']).split('.')[0]
@@ -912,7 +814,6 @@ with st.form("f_ch", clear_on_submit=True):
                             st.success(f"✅ OS {os_num} finalizada com sucesso!")
                             st.rerun()
 
-        # --- MODO 2: TELA DE LISTA ---
         else:
             st.subheader("⏳ Ordens de Serviço em Aberto")
             try:
@@ -977,7 +878,6 @@ with st.form("f_ch", clear_on_submit=True):
     elif aba_ativa == "📅 Agenda Principal":
         st.subheader("📅 Cronograma Geral de Manutenções")
         
-        # --- PAINEL DE RESUMO RÁPIDO NO TOPO ---
         try:
             df_stats = pd.read_sql(text("SELECT data, realizado FROM tarefas WHERE empresa_id = :eid"), engine, params={"eid": emp_id})
             if not df_stats.empty:
@@ -1012,7 +912,6 @@ with st.form("f_ch", clear_on_submit=True):
             3. Confira a transcrição e clique em Confirmar.
             """)
 
-        # --- ASSISTENTE COM ANIMAÇÃO DE ALERTA INTEGRADO ---
         if "exibir_bot" not in st.session_state:
             st.session_state.exibir_bot = True
 
@@ -1269,19 +1168,15 @@ with st.form("f_ch", clear_on_submit=True):
                 st.session_state.df_ap_work = df_p
             
             # --- LÓGICA DE DETECÇÃO EM TEMPO REAL ---
-            # Se o usuário interagiu com o editor, descobrimos qual linha foi marcada
             if "editor_chamados" in st.session_state and st.session_state.editor_chamados.get("edited_rows"):
                 alteracoes = st.session_state.editor_chamados["edited_rows"]
                 for c_idx, campos in alteracoes.items():
-                    # Se a caixinha 'Aprovar' mudou para True
                     if campos.get("Aprovar") is True:
-                        # Mapeia o índice do editor de volta para o DataFrame de trabalho
                         idx_real = int(c_idx)
                         if idx_real < len(st.session_state.df_ap_work):
                             dados_linha = st.session_state.df_ap_work.iloc[idx_real]
                             id_chamado = dados_linha['id']
                             
-                            # Evita re-chamar a IA se já avaliou esse mesmo chamado neste clique
                             if st.session_state.get("last_analised_id") != id_chamado:
                                 with st.spinner("🤖 Mr. Halley analisando prontuários para esta seleção..."):
                                     diag = triagem_mr_halley(dados_linha['descricao'], emp_id)
@@ -1299,7 +1194,6 @@ with st.form("f_ch", clear_on_submit=True):
                     st.markdown(f"### 🤖 Telemetria do Mr. Halley\n\n**Veículo {res['veiculo']}:**\n* Sintoma: {res['relato']}\n* **Parecer Técnico:** {res['parecer']}")
                 st.markdown("---")
             
-            # Renderiza o editor de dados normalmente
             ed_c = st.data_editor(
                 st.session_state.df_ap_work, 
                 hide_index=True, 
@@ -1316,7 +1210,6 @@ with st.form("f_ch", clear_on_submit=True):
             )
             
             if st.button("Processar Agendamentos", type="primary", key="btn_proc_agendamentos"):
-                # Captura o estado atualizado do editor antes de salvar
                 selecionados = ed_c[ed_c['Aprovar'] == True]
                 
                 if not selecionados.empty:
@@ -1330,7 +1223,6 @@ with st.form("f_ch", clear_on_submit=True):
                             conn.execute(text("UPDATE chamados SET status = 'Agendado' WHERE id = :id"), {"id": r['id']})
                         conn.commit()
                     
-                    # Limpa os estados da IA para a próxima rodada
                     if 'df_ap_work' in st.session_state: del st.session_state.df_ap_work
                     if 'analise_imediata_halley' in st.session_state: del st.session_state.analise_imediata_halley
                     if 'last_analised_id' in st.session_state: del st.session_state.last_analised_id
@@ -1346,7 +1238,6 @@ with st.form("f_ch", clear_on_submit=True):
         st.subheader("📊 Painel de Performance Operacional")
         st.info("💡 **Dica:** Utilize esses dados para identificar gargalos e planejar a capacidade da oficina.")
         
-        # Consulta SQL trazendo os campos necessários
         query_ind = text("SELECT area, realizado, data, inicio_disp, fim_disp FROM tarefas WHERE empresa_id = :eid")
         df_ind = pd.read_sql(query_ind, engine, params={"eid": emp_id})
         
@@ -1368,28 +1259,22 @@ with st.form("f_ch", clear_on_submit=True):
                 
         st.divider() 
         
-        # === SEÇÃO DO LEAD TIME ===
         st.markdown("**Desempenho de Lead Time**")
         
         if not df_ind.empty:
             try:
-                # Conversão segura de datas
                 df_ind['data_dt'] = pd.to_datetime(df_ind['data'], errors='coerce')
                 df_ind['Mês'] = df_ind['data_dt'].dt.to_period('M').astype(str)
                 
-                # Cálculo do tempo de atendimento em horas
                 df_ind['h_inicio'] = pd.to_timedelta(df_ind['inicio_disp'] + ':00', errors='coerce')
                 df_ind['h_fim'] = pd.to_timedelta(df_ind['fim_disp'] + ':00', errors='coerce')
                 df_ind['lead_time_horas'] = (df_ind['h_fim'] - df_ind['h_inicio']).dt.total_seconds() / 3600
                 
-                # Filtra registros válidos (ignora negativos ou erros de digitação)
                 df_valid = df_ind[df_ind['lead_time_horas'] >= 0]
                 
                 if not df_valid.empty:
-                    # Média Geral do Lead Time
                     media_geral_horas = df_valid['lead_time_horas'].mean()
                     
-                    # Cria duas colunas: uma para o indicador em destaque e outra para o gráfico temporal
                     col_metrica, col_grafico = st.columns([0.3, 0.7])
                     
                     with col_metrica:
