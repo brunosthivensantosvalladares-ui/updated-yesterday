@@ -80,7 +80,7 @@ def buscar_historico_relevante(sintoma_motorista, emp_id):
     except Exception:
         return []
 
-# --- TRIAGEM COM RESOLUÇÃO DE MODELO (GEMINI) ---
+# --- TRIAGEM DO MR. HALLEY (CORREÇÃO DE MODELO E ENDPOINT) ---
 def triagem_mr_halley(sintoma, emp_id):
     historicos = buscar_historico_relevante(sintoma, emp_id)
     PREAMBULO = "Baseado no histórico"
@@ -96,25 +96,21 @@ def triagem_mr_halley(sintoma, emp_id):
     try:
         genai.configure(api_key=gemini_key)
         
-        # Testa a lista de modelos suportados para evitar o erro 404 da v1beta
-        modelos_para_testar = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-2.0-flash']
+        # Testamos os identificadores estáveis aceitos na v1beta e v1
         model = None
+        erros_tentativas = []
         
-        # Tenta instanciar o modelo compatível
-        for nome_modelo in modelos_para_testar:
-            try:
-                model = genai.GenerativeModel(nome_modelo)
-                break
-            except Exception:
-                continue
-                
-        if not model:
-            model = genai.GenerativeModel('gemini-1.5-flash')
-
+        # Lista de aliases válidos para o SDK google-generativeai
+        modelos_suportados = [
+            'gemini-1.5-flash-latest',
+            'gemini-1.5-pro-latest',
+            'gemini-pro'
+        ]
+        
         historico_formatado = "\n".join([f"- {h}" for h in historicos])
         
         prompt = f"""
-Você é o assistente técnico Mr. Halley.
+Você é o assistente técnico Mr. Halley da plataforma Updated Yesterday.
 Analise a relação entre o problema relatado e as OSs anteriores da frota.
 
 Sintoma Relatado: "{sintoma}"
@@ -122,7 +118,7 @@ Sintoma Relatado: "{sintoma}"
 Histórico Encontrado no Banco:
 {historico_formatado}
 
-REGRAS ESTRITAS:
+REGRAS ESTRITAS DE RESPOSTA:
 1. Verifique se o histórico realmente trata do MESMO defeito ou de um sistema sinônimo.
 2. Se o histórico for de OUTRO sistema (exemplo: trocar pneu/buzina em uma OS de direção), DESCARTE e responda EXATAMENTE:
    "Baseado no histórico da frota, não há registros anteriores para este sintoma."
@@ -131,10 +127,19 @@ REGRAS ESTRITAS:
    - Escreva 1 recomendação técnica curta (10 a 15 palavras).
    - OBRIGATORIAMENTE use VERBOS NO INFINITIVO (ex: "recomenda-se realizar...", "inspecionar...", "efetuar a troca...").
 """
-        response = model.generate_content(prompt)
-        txt = response.text.strip()
-        
-        return txt if txt.lower().startswith("baseado no histórico") else f"{PREAMBULO}, {txt.lower()}"
+
+        # Tenta executar nos modelos estáveis
+        for m_nome in modelos_suportados:
+            try:
+                m_inst = genai.GenerativeModel(m_nome)
+                response = m_inst.generate_content(prompt)
+                txt = response.text.strip()
+                return txt if txt.lower().startswith("baseado no histórico") else f"{PREAMBULO}, {txt.lower()}"
+            except Exception as err_m:
+                erros_tentativas.append(f"{m_nome}: {str(err_m)}")
+                continue
+
+        return f"Erro ao conectar nos modelos da API: {' | '.join(erros_tentativas)}"
         
     except Exception as e:
         return f"Erro na chamada da IA: {str(e)}"
