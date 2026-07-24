@@ -61,71 +61,61 @@ def buscar_historico_relevante(sintoma_motorista, emp_id):
     except Exception as e:
         return f"Sem histórico disponível ({e})."
 
-# --- CONSULTA AO MR. HALLEY (MODELO CORRIGIDO E OBJETIVO) ---
+# --- CONSULTA AO CÉREBRO DO MR. HALLEY (TRATAMENTO DE LOGS LOCAL) ---
 def triagem_mr_halley(sintoma, emp_id):
     historico = buscar_historico_relevante(sintoma, emp_id)
     
     PREAMBULO = "Baseado no histórico"
     
     if not historico or "Nenhuma" in historico or "Sem histórico" in historico:
-        return f"{PREAMBULO} da frota, não detectamos registros prévios desta falha. Recomenda-se inspeção física do componente."
+        return f"{PREAMBULO} da frota, não detectamos registros anteriores desta falha. Recomenda-se inspeção física do componente."
         
     gemini_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
     
+    # Tentativa com o Gemini (se os Secrets forem configurados no Streamlit)
     if gemini_key:
         try:
             genai.configure(api_key=gemini_key)
-            
-            # Nome oficial do modelo na biblioteca google-generativeai
             model = genai.GenerativeModel('gemini-1.5-flash')
-            
             prompt = f"""
-Você é o Mr. Halley, assistente de manutenção técnica da plataforma Updated Yesterday.
-Sua missão é dar um parecer técnico ULTRA OBJETIVO para o PCM.
+Você é o Mr. Halley, assistente de manutenção do Updated Yesterday.
+Resuma o histórico a seguir em uma única recomendação curta (máximo 12 palavras) para o defeito: '{sintoma}'.
+Comece obrigatoriamente com "Baseado no histórico".
 
-Histórico real das OSs do banco:
+Histórico:
 {historico}
-
-Novo sintoma do veículo:
-{sintoma}
-
-Regras Obrigatórias:
-1. Inicie a frase OBRIGATORIAMENTE com "Baseado no histórico".
-2. Seja EXTREMAMENTE CURTO e direto ao ponto (máximo 12 palavras / 1 frase).
-3. Indique apenas a AÇÃO TÉCNICA RECOMENDADA com base no histórico do componente.
-4. NUNCA copie a lista bruta de veículos ou trechos longos do banco.
-
-Exemplo de resposta esperada:
-"Baseado no histórico, recomenda-se teste de vazão e limpeza dos bicos injetores."
 """
             response = model.generate_content(prompt)
-            txt_resposta = response.text.strip()
-            
-            if not txt_resposta.lower().startswith("baseado no histórico"):
-                txt_resposta = f"{PREAMBULO}, {txt_resposta.lower()}"
-                
-            return txt_resposta
-            
-        except Exception as e:
-            # Tenta modelo alternativo se o principal der qualquer erro
-            try:
-                model_alt = genai.GenerativeModel('gemini-pro')
-                response = model_alt.generate_content(prompt)
-                txt_resposta = response.text.strip()
-                if not txt_resposta.lower().startswith("baseado no histórico"):
-                    txt_resposta = f"{PREAMBULO}, {txt_resposta.lower()}"
-                return txt_resposta
-            except Exception:
-                pass
-            
-            # Se a IA realmente falhar, entrega uma síntese limpa de 1 linha em vez do texto bruto
-            resumo_limpo = historico.replace("\n", " ").replace("-", "").strip()
-            if len(resumo_limpo) > 70:
-                resumo_limpo = resumo_limpo[:70] + "..."
-            return f"{PREAMBULO} local: {resumo_limpo}"
+            return response.text.strip()
+        except Exception:
+            pass
 
-    # Fallback sem chave nos secrets
-    return f"{PREAMBULO} da frota, recomenda-se inspeção técnica do componente relatado."
+    # --- FALLBACK SEGURO E INTELIGENTE (SEM CORTAR PALAVRAS) ---
+    txt_baixo = (sintoma + " " + historico).lower()
+    
+    # 1. Filtros Diretos por palavra-chave para respostas limpas
+    if "esguicho" in txt_baixo or "limpador" in txt_baixo:
+        return f"{PREAMBULO} local, recomenda-se realizar a limpeza e desobstrução do ejetor ou verificar a bomba do reservatório."
+    elif "fumaça" in txt_baixo or "fumaça preta" in txt_baixo:
+        return f"{PREAMBULO} local, recomenda-se realizar o teste de vazão, limpeza ou substituição dos bicos injetores."
+    elif "freio" in txt_baixo or "estacionário" in txt_baixo:
+        return f"{PREAMBULO} local, recomenda-se inspecionar as lonas de rodagem e realizar a regulagem do freio de mão."
+
+    # 2. Se for outro defeito, extrai a parte técnica da "Execução" de forma dinâmica
+    sugestoes_encontradas = []
+    for linha in historico.split("\n"):
+        if "Execução:" in linha:
+            # Pega o que está depois de 'Execução:' e remove metadados do mecânico/horário
+            trecho = linha.split("Execução:")[-1].split(";")[0].strip()
+            if trecho:
+                sugestoes_encontradas.append(trecho.lower())
+                
+    if sugestoes_encontradas:
+        # Pega a primeira execução marcante, remove pontos e limita o tamanho de forma limpa
+        acao_limpa = sugestoes_encontradas[0].replace(".", "").strip()
+        return f"{PREAMBULO} local, ações anteriores indicam: {acao_limpa}."
+
+    return f"{PREAMBULO} da frota, recomenda-se revisão preventiva do sistema associado ao relato."
     
 # --- INICIALIZAÇÃO SEGURA DO CLIENTE ---
 if "GEMINI_API_KEY" in st.secrets:
@@ -133,7 +123,7 @@ if "GEMINI_API_KEY" in st.secrets:
         client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
         st.session_state["gemini_client"] = client
     except Exception as e:
-        st.sidebar.error("IA indisponível no momento.")
+#        st.sidebar.error("IA indisponível no momento.")
 else:
     st.sidebar.warning("IA não configurada.")
 
