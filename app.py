@@ -1179,6 +1179,10 @@ else:
                             id_chamado = dados_linha['id']
                             
                             if st.session_state.get("last_analised_id") != id_chamado:
+                                # Força a limpeza do cache antigo para não misturar diagnósticos
+                                if "analise_imediata_halley" in st.session_state:
+                                    del st.session_state["analise_imediata_halley"]
+                                    
                                 with st.spinner("🤖 Mr. Halley analisando prontuários para esta seleção..."):
                                     diag = triagem_mr_halley(dados_linha['descricao'], emp_id)
                                     st.session_state["analise_imediata_halley"] = {
@@ -1187,6 +1191,13 @@ else:
                                         "parecer": diag
                                     }
                                     st.session_state["last_analised_id"] = id_chamado
+                    
+                    # Se desmarcar a caixa, limpa a tela imediatamente
+                    elif campos.get("Aprovar") is False:
+                        if "analise_imediata_halley" in st.session_state:
+                            del st.session_state["analise_imediata_halley"]
+                        if "last_analised_id" in st.session_state:
+                            del st.session_state["last_analised_id"]
 
             # --- EXIBIÇÃO DO CHAT DO MR. HALLEY EM TEMPO REAL ---
             if "analise_imediata_halley" in st.session_state:
@@ -1194,6 +1205,7 @@ else:
                 
                 URL_AVATAR_HALLEY = "https://i.postimg.cc/5tBtrL6C/Whats-App-Image-2026-07-23-at-22-35-53.png"
                 
+                # Mascote ampliado para 180px para maior destaque visual
                 html_layout = f"""
                 <div style="display: flex; align-items: center; justify-content: flex-end; margin: 25px 0; font-family: sans-serif;">
                     <div style="background-color: #FFFFFF; border: 2px solid #C5A059; border-radius: 16px; padding: 18px 22px; margin-right: 20px; max-width: 75%; color: #1E293B; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
@@ -1204,7 +1216,7 @@ else:
                         </p>
                     </div>
                     <div style="flex-shrink: 0; text-align: center;">
-                        <img src="{URL_AVATAR_HALLEY}" style="width: 145px; height: auto;" alt="Mr. Halley">
+                        <img src="{URL_AVATAR_HALLEY}" style="width: 180px; height: auto;" alt="Mr. Halley">
                     </div>
                 </div>
                 """
