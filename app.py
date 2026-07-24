@@ -67,7 +67,7 @@ def buscar_historico_relevante(sintoma_motorista, emp_id):
     except Exception as e:
         return f"Sem histórico disponível ({e})."
 
-# --- CONSULTA AO CÉREBRO DO MR. HALLEY (SUGESTÃO DE DIAGNÓSTICO GARANTIDA) ---
+# --- CONSULTA AO CÉREBRO DO MR. HALLEY (SÍNTESE DIRETA E OBJETIVA) ---
 def triagem_mr_halley(sintoma, emp_id):
     historico = buscar_historico_relevante(sintoma, emp_id)
     
@@ -76,15 +76,16 @@ def triagem_mr_halley(sintoma, emp_id):
         
     gemini_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
     
+    # 1. Se o Gemini estiver ativo, ele sintetiza em pouquíssimas palavras
     if gemini_key:
         try:
             client = genai.Client(api_key=gemini_key)
             prompt = f"""
-Você é o Mr. Halley, assistente de manutenção do Updated Yesterday.
-Com base no histórico: '{historico}' e no sintoma atual: '{sintoma}'.
+Você é o Mr. Halley, assistente do Updated Yesterday.
+Com base no histórico: '{historico}' e sintoma: '{sintoma}'.
 
-Gere uma SUGESTÃO DE DIAGNÓSTICO EXTREMAMENTE CURTA (máximo 15 palavras).
-Seja direto ao ponto sugerindo o que a oficina deve testar/inspecionar com base na solução do histórico.
+Crie uma recomendação ULTRA CURTA (máximo 8 palavras) para a ordem de serviço.
+Exemplo: "Limpeza e teste de vazão dos bicos injetores."
 """
             response = client.models.generate_content(
                 model='gemini-1.5-flash',
@@ -94,19 +95,21 @@ Seja direto ao ponto sugerindo o que a oficina deve testar/inspecionar com base 
         except Exception:
             pass
 
-    # Fallback Inteligente: Extrai a solução real do histórico e faz a sugestão técnica
-    solucoes = []
+    # 2. Fallback Inteligente: Extrai palavras-chave e sintetiza a ação em 1 frase limpa
+    txt_baixo = historico.lower()
+    
+    if "bico" in txt_baixo or "injetor" in txt_baixo:
+        return "Recomenda-se teste de vazão e limpeza dos bicos injetores."
+    elif "freio" in txt_baixo or "lona" in txt_baixo:
+        return "Recomenda-se regulagem do freio estacionário e inspeção das lonas."
+    
+    # Se for outro componente, limpa e pega apenas os primeiros 60 caracteres úteis
     for linha in historico.split("\n"):
-        if "Solução:" in linha:
-            solucoes.append(linha.split("Solução:")[-1].strip())
-        elif ":" in linha and len(linha.split(":")[-1].strip()) > 5:
-            solucoes.append(linha.split(":")[-1].strip())
-
-    if solucoes:
-        # Pega a principal solução executada e sugere a inspeção
-        sugestao = solucoes[0].replace(".", "").strip()
-        return f"Sugestão de diagnóstico baseada na frota: Avaliar {sugestao}."
-        
+        if ":" in linha:
+            acao = linha.split(":")[-1].replace("FOI IDENTIFICADO QUE O PROBLEMA ERA NO", "").replace("FORAM RETIRADOS OS", "").strip()
+            if len(acao) > 5:
+                return f"Verificar e realizar manutenção em: {acao[:60].title()}."
+                
     return "Não detectei históricos anteriores desta falha para sugerir possíveis causas."
     
 # --- INICIALIZAÇÃO SEGURA DO CLIENTE ---
