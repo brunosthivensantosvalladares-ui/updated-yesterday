@@ -80,7 +80,7 @@ def buscar_historico_relevante(sintoma_motorista, emp_id):
     except Exception:
         return []
 
-# --- TRIAGEM DO MR. HALLEY (COM AJUSTE DE CONECTOR TÉCNICO) ---
+# --- TRIAGEM DO MR. HALLEY (CORREÇÃO DE CONFLITO DE ORIGEM) ---
 def triagem_mr_halley(sintoma, emp_id):
     historicos = buscar_historico_relevante(sintoma, emp_id)
     gemini_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
@@ -95,24 +95,26 @@ def triagem_mr_halley(sintoma, emp_id):
         
         prompt = f"""
 Você é o assistente técnico Mr. Halley da plataforma Updated Yesterday.
-Analise a relação entre o problema relatado e as OSs da frota.
+Analise a relação entre o problema relatado e as OSs da frota para definir a origem correta da recomendação.
 
 Sintoma Relatado: "{sintoma}"
 
 Histórico Encontrado no Banco de Dados:
 {historico_formatado}
 
-DIRETRIZES ESTRITAS DE RESPOSTA:
+REGRA CRÍTICA DE ORIGEM:
+Mesmo que o banco de dados tenha retornado alguma OS acima, você deve avaliar se ela trata do MESMO DEFEITO/SISTEMA do sintoma atual. 
+Se a OS antiga for sobre outro componente (exemplo: o sintoma atual é "direção puxando" e a OS antiga é sobre "consertar buzina" ou "trocar pneu"), você deve DESCONSIDERAR o histórico local e aplicar obrigatoriamente a SITUAÇÃO B (Análises técnicas externas).
 
-SITUAÇÃO A: Se existir histórico local correspondente no banco para este sintoma:
+DIRETRIZES DE RESPOSTA:
+
+SITUAÇÃO A: Se existir histórico local que trate REALMENTE do mesmo defeito ou sintoma equivalente:
 1. Inicie OBRIGATORIAMENTE com: "Baseado no histórico local da frota, recomenda-se"
-2. Complete a frase com uma recomendação curta (10 a 15 palavras) usando VERBOS NO INFINITIVO (ex: "...realizar o alinhamento...").
-3. Ignore serviços/peças secundárias sem relação com o sintoma.
+2. Complete a frase com uma recomendação curta (10 a 15 palavras) usando VERBOS NO INFINITIVO baseada no que resolveu o problema no passado.
 
-SITUAÇÃO B: Se NÃO existir histórico local correspondente no banco (ou se o histórico for de outro sistema descorrelacionado):
+SITUAÇÃO B: Se NÃO existir histórico local sobre o mesmo defeito (ou se as OSs encontradas forem de sistemas diferentes como buzina/pneu):
 1. Inicie OBRIGATORIAMENTE com: "Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se"
-2. Complete a frase fornecendo uma ação preventiva baseada no seu conhecimento automotivo geral para o sintoma "{sintoma}".
-3. Use VERBOS NO INFINITIVO e limite a resposta a 1 frase curta (10 a 15 palavras).
+2. Complete a frase fornecendo uma ação preventiva genérica para o sintoma "{sintoma}" usando VERBOS NO INFINITIVO (10 a 15 palavras).
 """
 
         # Chamada no SDK oficial google-genai
