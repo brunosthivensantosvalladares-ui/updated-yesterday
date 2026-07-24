@@ -8,7 +8,35 @@ from fpdf import FPDF
 import google.generativeai as genai
 import time as time_module
 import requests
+import re
 
+def formatar_acao_infinitivo(texto_bruto):
+    """ Converte textos passados/relatórios do banco para recomendações no infinitivo. """
+    txt = texto_bruto.strip()
+    
+# Mapeamento de vícios de escrita e tempo passado para o infinitivo
+    substituicoes = [
+        (r"(?i)^foi realizada a troca d[eo]s?\s*", "Realizar a troca do "),
+        (r"(?i)^foi realizada a?\s*", "Realizar "),
+        (r"(?i)^foi feito a?\s*", "Efetuar "),
+        (r"(?i)^foi trocado a?\s*", "Trocar "),
+        (r"(?i)^foi identificado que\s*", "Verificar "),
+        (r"(?i)^foi constatado que\s*", "Inspecionar "),
+        (r"(?i)^trocar\s*", "Trocar "),
+        (r"(?i)^realizada a?\s*", "Realizar "),
+    ]
+    
+    for padrao, subst in substituicoes:
+        if re.search(padrao, txt):
+            txt = re.sub(padrao, subst, txt).strip()
+            break
+            
+    # Se ainda começar com frases de relato passadas longas, ajusta o início
+    if txt.lower().startswith("foi "):
+        txt = "Verificar " + txt[4:]
+        
+    return txt.rstrip('.')
+    
 # --- 1. CONFIGURAÇÕES E ESTILOS ---
 NOME_SISTEMA = "Updated Yesterday"
 SLOGAN = "Seu Controle. Nossa Prioridade."
@@ -25,24 +53,33 @@ def get_engine():
         st.stop()
     return create_engine(db_url.replace("postgres://", "postgresql://", 1), pool_pre_ping=True)
 
-# --- BUSCA DE HISTÓRICO LIMPO NO BANCO ---
+# --- BUSCA DE HISTÓRICO COM VALIDAÇÃO DO COMPONENTE PRINCIPAL ---
 def buscar_historico_relevante(sintoma_motorista, emp_id):
     engine = get_engine()
     sintoma_limpo = sintoma_motorista.lower().strip()
     
-    stop_words = {'carro', 'veiculo', 'caminhao', 'esta', 'estao', 'muita', 'muito', 'problema', 'com', 'para', 'nao', 'sem', 'lado', 'pro'}
-    palavras_chave = [p for p in sintoma_limpo.split() if len(p) > 3 and p not in stop_words]
+    # Termos irrelevantes que geravam falsos positivos (como 'lado', 'direito', 'muita')
+    stop_words = {
+        'carro', 'veiculo', 'caminhao', 'esta', 'estao', 'muita', 'muito', 
+        'problema', 'com', 'para', 'nao', 'sem', 'lado', 'pro', 'direito', 
+        'direita', 'esquerdo', 'esquerda', 'puxando', 'ficando'
+    }
     
-    if not palavras_chave:
+    # Extrai o componente real (ex: "direção", "porta", "marcha", "embreagem")
+    palavras_componente = [p for p in sintoma_limpo.split() if len(p) > 3 and p not in stop_words]
+    
+    if not palavras_componente:
         return []
 
-    condicoes = " OR ".join([f"LOWER(descricao) LIKE '%{p}%'" for p in palavras_chave])
+    # Exige que A PALAVRA DO COMPONENTE PRINCIPAL esteja na descrição da OS
+    # Ex: Para "direção puxando", EXIGE a palavra 'direção' no banco
+    condicao_componente = f"LOWER(descricao) LIKE '%{palavras_componente[0]}%'"
     
     query = text(f"""
         SELECT descricao 
         FROM tarefas 
-        WHERE empresa_id = :eid AND realizado = True AND ({condicoes})
-        ORDER BY id DESC LIMIT 5
+        WHERE empresa_id = :eid AND realizado = True AND ({condicao_componente})
+        ORDER BY id DESC LIMIT 3
     """)
     
     try:
@@ -52,21 +89,16 @@ def buscar_historico_relevante(sintoma_motorista, emp_id):
         if not resultados:
             return []
 
-        # Filtra e extrai a melhor correspondência
         historicos = []
         for row in resultados:
             txt = str(row[0]).strip()
-            # Se a OS contiver o registro de execução, prioriza a solução real
             if "Execução:" in txt:
                 solucao = txt.split("Execução:")[-1].split(";")[0].strip()
-                if len(solucao) > 4:
-                    historicos.append(solucao)
+                if len(solucao) > 4: historicos.append(solucao)
             elif "Serviço:" in txt:
                 servico = txt.split("Serviço:")[-1].split(";")[0].strip()
-                if len(servico) > 4:
-                    historicos.append(servico)
+                if len(servico) > 4: historicos.append(servico)
             else:
-                # Remove prefixos brutos de horários se houver
                 txt_limpo = txt.split(";")[-1].strip() if ";" in txt else txt
                 historicos.append(txt_limpo)
 
@@ -74,36 +106,36 @@ def buscar_historico_relevante(sintoma_motorista, emp_id):
     except Exception:
         return []
 
-# --- TRIAGEM DO MR. HALLEY (PARECER CURTO E SEM RUÍDOS DE LOG) ---
+# --- TRIAGEM DO MR. HALLEY (PARECER COM VERBOS NO INFINITIVO) ---
 def triagem_mr_halley(sintoma, emp_id):
     historico_lista = buscar_historico_relevante(sintoma, emp_id)
     PREAMBULO = "Baseado no histórico"
     
-    # 1. Quando não há registro para o sintoma
+    # 1. Se não houver OS que cite especificamente o componente principal
     if not historico_lista:
         return f"{PREAMBULO} da frota, não há registros anteriores para este sintoma."
         
     gemini_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
     historico_texto = "\n".join([f"- {item}" for item in historico_lista])
     
-    # 2. Processamento via IA
+    # 2. Processamento via LLM (Se ativa, exige verbo no infinitivo)
     if gemini_key:
         try:
             genai.configure(api_key=gemini_key)
             model = genai.GenerativeModel('gemini-1.5-flash')
             
             prompt = f"""
-Você é o assistente técnico de manutenção Mr. Halley.
-Analise a relação entre o problema atual e as intervenções passadas da frota.
+Você é o assistente técnico Mr. Halley.
+Analise a OS passada e dê uma recomendação para o sintoma atual.
 
 Sintoma atual: {sintoma}
-Ações registradas no histórico:
+Ação registrada na OS antiga:
 {historico_texto}
 
-Regras estritas:
-1. Comece obrigatoriamente com "Baseado no histórico".
-2. Resuma a recomendação em no MÁXIMO 1 frase curta (10 a 14 palavras).
-3. Seja direto e objetivo, recomendando apenas a intervenção necessária.
+Regras:
+1. Comece com "Baseado no histórico".
+2. Use VERBOS NO INFINITIVO de recomendação técnica (ex: "recomenda-se realizar...", "inspecionar...", "efetuar a troca...").
+3. Máximo 1 frase ultra concisa.
 """
             response = model.generate_content(prompt)
             txt = response.text.strip()
@@ -111,14 +143,11 @@ Regras estritas:
         except Exception:
             pass
 
-    # 3. Fallback Local Sintetizado (Elimina logs longos, mecânicos e horários)
-    # Pega apenas a primeira intervenção válida e formata de forma limpa
-    acao_principal = historico_lista[0]
+    # 3. Fallback Local com Formatação no Infinitivo
+    acao_bruta = historico_lista[0]
+    acao_infinitivo = formatar_acao_infinitivo(acao_bruta)
     
-    # Limpa possíveis pontuações duplas
-    acao_principal = acao_principal.rstrip('.').strip()
-    
-    return f"{PREAMBULO} local da frota, recomenda-se: {acao_principal}."
+    return f"{PREAMBULO} local da frota, recomenda-se: {acao_infinitivo}."
     
 # --- INICIALIZAÇÃO SEGURA DO CLIENTE ---
 if "GEMINI_API_KEY" in st.secrets:
