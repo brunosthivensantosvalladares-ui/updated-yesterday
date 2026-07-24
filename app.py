@@ -64,7 +64,7 @@ def buscar_historico_relevante(sintoma_motorista, emp_id):
     except Exception as e:
         return f"Sem histórico disponível ({e})."
 
-# --- CONSULTA AO CÉREBRO DO MR. HALLEY (RESPOSTA ULTRA SUCINTA) ---
+# --- CONSULTA AO CÉREBRO DO MR. HALLEY (DINÂMICO E RESUMIDO) ---
 def triagem_mr_halley(sintoma, emp_id):
     historico = buscar_historico_relevante(sintoma, emp_id)
     
@@ -80,10 +80,8 @@ def triagem_mr_halley(sintoma, emp_id):
 Você é o Mr. Halley, assistente de manutenção do Updated Yesterday.
 Com base no histórico: '{historico}' e no sintoma atual: '{sintoma}'.
 
-Gere um parecer técnico EXTREMAMENTE CURTO e direto ao ponto (MÁXIMO 15 PALAVRAS / 1 FRASE).
-Não cite números de veículos do histórico. Apenas diga a causa provável e a ação recomendada.
-
-Exemplo ideal: "Histórico indica desgaste nas lonas ou regulagem. Recomendo inspeção e ajuste no sistema de freio."
+Gere um parecer técnico EXTREMAMENTE CURTO e direto ao ponto (MÁXIMO 1FRASE / 15 PALAVRAS).
+Não cite códigos de OS ou veículos. Apenas resuma o que o histórico sugere inspecionar.
 """
             response = client.models.generate_content(
                 model='gemini-1.5-flash',
@@ -93,7 +91,13 @@ Exemplo ideal: "Histórico indica desgaste nas lonas ou regulagem. Recomendo ins
         except Exception:
             pass
 
-    return "Histórico indica necessidade de verificação e regulagem no sistema de travagem."
+    # Fallback Inteligente caso a IA caia: Resume o histórico local em uma linha sem travar o assunto
+    resumos_passados = [linha.split(":")[-1].strip() for linha in historico.strip().split("\n") if linha]
+    if resumos_passados:
+        texto_resumo = " | ".join(resumos_passados)[:90]
+        return f"Dados locais sugerem avaliar: {texto_resumo}..."
+        
+    return "Recomenda-se triagem física no box devido à falta de dados históricos."
     
 # --- INICIALIZAÇÃO SEGURA DO CLIENTE ---
 if "GEMINI_API_KEY" in st.secrets:
@@ -1204,7 +1208,7 @@ else:
             if "analise_imediata_halley" in st.session_state:
                 res = st.session_state["analise_imediata_halley"]
                 
-                # Limpa tags HTML para evitar bugs de renderização
+                # Evita que caracteres especiais quebrem a estrutura HTML
                 parecer_limpo = str(res['parecer']).replace('<', '&lt;').replace('>', '&gt;')
                 
                 URL_AVATAR_HALLEY = "https://i.postimg.cc/5tBtrL6C/Whats-App-Image-2026-07-23-at-22-35-53.png"
