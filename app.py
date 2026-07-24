@@ -53,12 +53,11 @@ def get_engine():
         st.stop()
     return create_engine(db_url.replace("postgres://", "postgresql://", 1), pool_pre_ping=True)
 
-# --- BUSCA NO BANCO POR TERMOS DO SINTOMA ---
+# --- BUSCA SIMPLES NO BANCO DE DADOS ---
 def buscar_historico_relevante(sintoma_motorista, emp_id):
     engine = get_engine()
     sintoma_limpo = sintoma_motorista.lower().strip()
     
-    # Palavras irrelevantes que não definem o defeito
     stop_words = {'carro', 'veiculo', 'caminhao', 'esta', 'estao', 'muita', 'muito', 'problema', 'com', 'para', 'nao', 'sem', 'lado', 'pro'}
     palavras = [p for p in sintoma_limpo.split() if len(p) > 3 and p not in stop_words]
     
@@ -77,63 +76,58 @@ def buscar_historico_relevante(sintoma_motorista, emp_id):
     try:
         with engine.connect() as conn:
             resultados = conn.execute(query, {"eid": str(emp_id)}).fetchall()
-            
-        if not resultados:
-            return []
-
         return [str(r[0]).strip() for r in resultados]
     except Exception:
         return []
 
-# --- TRIAGEM DO MR. HALLEY (SÍNTESE DINÂMICA VIA IA) ---
+# --- TRIAGEM EXCLUSIVAMENTE VIA GEMINI (IA REAL) ---
 def triagem_mr_halley(sintoma, emp_id):
     historicos = buscar_historico_relevante(sintoma, emp_id)
     PREAMBULO = "Baseado no histórico"
     
-    # 1. Se a consulta SQL não encontrou nenhuma OS relacionada
+    # 1. Se o banco zerar
     if not historicos:
         return f"{PREAMBULO} da frota, não há registros anteriores para este sintoma."
         
     gemini_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
     
-    # 2. Avaliação e síntese inteligente via Gemini
-    if gemini_key:
-        try:
-            genai.configure(api_key=gemini_key)
-            model = genai.GenerativeModel('gemini-1.5-flash')
-            
-            historico_formatado = "\n".join([f"- {h}" for h in historicos])
-            
-            prompt = f"""
-Você é o assistente técnico de manutenção Mr. Halley.
-Sua tarefa é analisar o sintoma atual de um veículo e verificar se existe um histórico com o MESMO defeito ou defeito equivalente.
+    # Se não achar a chave nos Secrets
+    if not gemini_key:
+        return f"{PREAMBULO} (Chave GEMINI_API_KEY não configurada nos Secrets do Streamlit)."
 
-Sintoma Atual: "{sintoma}"
+    try:
+        # Configuração da API
+        genai.configure(api_key=gemini_key)
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        
+        historico_formatado = "\n".join([f"- {h}" for h in historicos])
+        
+        prompt = f"""
+Você é o assistente técnico Mr. Halley.
+Analise a relação entre o problema relatado e as OSs anteriores da frota.
 
-OSs Encontradas no Banco:
+Sintoma Relatado: "{sintoma}"
+
+Histórico Encontrado no Banco:
 {historico_formatado}
 
-INSTRUÇÕES OBRIGATÓRIAS:
-1. Avalie se alguma das OSs trata do MESMO defeito/sintoma (ou equivalente/sinônimo).
-2. Se NENHUMA OS tratar do mesmo defeito (ou se forem apenas peças secundárias sem relação, como buzina para direção), responda EXATAMENTE:
+REGRAS ESTRITAS:
+1. Verifique se o histórico realmente trata do MESMO defeito ou de um sistema sinônimo.
+2. Se o histórico for de OUTRO sistema (exemplo: trocar pneu em uma OS de direção, ou buzina), DESCARTE e responda EXATAMENTE:
    "Baseado no histórico da frota, não há registros anteriores para este sintoma."
-3. Se HOUVER uma OS com o mesmo defeito:
-   - Inicie OBRIGATORIAMENTE com "Baseado no histórico".
-   - Escreva 1 frase curta usando VERBOS NO INFINITIVO indicando a ação técnica recomendada (ex: "recomenda-se efetuar...", "recomenda-se realizar...").
-   - Ignore serviços não relacionados que foram feitos na mesma OS.
+3. Se o histórico for REALMENTE correspondente:
+   - Inicie com "Baseado no histórico".
+   - Escreva 1 recomendação técnica curta (10 a 15 palavras).
+   - OBRIGATORIAMENTE use VERBOS NO INFINITIVO (ex: "recomenda-se realizar...", "inspecionar...", "efetuar a troca...").
 """
-            response = model.generate_content(prompt)
-            txt = response.text.strip()
-            return txt if txt.lower().startswith("baseado no histórico") else f"{PREAMBULO}, {txt.lower()}"
-        except Exception:
-            pass
-
-    # 3. Fallback Local (Apenas se a API falhar): Exibe a execução da OS encontrada sem frases genéricas fixas
-    acao_os = historicos[0]
-    if "Execução:" in acao_os:
-        acao_os = acao_os.split("Execução:")[-1].split(";")[0].strip()
+        response = model.generate_content(prompt)
+        txt = response.text.strip()
         
-    return f"{PREAMBULO} local da frota, recomenda-se verificar: {acao_os}"
+        return txt if txt.lower().startswith("baseado no histórico") else f"{PREAMBULO}, {txt.lower()}"
+        
+    except Exception as e:
+        # Mostra o erro EXATO da API na tela em vez de fingir uma resposta
+        return f"Erro na chamada da IA: {str(e)}"
     
 # --- INICIALIZAÇÃO SEGURA DO CLIENTE ---
 if "GEMINI_API_KEY" in st.secrets:
