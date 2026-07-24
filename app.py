@@ -5,7 +5,7 @@ from sqlalchemy import create_engine, text
 from datetime import datetime, time, timedelta
 from io import BytesIO
 from fpdf import FPDF
-from google import genai
+import google.generativeai as genai
 import time as time_module
 import requests
 
@@ -67,50 +67,57 @@ def buscar_historico_relevante(sintoma_motorista, emp_id):
     except Exception as e:
         return f"Sem histórico disponível ({e})."
 
-# --- CONSULTA AO CÉREBRO DO MR. HALLEY (SÍNTESE DIRETA E OBJETIVA) ---
+# --- CONSULTA DINÂMICA AO CÉREBRO DO MR. HALLEY (RAG REAL COM GEMINI) ---
 def triagem_mr_halley(sintoma, emp_id):
+    # 1. Busca no banco de dados o histórico real de OSs concluídas
     historico = buscar_historico_relevante(sintoma, emp_id)
     
+    PREAMBULO = "Baseado no histórico"
+    
+    # Se o banco não encontrar ordens anteriores com os mesmos termos
     if not historico or "Nenhuma" in historico or "Sem histórico" in historico:
-        return "Não detectei históricos anteriores desta falha para sugerir possíveis causas."
+        return f"{PREAMBULO} da frota, não detectamos registros prévios desta falha. Recomenda-se inspeção física do sistema."
         
+    # 2. Captura a chave dos Secrets do Streamlit Cloud
     gemini_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
     
-    # 1. Se o Gemini estiver ativo, ele sintetiza em pouquíssimas palavras
     if gemini_key:
         try:
-            client = genai.Client(api_key=gemini_key)
+            # Conecta usando a biblioteca google.generativeai
+            genai.configure(api_key=gemini_key)
+            model = genai.GenerativeModel('gemini-1.5-flash')
+            
             prompt = f"""
-Você é o Mr. Halley, assistente do Updated Yesterday.
-Com base no histórico: '{historico}' e sintoma: '{sintoma}'.
+Você é o Mr. Halley, o assistente inteligente de manutenção preditiva da plataforma Updated Yesterday.
+Sua tarefa é analisar o novo defeito relatado pelo motorista e compará-lo com o histórico de Ordens de Serviço (OS) passadas da frota.
 
-Crie uma recomendação ULTRA CURTA (máximo 8 palavras) para a ordem de serviço.
-Exemplo: "Limpeza e teste de vazão dos bicos injetores."
+Histórico real retornado do banco de dados:
+{historico}
+
+Novo defeito relatado pelo motorista:
+{sintoma}
+
+Diretrizes estritas de resposta:
+1. Comece OBRIGATORIAMENTE a resposta com "Baseado no histórico".
+2. Seja ultra conciso: gere uma recomendação técnica de no MÁXIMO 1 frase (10 a 15 palavras).
+3. Seja 100% fiel ao histórico fornecido: analise o componente que falhou (ex: se for limpador/esguicho, recomende checar fusível/bomba/ejetor de água; se for fumaça, bicos de combustível; se for freio, regulagem).
+4. Nunca invente peças ou misture componentes de sistemas diferentes!
 """
-            response = client.models.generate_content(
-                model='gemini-1.5-flash',
-                contents=prompt
-            )
-            return response.text.strip()
-        except Exception:
-            pass
-
-    # 2. Fallback Inteligente: Extrai palavras-chave e sintetiza a ação em 1 frase limpa
-    txt_baixo = historico.lower()
-    
-    if "bico" in txt_baixo or "injetor" in txt_baixo:
-        return "Recomenda-se teste de vazão e limpeza dos bicos injetores."
-    elif "freio" in txt_baixo or "lona" in txt_baixo:
-        return "Recomenda-se regulagem do freio estacionário e inspeção das lonas."
-    
-    # Se for outro componente, limpa e pega apenas os primeiros 60 caracteres úteis
-    for linha in historico.split("\n"):
-        if ":" in linha:
-            acao = linha.split(":")[-1].replace("FOI IDENTIFICADO QUE O PROBLEMA ERA NO", "").replace("FORAM RETIRADOS OS", "").strip()
-            if len(acao) > 5:
-                return f"Verificar e realizar manutenção em: {acao[:60].title()}."
+            response = model.generate_content(prompt)
+            txt_resposta = response.text.strip()
+            
+            if not txt_resposta.lower().startswith("baseado no histórico"):
+                txt_resposta = f"{PREAMBULO}, {txt_resposta.lower()}"
                 
-    return "Não detectei históricos anteriores desta falha para sugerir possíveis causas."
+            return txt_resposta
+            
+        except Exception as e:
+            # Caso a API reporte erro, exibe a falha sem quebrar a aplicação
+            return f"{PREAMBULO} (Erro de API: {str(e)}). Dados do banco: {historico}"
+
+    # Fallback Sem IA (apenas se não houver chave cadastrada nos secrets)
+    linhas = [l.strip() for l in historico.split('\n') if l.strip()]
+    return f"{PREAMBULO} da frota: {' | '.join(linhas)}"
     
 # --- INICIALIZAÇÃO SEGURA DO CLIENTE ---
 if "GEMINI_API_KEY" in st.secrets:
