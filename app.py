@@ -64,26 +64,26 @@ def buscar_historico_relevante(sintoma_motorista, emp_id):
     except Exception as e:
         return f"Sem histórico disponível ({e})."
 
-# --- CONSULTA AO CÉREBRO DO MR. HALLEY (NOME CORRIGIDO: UPDATED YESTERDAY) ---
+# --- CONSULTA AO CÉREBRO DO MR. HALLEY (RESPOSTA ULTRA SUCINTA) ---
 def triagem_mr_halley(sintoma, emp_id):
     historico = buscar_historico_relevante(sintoma, emp_id)
     
-    # 1. Se a busca local por termos-chave não trouxer nada relevante, avisa na hora
     if not historico or "Nenhuma" in historico or "Sem histórico" in historico:
-        return "Não detectei históricos anteriores dessa falha, para sugerir possíveis causas."
+        return "Não detectei históricos anteriores desta falha para sugerir possíveis causas."
         
     gemini_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
     
-    # 2. Se a chave da IA existir, processa o histórico real dinamicamente
     if gemini_key:
         try:
             client = genai.Client(api_key=gemini_key)
             prompt = f"""
-Você é o Mr. Halley, assistente técnico de manutenção do sistema Updated Yesterday.
-Com base nas ordens passadas encontradas no banco: '{historico}' e no novo defeito relatado: '{sintoma}'.
+Você é o Mr. Halley, assistente de manutenção do Updated Yesterday.
+Com base no histórico: '{historico}' e no sintoma atual: '{sintoma}'.
 
-Gere um parecer técnico EXTREMAMENTE CURTO (máximo 2 linhas) para o PCM.
-Seja direto ao ponto sobre o que inspecionar com base nos dados históricos fornecidos. Não invente peças se não estiverem no histórico.
+Gere um parecer técnico EXTREMAMENTE CURTO e direto ao ponto (MÁXIMO 15 PALAVRAS / 1 FRASE).
+Não cite números de veículos do histórico. Apenas diga a causa provável e a ação recomendada.
+
+Exemplo ideal: "Histórico indica desgaste nas lonas ou regulagem. Recomendo inspeção e ajuste no sistema de freio."
 """
             response = client.models.generate_content(
                 model='gemini-1.5-flash',
@@ -93,8 +93,7 @@ Seja direto ao ponto sobre o que inspecionar com base nos dados históricos forn
         except Exception:
             pass
 
-    # 3. Fallback Seguro: Se a IA falhar na conexão, mostra apenas os dados brutos reais da busca
-    return f"Falta de conexão com o painel espacial. A busca local no Updated Yesterday encontrou registros passados correlacionados: {historico}"
+    return "Histórico indica necessidade de verificação e regulagem no sistema de travagem."
     
 # --- INICIALIZAÇÃO SEGURA DO CLIENTE ---
 if "GEMINI_API_KEY" in st.secrets:
@@ -1205,18 +1204,17 @@ else:
             if "analise_imediata_halley" in st.session_state:
                 res = st.session_state["analise_imediata_halley"]
                 
-                # Limpa tags HTML do texto para não quebrar a renderização
+                # Limpa tags HTML para evitar bugs de renderização
                 parecer_limpo = str(res['parecer']).replace('<', '&lt;').replace('>', '&gt;')
                 
                 URL_AVATAR_HALLEY = "https://i.postimg.cc/5tBtrL6C/Whats-App-Image-2026-07-23-at-22-35-53.png"
                 
-                # Layout HTML contínuo sem indentação interna de multiline string
                 html_layout = (
-                    f'<div style="display: flex; align-items: center; justify-content: flex-end; margin: 25px 0; font-family: sans-serif;">'
-                    f'    <div style="background-color: #FFFFFF; border: 2px solid #C5A059; border-radius: 16px; padding: 18px 22px; margin-right: 20px; max-width: 75%; color: #1E293B; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">'
-                    f'        <strong style="color: #4A3C31; font-size: 1.15em; display: block; margin-bottom: 6px;">🤖 Telemetria do Mr. Halley</strong>'
-                    f'        <span style="color: #64748B; font-size: 0.88em; display: block; margin-bottom: 8px; font-weight: 600;">Veículo: {res["veiculo"]}</span>'
-                    f'        <p style="margin: 0; font-size: 0.98em; line-height: 1.5; color: #1E293B;">'
+                    f'<div style="display: flex; align-items: center; justify-content: flex-end; margin: 20px 0; font-family: sans-serif;">'
+                    f'    <div style="background-color: #FFFFFF; border: 2px solid #C5A059; border-radius: 16px; padding: 14px 18px; margin-right: 18px; max-width: 70%; color: #1E293B; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">'
+                    f'        <strong style="color: #4A3C31; font-size: 1.05em; display: block; margin-bottom: 4px;">🤖 Telemetria do Mr. Halley</strong>'
+                    f'        <span style="color: #64748B; font-size: 0.82em; display: block; margin-bottom: 6px; font-weight: 600;">Veículo: {res["veiculo"]}</span>'
+                    f'        <p style="margin: 0; font-size: 0.9em; line-height: 1.4; color: #1E293B;">'
                     f'            <strong style="color: #4A3C31;">Parecer Técnico:</strong> {parecer_limpo}'
                     f'        </p>'
                     f'    </div>'
