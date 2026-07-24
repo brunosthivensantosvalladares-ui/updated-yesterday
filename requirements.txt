@@ -1,7 +1,7 @@
 streamlit
 pandas
-sqlalchemy
+SQLAlchemy
 psycopg2-binary
 fpdf
 xlsxwriter
-google-genai
+google-generativeai
