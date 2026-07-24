@@ -61,15 +61,14 @@ def buscar_historico_relevante(sintoma_motorista, emp_id):
     except Exception as e:
         return f"Sem histórico disponível ({e})."
 
-# --- CONSULTA AO MR. HALLEY (MODELO GEMINI CORRIGIDO E BUSCA RESTRITA) ---
+# --- CONSULTA AO MR. HALLEY (MODELO CORRIGIDO E OBJETIVO) ---
 def triagem_mr_halley(sintoma, emp_id):
     historico = buscar_historico_relevante(sintoma, emp_id)
     
     PREAMBULO = "Baseado no histórico"
     
-    # Se o banco não encontrar ordens anteriores com o mesmo componente
     if not historico or "Nenhuma" in historico or "Sem histórico" in historico:
-        return f"{PREAMBULO} da frota, não detectamos registros prévios desta falha para o componente. Recomenda-se inspeção física do sistema."
+        return f"{PREAMBULO} da frota, não detectamos registros prévios desta falha. Recomenda-se inspeção física do componente."
         
     gemini_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
     
@@ -77,18 +76,27 @@ def triagem_mr_halley(sintoma, emp_id):
         try:
             genai.configure(api_key=gemini_key)
             
-            # Ajuste do nome do modelo para compatibilidade com a v1beta
-            model = genai.GenerativeModel('models/gemini-1.5-flash')
+            # Nome oficial do modelo na biblioteca google-generativeai
+            model = genai.GenerativeModel('gemini-1.5-flash')
             
             prompt = f"""
-Você é o Mr. Halley, assistente técnico do Updated Yesterday.
-Análise do novo defeito: '{sintoma}'
-Histórico das OSs anteriores: '{historico}'
+Você é o Mr. Halley, assistente de manutenção técnica da plataforma Updated Yesterday.
+Sua missão é dar um parecer técnico ULTRA OBJETIVO para o PCM.
 
-Requisitos da resposta:
-1. Comece OBRIGATORIAMENTE com "Baseado no histórico".
-2. Responda em no MÁXIMO 1 frase curta (10 a 15 palavras).
-3. Seja 100% fiel ao sintoma '{sintoma}'. Fale estritamente do componente relatado.
+Histórico real das OSs do banco:
+{historico}
+
+Novo sintoma do veículo:
+{sintoma}
+
+Regras Obrigatórias:
+1. Inicie a frase OBRIGATORIAMENTE com "Baseado no histórico".
+2. Seja EXTREMAMENTE CURTO e direto ao ponto (máximo 12 palavras / 1 frase).
+3. Indique apenas a AÇÃO TÉCNICA RECOMENDADA com base no histórico do componente.
+4. NUNCA copie a lista bruta de veículos ou trechos longos do banco.
+
+Exemplo de resposta esperada:
+"Baseado no histórico, recomenda-se teste de vazão e limpeza dos bicos injetores."
 """
             response = model.generate_content(prompt)
             txt_resposta = response.text.strip()
@@ -98,19 +106,26 @@ Requisitos da resposta:
                 
             return txt_resposta
             
-        except Exception as e_flash:
-            # Fallback para o modelo alias padrão caso o nome com models/ dê divergência no endpoint
+        except Exception as e:
+            # Tenta modelo alternativo se o principal der qualquer erro
             try:
-                model_alt = genai.GenerativeModel('gemini-1.5-flash-latest')
+                model_alt = genai.GenerativeModel('gemini-pro')
                 response = model_alt.generate_content(prompt)
-                return response.text.strip()
-            except Exception as e_final:
-                # Se falhar a conexão com a API, exibe o resumo limpo do banco sem engessar nada
-                linhas = [l.strip() for l in historico.split('\n') if l.strip()]
-                return f"{PREAMBULO} local das OSs: {' | '.join(linhas[:2])}"
+                txt_resposta = response.text.strip()
+                if not txt_resposta.lower().startswith("baseado no histórico"):
+                    txt_resposta = f"{PREAMBULO}, {txt_resposta.lower()}"
+                return txt_resposta
+            except Exception:
+                pass
+            
+            # Se a IA realmente falhar, entrega uma síntese limpa de 1 linha em vez do texto bruto
+            resumo_limpo = historico.replace("\n", " ").replace("-", "").strip()
+            if len(resumo_limpo) > 70:
+                resumo_limpo = resumo_limpo[:70] + "..."
+            return f"{PREAMBULO} local: {resumo_limpo}"
 
-    linhas = [l.strip() for l in historico.split('\n') if l.strip()]
-    return f"{PREAMBULO} local das OSs: {' | '.join(linhas[:2])}"
+    # Fallback sem chave nos secrets
+    return f"{PREAMBULO} da frota, recomenda-se inspeção técnica do componente relatado."
     
 # --- INICIALIZAÇÃO SEGURA DO CLIENTE ---
 if "GEMINI_API_KEY" in st.secrets:
