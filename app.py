@@ -805,7 +805,7 @@ else:
                                 conn.commit()
                             st.rerun()
 
-elif aba_ativa == "✍️ Abrir Solicitação":
+    elif aba_ativa == "✍️ Abrir Solicitação":
         st.subheader("✍️ Nova Solicitação de Manutenção")
         st.info("💡 **Dica:** Informe o prefixo e detalhe o problema para que o Mr. Halley e a oficina possam se programar.")
         
@@ -1239,7 +1239,7 @@ with st.form("f_ch", clear_on_submit=True):
                     conn.commit()
                 st.rerun()
 
-elif aba_ativa == "📥 Chamados Oficina":
+    elif aba_ativa == "📥 Chamados Oficina":
         c_tit, c_refresh = st.columns([0.8, 0.2])
         with c_tit: 
             st.subheader("📥 Aprovação de Chamados")
