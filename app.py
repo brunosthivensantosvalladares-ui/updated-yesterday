@@ -1157,7 +1157,7 @@ else:
                     conn.commit()
                 st.rerun()
 
-    elif aba_ativa == "📥 Chamados Oficina":
+elif aba_ativa == "📥 Chamados Oficina":
         c_tit, c_refresh = st.columns([0.8, 0.2])
         with c_tit: 
             st.subheader("📥 Aprovação de Chamados")
@@ -1166,8 +1166,8 @@ else:
             st.markdown("""
                 ### 📥 Guia Rápido - Chamados
                 1. **Triagem:** Veja o que os motoristas relataram. 
-                2. **Aprovação:** Marque a caixa **Aprovar?** e o Mr. Halley dará o diagnóstico na hora!
-                3. **Planejamento:** Defina o Executor e a Área com base no parecer da IA.
+                2. **Aprovação:** Marque a caixa **Aprovar?** para o Mr. Halley dar o diagnóstico de cada veículo!
+                3. **Planejamento:** Defina o Executor e a Área com base nos pareceres.
                 4. **Finalizar:** Clique em **Processar Agendamentos**.
             """)
             
@@ -1175,83 +1175,92 @@ else:
             if st.button("🔄 Atualizar Lista", use_container_width=True, key="btn_refresh_chamados"):
                 if 'df_ap_work' in st.session_state: 
                     del st.session_state.df_ap_work
-                if 'analise_imediata_halley' in st.session_state:
-                    del st.session_state.analise_imediata_halley
+                if 'analises_halley' in st.session_state:
+                    del st.session_state.analises_halley
                 st.rerun()
             
         df_p = pd.read_sql(text("SELECT id, data_solicitacao, motorista, prefixo, descricao FROM chamados WHERE status = 'Pendente' AND empresa_id = :eid ORDER BY id DESC"), engine, params={"eid": emp_id})
         
         if not df_p.empty:
             if 'df_ap_work' not in st.session_state:
-                df_p['Executor'], df_p['Area_Destino'], df_p['Data_Programada'], df_p['Inicio'], df_p['Fim'], df_p['Aprovar'] = "", "Mecânica", datetime.now().date(), "00:00", "00:00", False
-                st.session_state.df_ap_work = df_p
+                # Reordenamos deixando a coluna Aprovar bem visível
+                df_p['Aprovar'] = False
+                df_p['Executor'] = ""
+                df_p['Area_Destino'] = "Mecânica"
+                df_p['Data_Programada'] = datetime.now().date()
+                df_p['Inicio'] = "00:00"
+                df_p['Fim'] = "00:00"
+                
+                # Reorganiza a ordem das colunas no DataFrame para colocar Aprovar? em destaque à esquerda
+                colunas_ordenadas = ['Aprovar', 'prefixo', 'descricao', 'motorista', 'Area_Destino', 'Executor', 'Data_Programada', 'Inicio', 'Fim', 'data_solicitacao', 'id']
+                st.session_state.df_ap_work = df_p[colunas_ordenadas]
             
-            # --- LÓGICA DE DETECÇÃO EM TEMPO REAL ---
+            # --- LÓGICA DE DETECÇÃO DE MÚLTIPLOS SELECIONADOS ---
             if "editor_chamados" in st.session_state and st.session_state.editor_chamados.get("edited_rows"):
                 alteracoes = st.session_state.editor_chamados["edited_rows"]
-                for c_idx, campos in alteracoes.items():
-                    if campos.get("Aprovar") is True:
-                        idx_real = int(c_idx)
-                        if idx_real < len(st.session_state.df_ap_work):
-                            dados_linha = st.session_state.df_ap_work.iloc[idx_real]
-                            id_chamado = dados_linha['id']
-                            
-                            if st.session_state.get("last_analised_id") != id_chamado:
-                                # Força a limpeza do cache antigo para não misturar diagnósticos
-                                if "analise_imediata_halley" in st.session_state:
-                                    del st.session_state["analise_imediata_halley"]
-                                    
-                                with st.spinner("🤖 Mr. Halley analisando prontuários para esta seleção..."):
+                
+                if "analises_halley" not in st.session_state:
+                    st.session_state.analises_halley = {}
+
+                # Atualiza os estados de cada linha editada
+                for c_idx_str, campos in alteracoes.items():
+                    c_idx = int(c_idx_str)
+                    if c_idx < len(st.session_state.df_ap_work):
+                        dados_linha = st.session_state.df_ap_work.iloc[c_idx]
+                        id_chamado = dados_linha['id']
+                        
+                        if campos.get("Aprovar") is True:
+                            if id_chamado not in st.session_state.analises_halley:
+                                with st.spinner(f"🤖 Mr. Halley analisando Veículo {dados_linha['prefixo']}..."):
                                     diag = triagem_mr_halley(dados_linha['descricao'], emp_id)
-                                    st.session_state["analise_imediata_halley"] = {
+                                    st.session_state.analises_halley[id_chamado] = {
                                         "veiculo": dados_linha['prefixo'],
                                         "relato": dados_linha['descricao'],
                                         "parecer": diag
                                     }
-                                    st.session_state["last_analised_id"] = id_chamado
-                    
-                    # Se desmarcar a caixa, limpa a tela imediatamente
-                    elif campos.get("Aprovar") is False:
-                        if "analise_imediata_halley" in st.session_state:
-                            del st.session_state["analise_imediata_halley"]
-                        if "last_analised_id" in st.session_state:
-                            del st.session_state["last_analised_id"]
+                        elif campos.get("Aprovar") is False:
+                            if id_chamado in st.session_state.analises_halley:
+                                del st.session_state.analises_halley[id_chamado]
 
-# --- EXIBIÇÃO DO CHAT DO MR. HALLEY EM TEMPO REAL ---
-            if "analise_imediata_halley" in st.session_state:
-                res = st.session_state["analise_imediata_halley"]
-                
-                parecer_limpo = str(res['parecer']).replace('<', '&lt;').replace('>', '&gt;')
+            # --- EXIBIÇÃO DE MÚLTIPLOS BALÕES DO MR. HALLEY ---
+            if "analises_halley" in st.session_state and st.session_state.analises_halley:
                 URL_AVATAR_HALLEY = "https://i.postimg.cc/5tBtrL6C/Whats-App-Image-2026-07-23-at-22-35-53.png"
                 
-                html_layout = (
-                    f'<div style="display: flex; align-items: center; justify-content: flex-end; margin: 20px 0; font-family: sans-serif;">'
-                    f'    <div style="background-color: #FFFFFF; border: 2px solid #C5A059; border-radius: 16px; padding: 16px 20px; margin-right: 18px; width: 100%; max-width: 78%; color: #1E293B; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">'
-                    f'        <strong style="color: #4A3C31; font-size: 1.05em; display: block; margin-bottom: 4px;">🤖 Telemetria do Mr. Halley</strong>'
-                    f'        <span style="color: #64748B; font-size: 0.82em; display: block; margin-bottom: 6px; font-weight: 600;">Veículo: {res["veiculo"]}</span>'
-                    f'        <p style="margin: 0; font-size: 0.92em; line-height: 1.45; color: #1E293B; word-wrap: break-word;">'
-                    f'            <strong style="color: #4A3C31;">Parecer Técnico:</strong> {parecer_limpo}'
-                    f'        </p>'
-                    f'    </div>'
-                    f'    <div style="flex-shrink: 0; text-align: center;">'
-                    f'        <img src="{URL_AVATAR_HALLEY}" style="width: 180px; height: auto;" alt="Mr. Halley">'
-                    f'    </div>'
-                    f'</div>'
-                )
+                # Exibe um balão individual para cada chamado marcado
+                for id_c, res in st.session_state.analises_halley.items():
+                    parecer_limpo = str(res['parecer']).replace('<', '&lt;').replace('>', '&gt;')
+                    
+                    html_layout = (
+                        f'<div style="display: flex; align-items: center; justify-content: flex-end; margin: 15px 0; font-family: sans-serif;">'
+                        f'    <div style="background-color: #FFFFFF; border: 2px solid #C5A059; border-radius: 16px; padding: 14px 18px; margin-right: 18px; width: 100%; max-width: 78%; color: #1E293B; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">'
+                        f'        <strong style="color: #4A3C31; font-size: 1.05em; display: block; margin-bottom: 4px;">🤖 Telemetria do Mr. Halley</strong>'
+                        f'        <span style="color: #64748B; font-size: 0.82em; display: block; margin-bottom: 6px; font-weight: 600;">Veículo: {res["veiculo"]} ({res["relato"]})</span>'
+                        f'        <p style="margin: 0; font-size: 0.92em; line-height: 1.4; color: #1E293B; word-wrap: break-word;">'
+                        f'            <strong style="color: #4A3C31;">Parecer Técnico:</strong> {parecer_limpo}'
+                        f'        </p>'
+                        f'    </div>'
+                        f'    <div style="flex-shrink: 0; text-align: center;">'
+                        f'        <img src="{URL_AVATAR_HALLEY}" style="width: 130px; height: auto;" alt="Mr. Halley">'
+                        f'    </div>'
+                        f'</div>'
+                    )
+                    st.markdown(html_layout, unsafe_allow_html=True)
                 
-                st.markdown(html_layout, unsafe_allow_html=True)
                 st.markdown("---")
-                
+            
+            # --- TABELA COM A COLUNA APROVAR NO INÍCIO (SEM ROLAGEM) ---
             ed_c = st.data_editor(
                 st.session_state.df_ap_work, 
                 hide_index=True, 
                 use_container_width=True, 
                 column_config={
-                    "data_solicitacao": "Aberto em", 
-                    "motorista": "Solicitante", 
-                    "Data_Programada": st.column_config.DateColumn("Data Programada"), 
-                    "Area_Destino": st.column_config.SelectboxColumn("Área", options=ORDEM_AREAS), 
-                    "Aprovar": st.column_config.CheckboxColumn("Aprovar?"), 
+                    "Aprovar": st.column_config.CheckboxColumn("Aprovar?", width="small"), 
+                    "prefixo": st.column_config.TextColumn("Prefixo", width="small"),
+                    "descricao": st.column_config.TextColumn("Descrição", width="large"),
+                    "motorista": st.column_config.TextColumn("Solicitante", width="medium"),
+                    "Area_Destino": st.column_config.SelectboxColumn("Área", options=ORDEM_AREAS, width="medium"), 
+                    "Data_Programada": st.column_config.DateColumn("Data Programada", width="medium"), 
+                    "data_solicitacao": None, 
                     "id": None
                 }, 
                 key="editor_chamados"
@@ -1272,8 +1281,7 @@ else:
                         conn.commit()
                     
                     if 'df_ap_work' in st.session_state: del st.session_state.df_ap_work
-                    if 'analise_imediata_halley' in st.session_state: del st.session_state.analise_imediata_halley
-                    if 'last_analised_id' in st.session_state: del st.session_state.last_analised_id
+                    if 'analises_halley' in st.session_state: del st.session_state.analises_halley
                         
                     st.success("✅ Agendamentos processados e enviados à Agenda Principal!")
                     st.rerun()
@@ -1281,7 +1289,7 @@ else:
                     st.warning("⚠️ Selecione ao menos um chamado na coluna 'Aprovar?' antes de processar.")
         else: 
             st.info("Nenhum chamado pendente no momento.")
-
+            
     elif aba_ativa == "📊 Indicadores":
         st.subheader("📊 Painel de Performance Operacional")
         st.info("💡 **Dica:** Utilize esses dados para identificar gargalos e planejar a capacidade da oficina.")
