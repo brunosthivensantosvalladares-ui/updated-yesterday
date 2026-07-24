@@ -1193,7 +1193,7 @@ else:
                 res = st.session_state["analise_imediata_halley"]
                 
                 # URL da imagem do mascote Mr. Halley (com fundo transparente)
-                URL_AVATAR_HALLEY = "https://i.postimg.cc/qvsMghXf/mr-halley-mascote-transp.png"
+                URL_AVATAR_HALLEY = "https://ibb.co/NnQ6kJjX.png"
                 
                 # Criamos a mensagem do chat usando o mascote como avatar
                 with st.chat_message("assistant", avatar=URL_AVATAR_HALLEY):
