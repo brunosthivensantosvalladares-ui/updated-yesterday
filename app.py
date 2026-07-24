@@ -55,7 +55,7 @@ def buscar_historico_relevante(sintoma_motorista, emp_id):
     except Exception as e:
         return f"Sem histórico disponível ({e})."
 
-# --- CONSULTA AO CÉREBRO DO MR. HALLEY VIA INFERENCE API (CORREÇÃO DE STATUS 403) ---
+# --- CONSULTA AO CÉREBRO DO MR. HALLEY VIA INFERENCE API (RESOLUÇÃO DE DNS) ---
 def triagem_mr_halley(sintoma, emp_id):
     historico = buscar_historico_relevante(sintoma, emp_id)
     
@@ -63,14 +63,13 @@ def triagem_mr_halley(sintoma, emp_id):
     if not token:
         return "⚠️ Chave 'HF_TOKEN' não configurada."
 
-    # Endpoint direto estável
-    API_URL = "https://api-inference.huggingface.co/models/microsoft/Phi-3-mini-4k-instruct"
+    # Usando o endpoint direto regional alternativo para escapar de falhas locais de DNS
+    API_URL = "https://api.huggingface.co/models/microsoft/Phi-3-mini-4k-instruct"
     headers = {
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json"
     }
 
-    # Prompt estruturado direto
     prompt = f"Você é o Mr. Halley, assistente de manutenção. Histórico: {historico}. Sintoma atual: {sintoma}. Diagnóstico provável curto:"
 
     payload = {
@@ -83,7 +82,7 @@ def triagem_mr_halley(sintoma, emp_id):
     }
 
     try:
-        response = requests.post(API_URL, headers=headers, json=payload, timeout=15)
+        response = requests.post(API_URL, headers=headers, json=payload, timeout=12)
         if response.status_code == 200:
             resultado = response.json()
             if isinstance(resultado, list) and len(resultado) > 0:
@@ -92,13 +91,14 @@ def triagem_mr_halley(sintoma, emp_id):
                 return resultado["generated_text"].strip()
             return "Diagnóstico gerado com sucesso."
         elif response.status_code == 503:
-            return "⚙️ O Mr. Halley está carregando o histórico espacial no servidor. Aguarde 15 segundos e clique no checkbox novamente."
-        elif response.status_code == 403:
-            return "⚠️ Acesso recusado (Status 403). Verifique se o seu HF_TOKEN nos secrets do Streamlit está correto e tem permissão de leitura (Read)."
+            return "⚙️ O Mr. Halley está carregando o histórico espacial no servidor. Aguarde 15 segundos e selecione novamente."
         else:
             return f"O sinal oscilou com o código {response.status_code}. Tente desmarcar e marcar novamente."
     except Exception as e:
-        return f"Falha na telemetria: {e}"
+        # Se a rede do servidor falhar completamente com IA externa, usamos um fallback estático inteligente baseado puramente no seu SQL!
+        if historico and "Nenhuma" not in historico:
+            return f"📢 (Modo Contingência) Não consegui contato com a central espacial, mas varri o banco local: soluções anteriores parecidas envolvem:\n{historico}"
+        return f"Falha na telemetria de rede: {e}"
 
 # --- INICIALIZAÇÃO SEGURA DO CLIENTE ---
 if "GEMINI_API_KEY" in st.secrets:
