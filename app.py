@@ -53,7 +53,7 @@ def get_engine():
         st.stop()
     return create_engine(db_url.replace("postgres://", "postgresql://", 1), pool_pre_ping=True)
 
-# --- BUSCA SIMPLES NO BANCO DE DADOS ---
+# --- BUSCA NO BANCO PARA TODA A FROTA (TRAZENDO O PREFIXO DO HISTÓRICO) ---
 def buscar_historico_relevante(sintoma_motorista, emp_id):
     engine = get_engine()
     sintoma_limpo = sintoma_motorista.lower().strip()
@@ -67,7 +67,7 @@ def buscar_historico_relevante(sintoma_motorista, emp_id):
     condicoes = " OR ".join([f"LOWER(descricao) LIKE '%{p}%'" for p in palavras])
     
     query = text(f"""
-        SELECT descricao 
+        SELECT prefixo, descricao 
         FROM tarefas 
         WHERE empresa_id = :eid AND realizado = True AND ({condicoes})
         ORDER BY id DESC LIMIT 5
@@ -76,12 +76,15 @@ def buscar_historico_relevante(sintoma_motorista, emp_id):
     try:
         with engine.connect() as conn:
             resultados = conn.execute(query, {"eid": str(emp_id)}).fetchall()
-        return [str(r[0]).strip() for r in resultados]
+        
+        # Retorna indicando qual veículo executou a OS
+        return [f"Veículo {r[0]}: {str(r[1]).strip()}" for r in resultados]
     except Exception:
         return []
 
-# --- TRIAGEM DO MR. HALLEY (SAUDAÇÃO CONTROLADA) ---
-def triagem_mr_halley(sintoma, emp_id, incluir_saudacao=False):
+# --- TRIAGEM DO MR. HALLEY (HISTÓRICO DA FROTA SEM FALSAS AFIRMAÇÕES) ---
+def triagem_mr_halley(sintoma, emp_id, prefixo=None, incluir_saudacao=False):
+    # Busca o histórico em toda a frota da empresa
     historicos = buscar_historico_relevante(sintoma, emp_id)
     gemini_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
     
@@ -90,39 +93,41 @@ def triagem_mr_halley(sintoma, emp_id, incluir_saudacao=False):
 
     try:
         client = genai.Client(api_key=gemini_key)
-        historico_formatado = "\n".join([f"- {h}" for h in historicos]) if historicos else "Nenhum histórico direto encontrado no banco."
+        historico_formatado = "\n".join([f"- {h}" for h in historicos]) if historicos else "Nenhum histórico encontrado na frota."
         
-        # Define a instrução de introdução conforme a primeira visita
         instrucao_saudacao = (
             "Comece a resposta apresentando-se brevemente: 'Olá! Sou o Mr. Halley, assistente de manutenção do Updated Yesterday. '" 
             if incluir_saudacao else 
-            "NÃO inclua nenhuma saudação, apresentação ou frases como 'Olá! Sou o Mr. Halley'. Vá DIRETO ao parecer técnico."
+            "NÃO inclua nenhuma saudação ou apresentação. Vá DIRETO ao parecer técnico."
         )
 
         prompt = f"""
 Você é o assistente técnico Mr. Halley da plataforma Updated Yesterday.
-Analise a relação entre o problema relatado e as OSs da frota.
+Analise a relação entre o problema relatado no veículo atual e o histórico de manutenção geral da frota.
 
-Sintoma Relatado: "{sintoma}"
+Veículo Atual Analisado: {prefixo if prefixo else 'Não informado'}
+Sintoma Relatado Atual: "{sintoma}"
 
-Histórico Encontrado no Banco de Dados:
+Histórico Geral de Outros Veículos da Frota:
 {historico_formatado}
 
 REGRA DE APRESENTAÇÃO:
 {instrucao_saudacao}
 
-REGRA CRÍTICA DE ORIGEM:
-Se a OS antiga encontrada for de outro sistema sem relação técnica real (ex: o sintoma atual é "direção puxando" e a OS antiga trata de "buzina"), DESCONSIDERE o histórico local e aplique obrigatoriamente a SITUAÇÃO B (Análises externas).
+REGRAS ESTRITAS DE DISTINÇÃO DE HISTÓRICO:
+1. O histórico fornecido pertence a OUTROS veículos da frota. NUNCA afirme ou dê a entender que o veículo atual ({prefixo}) realizou, trocou ou passou por essa manutenção anteriormente se a OS pertencer a outro prefixo.
+2. Se o histórico fornecido tratar de OUTRO sistema mecânico sem relação técnica real (exemplo: o sintoma atual é 'direção puxando' e as OSs antigas da frota falam sobre 'buzina' ou 'troca de pneu traseiro'), desconsidere o histórico local e aplique obrigatoriamente a SITUAÇÃO B.
+3. Mantenha a resposta concisa (10 a 15 palavras) e use VERBOS NO INFINITIVO.
 
 DIRETRIZES DE RESPOSTA:
 
-SITUAÇÃO A: Se existir histórico local que trate REALMENTE do mesmo defeito ou sintoma equivalente:
-1. Inicie com: "Baseado no histórico local da frota, recomenda-se"
-2. Complete com uma recomendação curta (10 a 15 palavras) usando VERBOS NO INFINITIVO.
+SITUAÇÃO A: Se existir histórico na frota que trate REALMENTE do mesmo defeito ou sintoma equivalente:
+1. Inicie OBRIGATORIAMENTE com: "Baseado no histórico local da frota, recomenda-se"
+2. Complete indicando a ação técnica necessária de forma impessoal (ex: "...recomenda-se realizar o alinhamento...").
 
-SITUAÇÃO B: Se NÃO existir histórico local sobre o mesmo defeito (ou se for de outro sistema):
-1. Inicie com: "Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se"
-2. Complete fornecendo uma ação preventiva para o sintoma "{sintoma}" usando VERBOS NO INFINITIVO (10 a 15 palavras).
+SITUAÇÃO B: Se NÃO existir histórico correlacionado na frota para este defeito específico:
+1. Inicie OBRIGATORIAMENTE com: "Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se"
+2. Complete fornecendo a recomendação preventiva genérica ideal para o sintoma "{sintoma}".
 """
 
         response = client.models.generate_content(
@@ -1247,7 +1252,14 @@ else:
                                     primeira_vez = not st.session_state.saudacao_exibida
                                     deve_saudar = primeira_vez and (len(st.session_state.analises_halley) == 0)
                                     
-                                    diag = triagem_mr_halley(dados_linha['descricao'], emp_id, incluir_saudacao=deve_saudar)
+                                    # Chamada atualizada com sintoma, emp_id, prefixo e flag de saudação
+                                    diag = triagem_mr_halley(
+                                        sintoma=dados_linha['descricao'], 
+                                        emp_id=emp_id, 
+                                        prefixo=dados_linha['prefixo'], 
+                                        incluir_saudacao=deve_saudar
+                                    )
+                                    
                                     st.session_state.analises_halley[id_chamado] = {
                                         "veiculo": dados_linha['prefixo'],
                                         "relato": dados_linha['descricao'],
