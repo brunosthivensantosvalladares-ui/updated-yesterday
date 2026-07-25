@@ -146,6 +146,51 @@ SITUAÇÃO B: Se NÃO existir histórico correlacionado na frota para este defei
             return response.text.strip()
         except Exception:
             return f"Erro de conexão com a IA: {str(e)}"
+
+# --- CHATBOX DO MR. HALLEY (INTERAÇÃO DIRETA VIA CHAT) ---
+def responder_chat_mr_halley(mensagem_usuario, emp_id):
+    historicos = buscar_historico_relevante(mensagem_usuario, emp_id)
+    gemini_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
+    
+    if not gemini_key:
+        return "Desculpe, minha conexão com a IA (GEMINI_API_KEY) não está configurada nos Secrets do Streamlit."
+
+    try:
+        client = genai.Client(api_key=gemini_key)
+        historico_formatado = "\n".join([f"- {h}" for h in historicos]) if historicos else "Nenhum histórico direto encontrado no banco da frota."
+        
+        prompt = f"""
+Você é o Mr. Halley, assistente virtual inteligente do sistema Updated Yesterday.
+Sua missão é ajudar o gestor de frota e a equipe de manutenção tirando dúvidas técnicas, diagnosticando sintomas e consultando históricos de manutenção.
+
+Pergunta/Sintoma do Usuário: "{mensagem_usuario}"
+
+Histórico Encontrado na Frota da Empresa:
+{historico_formatado}
+
+REGRAS DE RESPOSTA NO CHAT:
+1. Seja cortês, técnico, direto e profissional.
+2. Se houver histórico RELEVANTE e da MESMA falha no banco da frota, priorize citar as ações que resolveram o problema no passado.
+3. Se o histórico for de OUTRO sistema (ex: a dúvida é sobre freio e o histórico trouxe buzina) ou estiver vazio, informe gentilmente que não há registros anteriores idênticos na frota e forneça a orientação técnica correta baseada no seu conhecimento geral.
+4. Mantenha as respostas concisas, claras e estruturadas em tópicos quando necessário.
+"""
+
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=prompt,
+        )
+        return response.text.strip()
+        
+    except Exception as e:
+        try:
+            client = genai.Client(api_key=gemini_key)
+            response = client.models.generate_content(
+                model='gemini-2.0-flash',
+                contents=prompt,
+            )
+            return response.text.strip()
+        except Exception:
+            return f"Erro ao comunicar com a IA: {str(e)}"
     
 # --- INICIALIZAÇÃO SEGURA DO CLIENTE ---
 if "GEMINI_API_KEY" in st.secrets:
@@ -1337,6 +1382,44 @@ else:
                     st.warning("⚠️ Selecione ao menos um chamado na coluna 'Aprovar?' antes de processar.")
         else: 
             st.info("Nenhum chamado pendente no momento.")
+
+    elif aba_ativa == "🤖 Chat Mr. Halley":
+        st.subheader("🤖 Conversar com Mr. Halley - Telemetria & IA")
+        st.caption("Tire dúvidas técnicas sobre falhas, peças ou consulte históricos da frota em tempo real.")
+
+        # URL do Avatar do Mr. Halley
+        URL_AVATAR_HALLEY = "https://i.postimg.cc/5tBtrL6C/Whats-App-Image-2026-07-23-at-22-35-53.png"
+
+        # Inicializa o histórico de mensagens do chat no session_state se não existir
+        if "mensagens_chat_halley" not in st.session_state:
+            st.session_state.mensagens_chat_halley = [
+                {
+                    "role": "assistant",
+                    "content": "Olá! Sou o Mr. Halley, seu assistente técnico de manutenção. Como posso te ajudar com os veículos da frota hoje?"
+                }
+            ]
+
+        # Renderiza o histórico de mensagens da conversa
+        for msg in st.session_state.mensagens_chat_halley:
+            avatar = URL_AVATAR_HALLEY if msg["role"] == "assistant" else None
+            with st.chat_message(msg["role"], avatar=avatar):
+                st.markdown(msg["content"])
+
+        # Campo para entrada de novas mensagens do usuário
+        if prompt_user := st.chat_input("Digite um sintoma, veículo ou dúvida técnica..."):
+            # Exibe a mensagem do usuário na tela
+            st.session_state.mensagens_chat_halley.append({"role": "user", "content": prompt_user})
+            with st.chat_message("user"):
+                st.markdown(prompt_user)
+
+            # Processa a resposta do Mr. Halley
+            with st.chat_message("assistant", avatar=URL_AVATAR_HALLEY):
+                with st.spinner("Mr. Halley consultando banco de dados e analisando..."):
+                    resposta = responder_chat_mr_halley(prompt_user, emp_id)
+                    st.markdown(resposta)
+            
+            # Salva a resposta no histórico da sessão
+            st.session_state.mensagens_chat_halley.append({"role": "assistant", "content": resposta})
             
     elif aba_ativa == "📊 Indicadores":
         st.subheader("📊 Painel de Performance Operacional")
