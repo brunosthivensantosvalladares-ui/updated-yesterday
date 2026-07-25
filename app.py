@@ -80,8 +80,8 @@ def buscar_historico_relevante(sintoma_motorista, emp_id):
     except Exception:
         return []
 
-# --- TRIAGEM DO MR. HALLEY (CORREÇÃO DE CONFLITO DE ORIGEM) ---
-def triagem_mr_halley(sintoma, emp_id):
+# --- TRIAGEM DO MR. HALLEY (SAUDAÇÃO CONTROLADA) ---
+def triagem_mr_halley(sintoma, emp_id, incluir_saudacao=False):
     historicos = buscar_historico_relevante(sintoma, emp_id)
     gemini_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
     
@@ -90,39 +90,45 @@ def triagem_mr_halley(sintoma, emp_id):
 
     try:
         client = genai.Client(api_key=gemini_key)
-        
         historico_formatado = "\n".join([f"- {h}" for h in historicos]) if historicos else "Nenhum histórico direto encontrado no banco."
         
+        # Define a instrução de introdução conforme a primeira visita
+        instrucao_saudacao = (
+            "Comece a resposta apresentando-se brevemente: 'Olá! Sou o Mr. Halley, assistente de manutenção do Updated Yesterday. '" 
+            if incluir_saudacao else 
+            "NÃO inclua nenhuma saudação, apresentação ou frases como 'Olá! Sou o Mr. Halley'. Vá DIRETO ao parecer técnico."
+        )
+
         prompt = f"""
 Você é o assistente técnico Mr. Halley da plataforma Updated Yesterday.
-Analise a relação entre o problema relatado e as OSs da frota para definir a origem correta da recomendação.
+Analise a relação entre o problema relatado e as OSs da frota.
 
 Sintoma Relatado: "{sintoma}"
 
 Histórico Encontrado no Banco de Dados:
 {historico_formatado}
 
+REGRA DE APRESENTAÇÃO:
+{instrucao_saudacao}
+
 REGRA CRÍTICA DE ORIGEM:
-Mesmo que o banco de dados tenha retornado alguma OS acima, você deve avaliar se ela trata do MESMO DEFEITO/SISTEMA do sintoma atual. 
-Se a OS antiga for sobre outro componente (exemplo: o sintoma atual é "direção puxando" e a OS antiga é sobre "consertar buzina" ou "trocar pneu"), você deve DESCONSIDERAR o histórico local e aplicar obrigatoriamente a SITUAÇÃO B (Análises técnicas externas).
+Se a OS antiga encontrada for de outro sistema sem relação técnica real (ex: o sintoma atual é "direção puxando" e a OS antiga trata de "buzina"), DESCONSIDERE o histórico local e aplique obrigatoriamente a SITUAÇÃO B (Análises externas).
 
 DIRETRIZES DE RESPOSTA:
 
 SITUAÇÃO A: Se existir histórico local que trate REALMENTE do mesmo defeito ou sintoma equivalente:
-1. Inicie OBRIGATORIAMENTE com: "Baseado no histórico local da frota, recomenda-se"
-2. Complete a frase com uma recomendação curta (10 a 15 palavras) usando VERBOS NO INFINITIVO baseada no que resolveu o problema no passado.
+1. Inicie com: "Baseado no histórico local da frota, recomenda-se"
+2. Complete com uma recomendação curta (10 a 15 palavras) usando VERBOS NO INFINITIVO.
 
-SITUAÇÃO B: Se NÃO existir histórico local sobre o mesmo defeito (ou se as OSs encontradas forem de sistemas diferentes como buzina/pneu):
-1. Inicie OBRIGATORIAMENTE com: "Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se"
-2. Complete a frase fornecendo uma ação preventiva genérica para o sintoma "{sintoma}" usando VERBOS NO INFINITIVO (10 a 15 palavras).
+SITUAÇÃO B: Se NÃO existir histórico local sobre o mesmo defeito (ou se for de outro sistema):
+1. Inicie com: "Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se"
+2. Complete fornecendo uma ação preventiva para o sintoma "{sintoma}" usando VERBOS NO INFINITIVO (10 a 15 palavras).
 """
 
-        # Chamada no SDK oficial google-genai
         response = client.models.generate_content(
             model='gemini-2.5-flash',
             contents=prompt,
         )
-        
         return response.text.strip()
         
     except Exception as e:
@@ -1186,6 +1192,14 @@ else:
         with c_tit: 
             st.subheader("📥 Aprovação de Chamados")
             
+        with c_refresh:
+            if st.button("🔄 Atualizar Lista", use_container_width=True, key="btn_refresh_chamados"):
+                if 'df_ap_work' in st.session_state: 
+                    del st.session_state.df_ap_work
+                if 'analises_halley' in st.session_state:
+                    del st.session_state.analises_halley
+                st.rerun()
+
         with st.popover("💡 Como usar os Chamados?"):
             st.markdown("""
                 ### 📥 Guia Rápido - Chamados
@@ -1195,19 +1209,10 @@ else:
                 4. **Finalizar:** Clique em **Processar Agendamentos**.
             """)
             
-        with c_refresh:
-            if st.button("🔄 Atualizar Lista", use_container_width=True, key="btn_refresh_chamados"):
-                if 'df_ap_work' in st.session_state: 
-                    del st.session_state.df_ap_work
-                if 'analises_halley' in st.session_state:
-                    del st.session_state.analises_halley
-                st.rerun()
-            
         df_p = pd.read_sql(text("SELECT id, data_solicitacao, motorista, prefixo, descricao FROM chamados WHERE status = 'Pendente' AND empresa_id = :eid ORDER BY id DESC"), engine, params={"eid": emp_id})
         
         if not df_p.empty:
             if 'df_ap_work' not in st.session_state:
-                # Reordenamos deixando a coluna Aprovar bem visível
                 df_p['Aprovar'] = False
                 df_p['Executor'] = ""
                 df_p['Area_Destino'] = "Mecânica"
@@ -1215,10 +1220,13 @@ else:
                 df_p['Inicio'] = "00:00"
                 df_p['Fim'] = "00:00"
                 
-                # Reorganiza a ordem das colunas no DataFrame para colocar Aprovar? em destaque à esquerda
                 colunas_ordenadas = ['Aprovar', 'prefixo', 'descricao', 'motorista', 'Area_Destino', 'Executor', 'Data_Programada', 'Inicio', 'Fim', 'data_solicitacao', 'id']
                 st.session_state.df_ap_work = df_p[colunas_ordenadas]
             
+            # Inicializa a flag de controle da primeira saudação na sessão
+            if "saudacao_exibida" not in st.session_state:
+                st.session_state.saudacao_exibida = False
+
             # --- LÓGICA DE DETECÇÃO DE MÚLTIPLOS SELECIONADOS ---
             if "editor_chamados" in st.session_state and st.session_state.editor_chamados.get("edited_rows"):
                 alteracoes = st.session_state.editor_chamados["edited_rows"]
@@ -1226,7 +1234,6 @@ else:
                 if "analises_halley" not in st.session_state:
                     st.session_state.analises_halley = {}
 
-                # Atualiza os estados de cada linha editada
                 for c_idx_str, campos in alteracoes.items():
                     c_idx = int(c_idx_str)
                     if c_idx < len(st.session_state.df_ap_work):
@@ -1236,17 +1243,23 @@ else:
                         if campos.get("Aprovar") is True:
                             if id_chamado not in st.session_state.analises_halley:
                                 with st.spinner(f"🤖 Mr. Halley analisando Veículo {dados_linha['prefixo']}..."):
-                                    diag = triagem_mr_halley(dados_linha['descricao'], emp_id)
+                                    # Captura se é a primeira saudação da lista
+                                    primeira_vez = not st.session_state.saudacao_exibida
+                                    deve_saudar = primeira_vez and (len(st.session_state.analises_halley) == 0)
+                                    
+                                    diag = triagem_mr_halley(dados_linha['descricao'], emp_id, incluir_saudacao=deve_saudar)
                                     st.session_state.analises_halley[id_chamado] = {
                                         "veiculo": dados_linha['prefixo'],
                                         "relato": dados_linha['descricao'],
                                         "parecer": diag
                                     }
+                                    # Trava a saudação após a primeira resposta gerada com sucesso
+                                    st.session_state.saudacao_exibida = True
                         elif campos.get("Aprovar") is False:
                             if id_chamado in st.session_state.analises_halley:
                                 del st.session_state.analises_halley[id_chamado]
 
-# --- EXIBIÇÃO DE MÚLTIPLOS BALÕES DO MR. HALLEY ---
+            # --- EXIBIÇÃO DE MÚLTIPLOS BALÕES DO MR. HALLEY ---
             if "analises_halley" in st.session_state and st.session_state.analises_halley:
                 URL_AVATAR_HALLEY = "https://i.postimg.cc/5tBtrL6C/Whats-App-Image-2026-07-23-at-22-35-53.png"
                 
@@ -1267,12 +1280,11 @@ else:
                         f'    </div>'
                         f'</div>'
                     )
-                    # Certifique-se de que esta linha tem o MESMO alinhamento de 'html_layout =' acima
                     st.markdown(html_layout, unsafe_allow_html=True)
                 
                 st.markdown("---")
             
-            # --- TABELA COM A COLUNA APROVAR NO INÍCIO (SEM ROLAGEM) ---
+            # --- TABELA DE CHAMADOS ---
             ed_c = st.data_editor(
                 st.session_state.df_ap_work, 
                 hide_index=True, 
