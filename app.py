@@ -709,7 +709,7 @@ else:
     if st.session_state["perfil"] == "motorista":
         opcoes = ["✍️ Abrir Solicitação", "📜 Status"]
     else:
-        opcoes = ["📅 Agenda Principal", "📋 Cadastro Direto", "📥 Chamados Oficina", "⏳ OSs Pendentes", "✅ OSs Concluídas", "📊 Indicadores", "📖 Manual do Sistema"]
+        opcoes = ["📅 Agenda Principal", "📋 Cadastro Direto", "📥 Chamados Oficina", "🤖 Chat Mr. Halley", "⏳ OSs Pendentes", "✅ OSs Concluídas", "📊 Indicadores", "📖 Manual do Sistema"]
         
         if usuario_ativo == "bruno":
             opcoes.insert(6, "👥 Minha Equipe")
