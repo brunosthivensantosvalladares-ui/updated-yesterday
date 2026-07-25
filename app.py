@@ -753,6 +753,49 @@ else:
             st.session_state["logado"] = False
             st.rerun()
 
+    # --- CHATBOX FLUTUANTE NA BARRA LATERAL (MR. HALLEY) ---
+        st.divider()
+        qtd_analises = len(st.session_state.get("analises_halley", {}))
+        label_bot = f"💬 Mr. Halley ({qtd_analises})" if qtd_analises > 0 else "💬 Mr. Halley (IA)"
+
+        with st.popover(label_bot, use_container_width=True):
+            st.subheader("🤖 Mr. Halley - Assistente Flutuante")
+            st.caption("Históricos, pareceres e dúvidas técnicas em tempo real.")
+            
+            URL_AVATAR_HALLEY = "https://i.postimg.cc/5tBtrL6C/Whats-App-Image-2026-07-23-at-22-35-53.png"
+            
+            if "analises_halley" in st.session_state and st.session_state.analises_halley:
+                st.markdown("### 📋 ANÁLISES RECENTES DE OS:")
+                for id_c, res in st.session_state.analises_halley.items():
+                    with st.expander(f"Veículo {res['veiculo']} - {res['relato'][:20]}..."):
+                        st.markdown(f"**Relato:** {res['relato']}")
+                        st.markdown(f"**Parecer:** {res['parecer']}")
+                st.divider()
+
+            if "mensagens_chat_halley" not in st.session_state:
+                st.session_state.mensagens_chat_halley = [
+                    {"role": "assistant", "content": "Olá! Sou o Mr. Halley. Como posso te ajudar com a frota agora?"}
+                ]
+
+            chat_container = st.container(height=280)
+            with chat_container:
+                for msg in st.session_state.mensagens_chat_halley:
+                    avatar = URL_AVATAR_HALLEY if msg["role"] == "assistant" else None
+                    with st.chat_message(msg["role"], avatar=avatar):
+                        st.markdown(msg["content"])
+
+            if prompt_flutuante := st.chat_input("Dúvida técnica ou sintoma...", key="chat_input_flutuante"):
+                st.session_state.mensagens_chat_halley.append({"role": "user", "content": prompt_flutuante})
+                with chat_container:
+                    with st.chat_message("user"):
+                        st.markdown(prompt_flutuante)
+                    with st.chat_message("assistant", avatar=URL_AVATAR_HALLEY):
+                        with st.spinner("Analisando..."):
+                            resp = responder_chat_mr_halley(prompt_flutuante, emp_id)
+                            st.markdown(resp)
+                st.session_state.mensagens_chat_halley.append({"role": "assistant", "content": resp})
+                st.rerun()
+
     # --- BOTÕES DE NAVEGAÇÃO DE ABA NO TOPO ---
     cols = st.columns(len(opcoes))
     for i, nome in enumerate(opcoes):
@@ -1312,6 +1355,14 @@ else:
                                     }
                                     # Trava a saudação após a primeira resposta gerada com sucesso
                                     st.session_state.saudacao_exibida = True
+# Envia a análise direto para a janela do Chat Flutuante
+                                    if "mensagens_chat_halley" not in st.session_state:
+                                        st.session_state.mensagens_chat_halley = []
+                                    st.session_state.mensagens_chat_halley.append({
+                                        "role": "assistant",
+                                        "content": f"📌 **Análise Veículo {dados_linha['prefixo']}** ({dados_linha['descricao']}):\n\n{diag}"
+                                    })
+                                    
                         elif campos.get("Aprovar") is False:
                             if id_chamado in st.session_state.analises_halley:
                                 del st.session_state.analises_halley[id_chamado]
