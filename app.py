@@ -14,7 +14,7 @@ def formatar_acao_infinitivo(texto_bruto):
     """ Converte textos passados/relatórios do banco para recomendações no infinitivo. """
     txt = texto_bruto.strip()
     
-# Mapeamento de vícios de escrita e tempo passado para o infinitivo
+    # Mapeamento de vícios de escrita e tempo passado para o infinitivo
     substituicoes = [
         (r"(?i)^foi realizada a troca d[eo]s?\s*", "Realizar a troca do "),
         (r"(?i)^foi realizada a?\s*", "Realizar "),
@@ -172,7 +172,7 @@ REGRAS DE RESPOSTA NO CHAT:
 1. Seja cortês, técnico, direto e profissional.
 2. Se houver histórico RELEVANTE e da MESMA falha no banco da frota, priorize citar as ações que resolveram o problema no passado.
 3. Se o histórico for de OUTRO sistema (ex: a dúvida é sobre freio e o histórico trouxe buzina) ou estiver vazio, informe gentilmente que não há registros anteriores idênticos na frota e forneça a orientação técnica correta baseada no seu conhecimento geral.
-4. Mantenha as respostas concisas, claras e estruturadas em tópicos quando necessário.
+4. Mantenha as respostas concisas, claras e estruturadas in tópicos quando necessário.
 """
 
         response = client.models.generate_content(
@@ -191,6 +191,62 @@ REGRAS DE RESPOSTA NO CHAT:
             return response.text.strip()
         except Exception:
             return f"Erro ao comunicar com a IA: {str(e)}"
+
+# --- CHAT FLUTUANTE EM CSS/HTML + PYTHON ---
+def renderizar_chat_flutuante(emp_id):
+    URL_AVATAR = "https://i.postimg.cc/5tBtrL6C/Whats-App-Image-2026-07-23-at-22-35-53.png"
+    
+    if "mensagens_chat_halley" not in st.session_state:
+        st.session_state.mensagens_chat_halley = [
+            {"role": "assistant", "content": "Olá! Sou o Mr. Halley. Como posso te ajudar com a frota?"}
+        ]
+        
+    qtd_analises = len(st.session_state.get("analises_halley", {}))
+    label_status = f"💬 Mr. Halley ({qtd_analises})" if qtd_analises > 0 else "💬 Mr. Halley (IA)"
+
+    st.markdown("""
+        <style>
+        div[data-testid="stExpander"] {
+            position: fixed !important;
+            bottom: 20px !important;
+            right: 20px !important;
+            width: 360px !important;
+            z-index: 999999 !important;
+            background-color: #ffffff !important;
+            border: 2px solid #C5A059 !important;
+            border-radius: 12px !important;
+            box-shadow: 0px 4px 20px rgba(0, 0, 0, 0.25) !important;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+    with st.expander(label_status, expanded=False):
+        st.caption("🤖 **Mr. Halley** — Assistente Técnico")
+        
+        if "analises_halley" in st.session_state and st.session_state.analises_halley:
+            st.markdown("**📋 Análises Recentes:**")
+            for id_c, res in list(st.session_state.analises_halley.items())[-2:]:
+                st.info(f"**Veículo {res['veiculo']}:** {res['parecer']}")
+            st.divider()
+
+        chat_box = st.container(height=250)
+        with chat_box:
+            for msg in st.session_state.mensagens_chat_halley:
+                avatar = URL_AVATAR if msg["role"] == "assistant" else None
+                with st.chat_message(msg["role"], avatar=avatar):
+                    st.markdown(msg["content"])
+
+        if prompt := st.chat_input("Dúvida técnica...", key="chat_flutuante_input"):
+            st.session_state.mensagens_chat_halley.append({"role": "user", "content": prompt})
+            with chat_box:
+                with st.chat_message("user"):
+                    st.markdown(prompt)
+                with st.chat_message("assistant", avatar=URL_AVATAR):
+                    with st.spinner("Analisando..."):
+                        resp = responder_chat_mr_halley(prompt, emp_id)
+                        st.markdown(resp)
+            st.session_state.mensagens_chat_halley.append({"role": "assistant", "content": resp})
+            st.rerun()
     
 # --- INICIALIZAÇÃO SEGURA DO CLIENTE ---
 if "GEMINI_API_KEY" in st.secrets:
@@ -1574,3 +1630,5 @@ else:
                     st.warning("Integrantes removidos.")
                     time_module.sleep(1)
                     st.rerun()
+# Insere no final do arquivo para ativar o fluxo em todas as páginas
+renderizar_chat_flutuante(emp_id)
