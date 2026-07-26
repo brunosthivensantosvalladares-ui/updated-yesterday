@@ -192,7 +192,7 @@ REGRAS DE RESPOSTA NO CHAT:
         except Exception:
             return f"Erro ao comunicar com a IA: {str(e)}"
 
-# --- CHAT FLUTUANTE EM CSS/HTML + PYTHON (AJUSTADO) ---
+# --- CHAT FLUTUANTE EM CSS/HTML + PYTHON (ORDEM CRONOLÓGICA CORRIGIDA) ---
 def renderizar_chat_flutuante(emp_id):
     URL_AVATAR = "https://i.postimg.cc/5tBtrL6C/Whats-App-Image-2026-07-23-at-22-35-53.png"
     
@@ -205,10 +205,10 @@ def renderizar_chat_flutuante(emp_id):
             {"role": "assistant", "content": "Olá! Sou o Mr. Halley. Como posso te ajudar com a frota?"}
         ]
         
-    qtd_analises = len(st.session_state.get("analises_halley", {}))
+    qtd_analises = len(st.session_state.get("analises_halley", []))
     label_status = f"💬 Mr. Halley ({qtd_analises})" if qtd_analises > 0 else "💬 Mr. Halley (IA)"
 
-    # CSS CORRIGIDO: Garante que a caixa fique totalmente visível no canto inferior direito
+    # CSS CORRIGIDO: Mantém a caixa ajustada e visível no canto da tela
     st.markdown("""
         <style>
         div[data-testid="stExpander"] {
@@ -227,17 +227,21 @@ def renderizar_chat_flutuante(emp_id):
         </style>
     """, unsafe_allow_html=True)
 
-    # Abre automaticamente se acabou de aprovar uma OS
+    # Expande automaticamente ao aprovar chamado
     deve_expandir = st.session_state.abrir_chat_halley
 
     with st.expander(label_status, expanded=deve_expandir):
         st.caption("🤖 **Mr. Halley** — Assistente Técnico")
         
-        # Se houver análises recentes de chamados aprovados
+        # Exibe análises em ordem cronológica de cliques (lendo os últimos elementos da lista)
         if "analises_halley" in st.session_state and st.session_state.analises_halley:
             st.markdown("**📋 Análises Recentes:**")
-            for id_c, res in list(st.session_state.analises_halley.items())[-2:]:
-                st.info(f"**Veículo {res['veiculo']}:** {res['parecer']}")
+            lista_analises = st.session_state.analises_halley
+            
+            # Se for lista, pega os últimos 3 itens na ordem de clique
+            if isinstance(lista_analises, list):
+                for res in lista_analises[-3:]:
+                    st.info(f"**Veículo {res['veiculo']}:** {res['parecer']}")
             st.divider()
 
         chat_box = st.container(height=220)
@@ -1387,12 +1391,12 @@ else:
             if "saudacao_exibida" not in st.session_state:
                 st.session_state.saudacao_exibida = False
 
-            # --- LÓGICA DE DETECÇÃO DE MÚLTIPLOS SELECIONADOS ---
+            # --- LÓGICA DE DETECÇÃO DE MÚLTIPLOS SELECIONADOS (CRONOLÓGICA) ---
             if "editor_chamados" in st.session_state and st.session_state.editor_chamados.get("edited_rows"):
                 alteracoes = st.session_state.editor_chamados["edited_rows"]
                 
-                if "analises_halley" not in st.session_state:
-                    st.session_state.analises_halley = {}
+                if "analises_halley" not in st.session_state or not isinstance(st.session_state.analises_halley, list):
+                    st.session_state.analises_halley = [] # Lista cronológica pura
 
                 for c_idx_str, campos in alteracoes.items():
                     c_idx = int(c_idx_str)
@@ -1401,7 +1405,10 @@ else:
                         id_chamado = dados_linha['id']
                         
                         if campos.get("Aprovar") is True:
-                            if id_chamado not in st.session_state.analises_halley:
+                            # Evita requisições duplicadas se a OS já foi processada nesta sessão
+                            ja_analisado = any(a["id"] == id_chamado for a in st.session_state.analises_halley)
+                            
+                            if not ja_analisado:
                                 with st.spinner(f"🤖 Mr. Halley analisando Veículo {dados_linha['prefixo']}..."):
                                     primeira_vez = not st.session_state.saudacao_exibida
                                     deve_saudar = primeira_vez and (len(st.session_state.analises_halley) == 0)
@@ -1413,14 +1420,16 @@ else:
                                         incluir_saudacao=deve_saudar
                                     )
                                     
-                                    st.session_state.analises_halley[id_chamado] = {
+                                    # Anexa no final da lista preservando a sequência exata de seleção
+                                    st.session_state.analises_halley.append({
+                                        "id": id_chamado,
                                         "veiculo": dados_linha['prefixo'],
                                         "relato": dados_linha['descricao'],
                                         "parecer": diag
-                                    }
+                                    })
                                     st.session_state.saudacao_exibida = True
 
-                                    # Envia para o chat e FORÇA O CHAT FLUTUANTE A ABRIR NA TELA
+                                    # Alimenta o Chat Box flutuante na ordem correta
                                     if "mensagens_chat_halley" not in st.session_state:
                                         st.session_state.mensagens_chat_halley = []
                                     st.session_state.mensagens_chat_halley.append({
@@ -1428,37 +1437,14 @@ else:
                                         "content": f"📌 **Análise Veículo {dados_linha['prefixo']}** ({dados_linha['descricao']}):\n\n{diag}"
                                     })
                                     
-                                    # 👈 FORÇA A ABERTURA AUTOMÁTICA DO CHAT FLUTUANTE
                                     st.session_state.abrir_chat_halley = True
-                                    
-                        elif campos.get("Aprovar") is False:
-                            if id_chamado in st.session_state.analises_halley:
-                                del st.session_state.analises_halley[id_chamado]
+                                    st.rerun()
 
-            # --- EXIBIÇÃO DE MÚLTIPLOS BALÕES DO MR. HALLEY ---
-            if "analises_halley" in st.session_state and st.session_state.analises_halley:
-                URL_AVATAR_HALLEY = "https://i.postimg.cc/5tBtrL6C/Whats-App-Image-2026-07-23-at-22-35-53.png"
-                
-                for id_c, res in st.session_state.analises_halley.items():
-                    parecer_limpo = str(res['parecer']).replace('<', '&lt;').replace('>', '&gt;')
-                    
-                    html_layout = (
-                        f'<div style="display: flex; align-items: flex-start; justify-content: flex-end; margin: 15px 0; font-family: sans-serif;">'
-                        f'    <div style="background-color: #FFFFFF; border: 2px solid #C5A059; border-radius: 16px; padding: 16px 20px; margin-right: 18px; width: 100%; max-width: 80%; color: #1E293B; box-shadow: 0 4px 12px rgba(0,0,0,0.08); height: auto;">'
-                        f'        <strong style="color: #4A3C31; font-size: 1.05em; display: block; margin-bottom: 4px;">🤖 Telemetria do Mr. Halley</strong>'
-                        f'        <span style="color: #64748B; font-size: 0.82em; display: block; margin-bottom: 6px; font-weight: 600;">Veículo: {res["veiculo"]} ({res["relato"]})</span>'
-                        f'        <p style="margin: 0; font-size: 0.92em; line-height: 1.5; color: #1E293B; word-break: break-word; overflow-wrap: break-word;">'
-                        f'            <strong style="color: #4A3C31;">Parecer Técnico:</strong> {parecer_limpo}'
-                        f'        </p>'
-                        f'    </div>'
-                        f'    <div style="flex-shrink: 0; text-align: center;">'
-                        f'        <img src="{URL_AVATAR_HALLEY}" style="width: 120px; height: auto;" alt="Mr. Halley">'
-                        f'    </div>'
-                        f'</div>'
-                    )
-                    st.markdown(html_layout, unsafe_allow_html=True)
-                
-                st.markdown("---")
+                        elif campos.get("Aprovar") is False:
+                            # Limpa a análise da lista se o usuário desmarcar a linha
+                            st.session_state.analises_halley = [a for a in st.session_state.analises_halley if a["id"] != id_chamado]
+
+            # --- OS BALÕES DO CENTRO DA TELA FORAM REMOVIDOS DAQUI PARA DEIXAR O LAYOUT LIMPO ---
             
             # --- TABELA DE CHAMADOS ---
             ed_c = st.data_editor(
@@ -1506,10 +1492,8 @@ else:
         st.subheader("🤖 Conversar com Mr. Halley - Telemetria & IA")
         st.caption("Tire dúvidas técnicas sobre falhas, peças ou consulte históricos da frota em tempo real.")
 
-        # URL do Avatar do Mr. Halley
         URL_AVATAR_HALLEY = "https://i.postimg.cc/5tBtrL6C/Whats-App-Image-2026-07-23-at-22-35-53.png"
 
-        # Inicializa o histórico de mensagens do chat no session_state se não existir
         if "mensagens_chat_halley" not in st.session_state:
             st.session_state.mensagens_chat_halley = [
                 {
@@ -1518,27 +1502,23 @@ else:
                 }
             ]
 
-        # Renderiza o histórico de mensagens da conversa
         for msg in st.session_state.mensagens_chat_halley:
             avatar = URL_AVATAR_HALLEY if msg["role"] == "assistant" else None
             with st.chat_message(msg["role"], avatar=avatar):
                 st.markdown(msg["content"])
 
-        # Campo para entrada de novas mensagens do usuário
         if prompt_user := st.chat_input("Digite um sintoma, veículo ou dúvida técnica..."):
-            # Exibe a mensagem do usuário na tela
             st.session_state.mensagens_chat_halley.append({"role": "user", "content": prompt_user})
             with st.chat_message("user"):
                 st.markdown(prompt_user)
 
-            # Processa a resposta do Mr. Halley
             with st.chat_message("assistant", avatar=URL_AVATAR_HALLEY):
                 with st.spinner("Mr. Halley consultando banco de dados e analisando..."):
                     resposta = responder_chat_mr_halley(prompt_user, emp_id)
                     st.markdown(resposta)
             
-            # Salva a resposta no histórico da sessão
             st.session_state.mensagens_chat_halley.append({"role": "assistant", "content": resposta})
+            st.rerun()
             
     elif aba_ativa == "📊 Indicadores":
         st.subheader("📊 Painel de Performance Operacional")
