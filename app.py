@@ -1630,5 +1630,9 @@ else:
                     st.warning("Integrantes removidos.")
                     time_module.sleep(1)
                     st.rerun()
-# Insere no final do arquivo para ativar o fluxo em todas as páginas
-renderizar_chat_flutuante(emp_id)
+
+
+# --- ENCERRAMENTO GLOBAL DO FICHEIRO (FORA DE QUALQUER ABA) ---
+# Ativa o Chat Flutuante em qualquer página, apenas após o utilizador iniciar sessão com sucesso
+if st.session_state.get("logado") and "empresa" in st.session_state:
+    renderizar_chat_flutuante(st.session_state["empresa"])
