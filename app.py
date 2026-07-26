@@ -192,10 +192,14 @@ REGRAS DE RESPOSTA NO CHAT:
         except Exception:
             return f"Erro ao comunicar com a IA: {str(e)}"
 
-# --- CHAT FLUTUANTE EM CSS/HTML + PYTHON ---
+# --- CHAT FLUTUANTE EM CSS/HTML + PYTHON (AJUSTADO) ---
 def renderizar_chat_flutuante(emp_id):
     URL_AVATAR = "https://i.postimg.cc/5tBtrL6C/Whats-App-Image-2026-07-23-at-22-35-53.png"
     
+    # Controle de abertura automática do chat
+    if "abrir_chat_halley" not in st.session_state:
+        st.session_state.abrir_chat_halley = False
+
     if "mensagens_chat_halley" not in st.session_state:
         st.session_state.mensagens_chat_halley = [
             {"role": "assistant", "content": "Olá! Sou o Mr. Halley. Como posso te ajudar com a frota?"}
@@ -204,32 +208,39 @@ def renderizar_chat_flutuante(emp_id):
     qtd_analises = len(st.session_state.get("analises_halley", {}))
     label_status = f"💬 Mr. Halley ({qtd_analises})" if qtd_analises > 0 else "💬 Mr. Halley (IA)"
 
+    # CSS CORRIGIDO: Garante que a caixa fique totalmente visível no canto inferior direito
     st.markdown("""
         <style>
         div[data-testid="stExpander"] {
             position: fixed !important;
-            bottom: 20px !important;
+            bottom: 15px !important;
             right: 20px !important;
-            width: 360px !important;
+            width: 350px !important;
+            max-height: 75vh !important;
             z-index: 999999 !important;
             background-color: #ffffff !important;
             border: 2px solid #C5A059 !important;
             border-radius: 12px !important;
-            box-shadow: 0px 4px 20px rgba(0, 0, 0, 0.25) !important;
+            box-shadow: 0px 4px 20px rgba(0, 0, 0, 0.3) !important;
+            overflow-y: auto !important;
         }
         </style>
     """, unsafe_allow_html=True)
 
-    with st.expander(label_status, expanded=False):
+    # Abre automaticamente se acabou de aprovar uma OS
+    deve_expandir = st.session_state.abrir_chat_halley
+
+    with st.expander(label_status, expanded=deve_expandir):
         st.caption("🤖 **Mr. Halley** — Assistente Técnico")
         
+        # Se houver análises recentes de chamados aprovados
         if "analises_halley" in st.session_state and st.session_state.analises_halley:
             st.markdown("**📋 Análises Recentes:**")
             for id_c, res in list(st.session_state.analises_halley.items())[-2:]:
                 st.info(f"**Veículo {res['veiculo']}:** {res['parecer']}")
             st.divider()
 
-        chat_box = st.container(height=250)
+        chat_box = st.container(height=220)
         with chat_box:
             for msg in st.session_state.mensagens_chat_halley:
                 avatar = URL_AVATAR if msg["role"] == "assistant" else None
@@ -1392,11 +1403,9 @@ else:
                         if campos.get("Aprovar") is True:
                             if id_chamado not in st.session_state.analises_halley:
                                 with st.spinner(f"🤖 Mr. Halley analisando Veículo {dados_linha['prefixo']}..."):
-                                    # Captura se é a primeira saudação da lista
                                     primeira_vez = not st.session_state.saudacao_exibida
                                     deve_saudar = primeira_vez and (len(st.session_state.analises_halley) == 0)
                                     
-                                    # Chamada atualizada com sintoma, emp_id, prefixo e flag de saudação
                                     diag = triagem_mr_halley(
                                         sintoma=dados_linha['descricao'], 
                                         emp_id=emp_id, 
@@ -1409,15 +1418,18 @@ else:
                                         "relato": dados_linha['descricao'],
                                         "parecer": diag
                                     }
-                                    # Trava a saudação após a primeira resposta gerada com sucesso
                                     st.session_state.saudacao_exibida = True
-# Envia a análise direto para a janela do Chat Flutuante
+
+                                    # Envia para o chat e FORÇA O CHAT FLUTUANTE A ABRIR NA TELA
                                     if "mensagens_chat_halley" not in st.session_state:
                                         st.session_state.mensagens_chat_halley = []
                                     st.session_state.mensagens_chat_halley.append({
                                         "role": "assistant",
                                         "content": f"📌 **Análise Veículo {dados_linha['prefixo']}** ({dados_linha['descricao']}):\n\n{diag}"
                                     })
+                                    
+                                    # 👈 FORÇA A ABERTURA AUTOMÁTICA DO CHAT FLUTUANTE
+                                    st.session_state.abrir_chat_halley = True
                                     
                         elif campos.get("Aprovar") is False:
                             if id_chamado in st.session_state.analises_halley:
