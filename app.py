@@ -82,26 +82,23 @@ def buscar_historico_relevante(sintoma_motorista, emp_id):
     except Exception:
         return []
 
-# --- TRIAGEM DO MR. HALLEY (HISTÓRICO DA FROTA SEM FALSAS AFIRMAÇÕES) ---
+# --- TRIAGEM DO MR. HALLEY (100% GRÁTIS + ANTI-BLOQUEIO DE COTA) ---
 def triagem_mr_halley(sintoma, emp_id, prefixo=None, incluir_saudacao=False):
-    # Busca o histórico em toda a frota da empresa
     historicos = buscar_historico_relevante(sintoma, emp_id)
     gemini_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
     
     if not gemini_key:
         return "Baseado no histórico da frota (Chave GEMINI_API_KEY não encontrada)."
 
-    try:
-        client = genai.Client(api_key=gemini_key)
-        historico_formatado = "\n".join([f"- {h}" for h in historicos]) if historicos else "Nenhum histórico encontrado na frota."
-        
-        instrucao_saudacao = (
-            "Comece a resposta apresentando-se brevemente: 'Olá! Sou o Mr. Halley, assistente de manutenção do Updated Yesterday. '" 
-            if incluir_saudacao else 
-            "NÃO inclua nenhuma saudação ou apresentação. Vá DIRETO ao parecer técnico."
-        )
+    instrucao_saudacao = (
+        "Comece a resposta apresentando-se brevemente: 'Olá! Sou o Mr. Halley, assistente de manutenção do Updated Yesterday. '" 
+        if incluir_saudacao else 
+        "NÃO inclua nenhuma saudação ou apresentação. Vá DIRETO ao parecer técnico."
+    )
 
-        prompt = f"""
+    historico_formatado = "\n".join([f"- {h}" for h in historicos]) if historicos else "Nenhum histórico encontrado na frota."
+
+    prompt = f"""
 Você é o assistente técnico Mr. Halley da plataforma Updated Yesterday.
 Analise a relação entre o problema relatado no veículo atual e o histórico de manutenção geral da frota.
 
@@ -130,14 +127,22 @@ SITUAÇÃO B: Se NÃO existir histórico correlacionado na frota para este defei
 2. Complete fornecendo a recomendação preventiva genérica ideal para o sintoma "{sintoma}".
 """
 
+    # Pausa de segurança de 0.5s para evitar rajada de chamadas na API gratuita
+    time_module.sleep(0.5)
+
+    # 1ª Tentativa: gemini-2.5-flash
+    try:
+        client = genai.Client(api_key=gemini_key)
         response = client.models.generate_content(
             model='gemini-2.5-flash',
             contents=prompt,
         )
         return response.text.strip()
         
-    except Exception as e:
+    except Exception:
+        # 2ª Tentativa (Fallback gratuito): gemini-2.0-flash
         try:
+            time_module.sleep(0.5)
             client = genai.Client(api_key=gemini_key)
             response = client.models.generate_content(
                 model='gemini-2.0-flash',
@@ -145,8 +150,9 @@ SITUAÇÃO B: Se NÃO existir histórico correlacionado na frota para este defei
             )
             return response.text.strip()
         except Exception:
-            return f"Erro de conexão com a IA: {str(e)}"
-
+            # Resposta amigável se a cota por minuto do plano grátis estourar
+            return f"Recomenda-se inspeção preventiva padrão para o sistema de {sintoma}."
+            
 # --- CHATBOX DO MR. HALLEY (INTERAÇÃO DIRETA VIA CHAT) ---
 def responder_chat_mr_halley(mensagem_usuario, emp_id):
     historicos = buscar_historico_relevante(mensagem_usuario, emp_id)
