@@ -837,11 +837,6 @@ else:
             
             if "analises_halley" in st.session_state and st.session_state.analises_halley:
                 st.markdown("### 📋 ANÁLISES RECENTES DE OS:")
-                for id_c, res in st.session_state.analises_halley.items():
-                    with st.expander(f"Veículo {res['veiculo']} - {res['relato'][:20]}..."):
-                        st.markdown(f"**Relato:** {res['relato']}")
-                        st.markdown(f"**Parecer:** {res['parecer']}")
-                st.divider()
 
             if "mensagens_chat_halley" not in st.session_state:
                 st.session_state.mensagens_chat_halley = [
@@ -1387,16 +1382,16 @@ else:
                 colunas_ordenadas = ['Aprovar', 'prefixo', 'descricao', 'motorista', 'Area_Destino', 'Executor', 'Data_Programada', 'Inicio', 'Fim', 'data_solicitacao', 'id']
                 st.session_state.df_ap_work = df_p[colunas_ordenadas]
             
-            # Inicializa a flag de controle da primeira saudação na sessão
             if "saudacao_exibida" not in st.session_state:
                 st.session_state.saudacao_exibida = False
 
-            # --- LÓGICA DE DETECÇÃO DE MÚLTIPLOS SELECIONADOS (CRONOLÓGICA) ---
+            # --- LÓGICA DE DETECÇÃO DE MÚLTIPLOS SELECIONADOS ---
             if "editor_chamados" in st.session_state and st.session_state.editor_chamados.get("edited_rows"):
                 alteracoes = st.session_state.editor_chamados["edited_rows"]
                 
+                # Garante que seja sempre uma Lista
                 if "analises_halley" not in st.session_state or not isinstance(st.session_state.analises_halley, list):
-                    st.session_state.analises_halley = [] # Lista cronológica pura
+                    st.session_state.analises_halley = []
 
                 for c_idx_str, campos in alteracoes.items():
                     c_idx = int(c_idx_str)
@@ -1405,7 +1400,6 @@ else:
                         id_chamado = dados_linha['id']
                         
                         if campos.get("Aprovar") is True:
-                            # Evita requisições duplicadas se a OS já foi processada nesta sessão
                             ja_analisado = any(a["id"] == id_chamado for a in st.session_state.analises_halley)
                             
                             if not ja_analisado:
@@ -1420,7 +1414,6 @@ else:
                                         incluir_saudacao=deve_saudar
                                     )
                                     
-                                    # Anexa no final da lista preservando a sequência exata de seleção
                                     st.session_state.analises_halley.append({
                                         "id": id_chamado,
                                         "veiculo": dados_linha['prefixo'],
@@ -1429,7 +1422,6 @@ else:
                                     })
                                     st.session_state.saudacao_exibida = True
 
-                                    # Alimenta o Chat Box flutuante na ordem correta
                                     if "mensagens_chat_halley" not in st.session_state:
                                         st.session_state.mensagens_chat_halley = []
                                     st.session_state.mensagens_chat_halley.append({
@@ -1441,11 +1433,8 @@ else:
                                     st.rerun()
 
                         elif campos.get("Aprovar") is False:
-                            # Limpa a análise da lista se o usuário desmarcar a linha
                             st.session_state.analises_halley = [a for a in st.session_state.analises_halley if a["id"] != id_chamado]
 
-            # --- OS BALÕES DO CENTRO DA TELA FORAM REMOVIDOS DAQUI PARA DEIXAR O LAYOUT LIMPO ---
-            
             # --- TABELA DE CHAMADOS ---
             ed_c = st.data_editor(
                 st.session_state.df_ap_work, 
