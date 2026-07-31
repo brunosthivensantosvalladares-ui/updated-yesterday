@@ -198,7 +198,7 @@ REGRAS DE RESPOSTA NO CHAT:
         except Exception:
             return f"Erro ao comunicar com a IA: {str(e)}"
 
-# --- CHAT FLUTUANTE EM CSS/HTML + PYTHON (ORDEM CRONOLÓGICA CORRIGIDA) ---
+# --- CHAT FLUTUANTE EM CSS/HTML + PYTHON (SEM DUPLICAÇÃO) ---
 def renderizar_chat_flutuante(emp_id):
     URL_AVATAR = "https://i.postimg.cc/5tBtrL6C/Whats-App-Image-2026-07-23-at-22-35-53.png"
     
@@ -214,14 +214,14 @@ def renderizar_chat_flutuante(emp_id):
     qtd_analises = len(st.session_state.get("analises_halley", []))
     label_status = f"💬 Mr. Halley ({qtd_analises})" if qtd_analises > 0 else "💬 Mr. Halley (IA)"
 
-    # CSS CORRIGIDO: Mantém a caixa ajustada e visível no canto da tela
+    # CSS: Mantém a caixa ajustada e visível no canto da tela
     st.markdown("""
         <style>
         div[data-testid="stExpander"] {
             position: fixed !important;
             bottom: 15px !important;
             right: 20px !important;
-            width: 350px !important;
+            width: 360px !important;
             max-height: 75vh !important;
             z-index: 999999 !important;
             background-color: #ffffff !important;
@@ -238,19 +238,10 @@ def renderizar_chat_flutuante(emp_id):
 
     with st.expander(label_status, expanded=deve_expandir):
         st.caption("🤖 **Mr. Halley** — Assistente Técnico")
-        
-        # Exibe análises em ordem cronológica de cliques (lendo os últimos elementos da lista)
-        if "analises_halley" in st.session_state and st.session_state.analises_halley:
-            st.markdown("**📋 Análises Recentes:**")
-            lista_analises = st.session_state.analises_halley
-            
-            # Se for lista, pega os últimos 3 itens na ordem de clique
-            if isinstance(lista_analises, list):
-                for res in lista_analises[-3:]:
-                    st.info(f"**Veículo {res['veiculo']}:** {res['parecer']}")
-            st.divider()
+        st.divider()
 
-        chat_box = st.container(height=220)
+        # Histórico de bate-papo (único local onde as análises e conversas aparecem)
+        chat_box = st.container(height=260)
         with chat_box:
             for msg in st.session_state.mensagens_chat_halley:
                 avatar = URL_AVATAR if msg["role"] == "assistant" else None
