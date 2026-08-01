@@ -188,7 +188,7 @@ REGRAS DE RESPOSTA NO CHAT:
         except Exception:
             return f"Erro ao comunicar com a IA: {str(e)}"
 
-# --- CHAT FLUTUANTE EM CSS/HTML + PYTHON (SEM DUPLICAÇÃO) ---
+# --- CHAT FLUTUANTE EM CSS/HTML + PYTHON (ALTURA AUMENTADA & SCROLL AJUSTADO) ---
 def renderizar_chat_flutuante(emp_id):
     URL_AVATAR = "https://i.postimg.cc/5tBtrL6C/Whats-App-Image-2026-07-23-at-22-35-53.png"
     
@@ -204,34 +204,34 @@ def renderizar_chat_flutuante(emp_id):
     qtd_analises = len(st.session_state.get("analises_halley", []))
     label_status = f"💬 Mr. Halley ({qtd_analises})" if qtd_analises > 0 else "💬 Mr. Halley (IA)"
 
-    # CSS: Mantém a caixa ajustada e visível no canto da tela
+    # CSS AJUSTADO: Maior altura (82vh) e largura estendida para leitura confortável
     st.markdown("""
         <style>
         div[data-testid="stExpander"] {
             position: fixed !important;
             bottom: 15px !important;
             right: 20px !important;
-            width: 360px !important;
-            max-height: 75vh !important;
+            width: 380px !important;
+            max-height: 82vh !important;
             z-index: 999999 !important;
             background-color: #ffffff !important;
             border: 2px solid #C5A059 !important;
             border-radius: 12px !important;
             box-shadow: 0px 4px 20px rgba(0, 0, 0, 0.3) !important;
             overflow-y: auto !important;
+            scroll-behavior: smooth !important;
         }
         </style>
     """, unsafe_allow_html=True)
 
-    # Expande automaticamente ao aprovar chamado
     deve_expandir = st.session_state.abrir_chat_halley
 
     with st.expander(label_status, expanded=deve_expandir):
         st.caption("🤖 **Mr. Halley** — Assistente Técnico")
         st.divider()
 
-        # Histórico de bate-papo (único local onde as análises e conversas aparecem)
-        chat_box = st.container(height=260)
+        # Container de mensagens expandido para 340px
+        chat_box = st.container(height=340)
         with chat_box:
             for msg in st.session_state.mensagens_chat_halley:
                 avatar = URL_AVATAR if msg["role"] == "assistant" else None
