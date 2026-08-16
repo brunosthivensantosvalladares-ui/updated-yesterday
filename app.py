@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import os
+import json
 from sqlalchemy import create_engine, text
 from datetime import datetime, time, timedelta
 from io import BytesIO
@@ -102,7 +103,6 @@ def triagem_mr_halley(sintoma, emp_id, prefixo=None, incluir_saudacao=False):
     llm = obter_llm()
     historicos = buscar_historico_relevante(sintoma, emp_id)
     
-    # Se não houver IA configurada
     if not llm:
         return f"Recomenda-se verificação técnica preventiva para o sistema de {sintoma}."
 
@@ -151,14 +151,87 @@ REGRAS DE RESPOSTA:
             return f"Baseado no histórico local da frota, recomenda-se inspeção técnica do sistema de {sintoma}."
         return f"Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se inspeção técnica do sistema de {sintoma}."
 
+# --- FUNÇÃO DE PROCESSAMENTO DE ABERTURA DE OS VIA CHAT ---
+def processar_comando_os(texto_usuario, emp_id):
+    """Verifica se o usuário quer abrir/cadastrar uma OS e realiza o agendamento no banco."""
+    llm = obter_llm()
+    if not llm:
+        return None
 
-# --- CHATBOX DO MR. HALLEY (FOCO PRECISO NA ÚLTIMA ANÁLISE) ---
+    hoje_str = str(datetime.now().date())
+    template_extracao = """
+Analise a mensagem do gestor de oficina e verifique se ele está solicitando a criação/abertura/cadastro de uma Ordem de Serviço (OS).
+
+Mensagem: "{mensagem}"
+Data Atual: {hoje}
+
+Se a mensagem for uma solicitação de cadastro/abertura de OS, extraia os dados e responda EXCLUSIVAMENTE em formato JSON puro, sem blocos markdown (sem ```json), com as seguintes chaves:
+- "criar_os": true
+- "prefixo": "prefixo do veículo (ou 'S/P' se não informado)"
+- "descricao": "descrição clara do serviço a ser feito"
+- "executor": "nome do mecânico/executor (ou 'A definir' se não informado)"
+- "area": "Mecânica, Elétrica, Borracharia, Chapeamento ou Limpeza (escolha a mais adequada)"
+- "data": "data no formato AAAA-MM-DD (se o usuário disser 'hoje' use {hoje}, se disser 'amanhã' use a data de amanhã)"
+
+Se NÃO for um pedido de abertura de OS, responda apenas:
+{{"criar_os": false}}
+"""
+    prompt = ChatPromptTemplate.from_template(template_extracao)
+    chain = prompt | llm
+
+    try:
+        resultado = chain.invoke({"mensagem": texto_usuario, "hoje": hoje_str}).content.strip()
+        resultado_limpo = resultado.replace("```json", "").replace("```", "").strip()
+        dados = json.loads(resultado_limpo)
+
+        if dados.get("criar_os") is True:
+            engine = get_engine()
+            nova_os = obter_proxima_os(engine, emp_id)
+            
+            with engine.connect() as conn:
+                conn.execute(
+                    text("""
+                        INSERT INTO tarefas (data, executor, prefixo, inicio_disp, fim_disp, descricao, area, turno, origem, empresa_id, numero_os)
+                        VALUES (:dt, :ex, :pr, '00:00', '00:00', :ds, :ar, 'Não definido', 'Chat Mr. Halley', :eid, :nos)
+                    """),
+                    {
+                        "dt": dados.get("data", hoje_str),
+                        "ex": dados.get("executor", "A definir"),
+                        "pr": dados.get("prefixo", "S/P"),
+                        "ds": dados.get("descricao", "Serviço via chat"),
+                        "ar": dados.get("area", "Mecânica"),
+                        "eid": str(emp_id),
+                        "nos": nova_os
+                    }
+                )
+                conn.commit()
+            
+            return (
+                f"✅ **Ordem de Serviço Nº {nova_os} gerada com sucesso!**\n\n"
+                f"- **Veículo:** {dados.get('prefixo')}\n"
+                f"- **Serviço:** {dados.get('descricao')}\n"
+                f"- **Área:** {dados.get('area')}\n"
+                f"- **Data:** {dados.get('data')}\n"
+                f"- **Executor:** {dados.get('executor')}\n\n"
+                f"*A OS já foi enviada diretamente para a Agenda Principal.*"
+            )
+    except Exception:
+        pass
+    
+    return None
+
+# --- CHATBOX DO MR. HALLEY (FOCO PRECISO NA ÚLTIMA ANÁLISE E CRIAÇÃO DE OS) ---
 def responder_chat_mr_halley(mensagem_usuario, emp_id):
+    # 1. Tenta processar como comando de abertura de OS
+    resposta_os = processar_comando_os(mensagem_usuario, emp_id)
+    if resposta_os:
+        return resposta_os
+
+    # 2. Se não for comando de OS, segue o fluxo normal
     llm = obter_llm()
     if not llm:
         return "Desculpe, a conexão com a IA (GROQ_API_KEY) não está configurada nos Secrets do Streamlit."
 
-    # 1. Identifica com precisão a ÚLTIMA análise realizada na tela
     contexto_foco_atual = "Nenhum chamado foi analisado recentemente nesta tela."
     if "analises_halley" in st.session_state and st.session_state.analises_halley:
         ultima = st.session_state.analises_halley[-1]
@@ -169,7 +242,6 @@ def responder_chat_mr_halley(mensagem_usuario, emp_id):
             f"- Diagnóstico emitido: {ultima['parecer']}"
         )
 
-    # 2. Histórico geral de OSs concluídas da frota no banco
     historicos_banco = buscar_historico_relevante(mensagem_usuario, emp_id)
     contexto_banco = "HISTÓRICO DE MANUTENÇÕES CONCLUÍDAS DA FROTA:\n" + (
         "\n".join([f"- {h}" for h in historicos_banco]) if historicos_banco else "Nenhum registro anterior no banco."
@@ -206,9 +278,9 @@ REGRAS DE RESPOSTA:
     except Exception as e:
         return f"Erro ao processar consulta: {str(e)}"
         
-# --- CHAT FLUTUANTE EM CSS/HTML + PYTHON (ALTURA AUMENTADA & SEM DUPLICAÇÃO) ---
+# --- CHAT FLUTUANTE EM CSS/HTML + PYTHON ---
 def renderizar_chat_flutuante(emp_id):
-    URL_AVATAR = "https://i.postimg.cc/5tBtrL6C/Whats-App-Image-2026-07-23-at-22-35-53.png"
+    URL_AVATAR = "[https://i.postimg.cc/5tBtrL6C/Whats-App-Image-2026-07-23-at-22-35-53.png](https://i.postimg.cc/5tBtrL6C/Whats-App-Image-2026-07-23-at-22-35-53.png)"
     
     if "abrir_chat_halley" not in st.session_state:
         st.session_state.abrir_chat_halley = False
@@ -540,7 +612,7 @@ def exibir_painel_pagamento_pro(origem):
             </div>
         """, unsafe_allow_html=True)
         _, col_qr, _ = st.columns([1, 1, 1])
-        col_qr.image("https://i.postimg.cc/3Nn86MF0/QRcode.png", use_container_width=True)
+        col_qr.image("[https://i.postimg.cc/3Nn86MF0/QRcode.png](https://i.postimg.cc/3Nn86MF0/QRcode.png)", use_container_width=True)
         st.markdown("<p style='text-align: center;'><b>Chave Pix (Copie e Cole):</b></p>", unsafe_allow_html=True)
         st.code("3a7713a1-0a98-41b6-86b5-268c70cfe3f8")
         if st.button("❌ Minimizar detalhes", key=f"min_btn_{origem}"):
@@ -1423,9 +1495,9 @@ else:
 
     elif aba_ativa == "🤖 Chat Mr. Halley":
         st.subheader("🤖 Conversar com Mr. Halley - Telemetria & IA")
-        st.caption("Tire dúvidas técnicas sobre falhas, peças ou consulte históricos da frota em tempo real.")
+        st.caption("Tire dúvidas técnicas sobre falhas, consulte históricos ou solicite a abertura de OS diretamente pelo chat.")
 
-        URL_AVATAR_HALLEY = "https://i.postimg.cc/5tBtrL6C/Whats-App-Image-2026-07-23-at-22-35-53.png"
+        URL_AVATAR_HALLEY = "[https://i.postimg.cc/5tBtrL6C/Whats-App-Image-2026-07-23-at-22-35-53.png](https://i.postimg.cc/5tBtrL6C/Whats-App-Image-2026-07-23-at-22-35-53.png)"
 
         if "mensagens_chat_halley" not in st.session_state:
             st.session_state.mensagens_chat_halley = [
@@ -1440,13 +1512,13 @@ else:
             with st.chat_message(msg["role"], avatar=avatar):
                 st.markdown(msg["content"])
 
-        if prompt_user := st.chat_input("Digite um sintoma, veículo ou dúvida técnica..."):
+        if prompt_user := st.chat_input("Digite um sintoma, dúvida técnica ou peça para abrir uma OS..."):
             st.session_state.mensagens_chat_halley.append({"role": "user", "content": prompt_user})
             with st.chat_message("user"):
                 st.markdown(prompt_user)
 
             with st.chat_message("assistant", avatar=URL_AVATAR_HALLEY):
-                with st.spinner("Mr. Halley consultando histórico interno e web..."):
+                with st.spinner("Mr. Halley processando..."):
                     resposta = responder_chat_mr_halley(prompt_user, emp_id)
                     st.markdown(resposta)
             
