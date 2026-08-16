@@ -153,43 +153,45 @@ DIRETRIZES DE RESPOSTA:
         return f"Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se inspeção técnica do sistema de {sintoma}."
 
 
-# --- CHATBOX DO MR. HALLEY (100% CONTEXTUAL E INTEGRADO AO HISTÓRICO) ---
+# --- CHATBOX DO MR. HALLEY (FOCO PRECISO NA ÚLTIMA ANÁLISE) ---
 def responder_chat_mr_halley(mensagem_usuario, emp_id):
     llm = obter_llm()
     if not llm:
         return "Desculpe, a conexão com a IA (GROQ_API_KEY) não está configurada nos Secrets do Streamlit."
 
-    # 1. Recupera as últimas análises feitas na tela durante a sessão
-    contexto_analises = ""
+    # 1. Identifica com precisão a ÚLTIMA análise realizada na tela
+    contexto_foco_atual = "Nenhum chamado foi analisado recentemente nesta tela."
     if "analises_halley" in st.session_state and st.session_state.analises_halley:
-        linhas_analises = [
-            f"- Veículo {a['veiculo']} (Relato: '{a['relato']}'): {a['parecer']}"
-            for a in st.session_state.analises_halley[-5:]
-        ]
-        contexto_analises = "ANÁLISES RECENTES DESTA SESSÃO:\n" + "\n".join(linhas_analises)
+        ultima = st.session_state.analises_halley[-1]
+        contexto_foco_atual = (
+            f"ÚLTIMA ANÁLISE REALIZADA (FOCO ATUAL):\n"
+            f"- Veículo em análise: {ultima['veiculo']}\n"
+            f"- Falha/Sintoma relatado: '{ultima['relato']}'\n"
+            f"- Diagnóstico emitido: {ultima['parecer']}"
+        )
 
-    # 2. Busca os registros reais concluídos no banco (mesma base da triagem)
+    # 2. Histórico geral de OSs concluídas da frota no banco
     historicos_banco = buscar_historico_relevante(mensagem_usuario, emp_id)
-    contexto_banco = "HISTÓRICO GERAL DE MANUTENÇÕES DA FROTA (BANCO DE DADOS):\n" + (
-        "\n".join([f"- {h}" for h in historicos_banco]) if historicos_banco else "Nenhum registro anterior cadastrado."
+    contexto_banco = "HISTÓRICO DE MANUTENÇÕES CONCLUÍDAS DA FROTA:\n" + (
+        "\n".join([f"- {h}" for h in historicos_banco]) if historicos_banco else "Nenhum registro anterior no banco."
     )
 
     template = """
 Você é o Mr. Halley, assistente técnico de manutenção da plataforma Up 2 Today.
 
-Pergunta do Usuário: "{mensagem_usuario}"
-
-{contexto_analises}
+{contexto_foco_atual}
 
 {contexto_banco}
 
-DIRETRIZES DE RESPOSTA:
-1. Responda diretamente à pergunta do usuário, com precisão técnica e tom profissional.
-2. NUNCA utilize saudações formais longas (como 'Prezado gestor...', 'Olá! Sou o Mr. Halley...'). Vá direto ao ponto.
-3. Se o usuário perguntar sobre veículos anteriores, falhas similares ou a origem de um diagnóstico:
-   - Consulte o "HISTÓRICO GERAL DE MANUTENÇÕES DA FROTA" e as "ANÁLISES RECENTES DESTA SESSÃO".
-   - Identifique qual veículo (prefixo) realizou o serviço correlato e cite o prefixo e a manutenção realizada.
-4. Se realmente não existir nenhum registro sobre o assunto no histórico fornecido, afirme isso claramente e forneça a orientação técnica geral recomendada.
+Pergunta do Usuário: "{mensagem_usuario}"
+
+REGRAS DE RESPOSTA:
+1. Se o usuário fizer referência a "este último problema", "esta falha", "este sintoma" ou "qual veículo teve falha similar antes", considere OBRIGATORIAMENTE o item descrito em "ÚLTIMA ANÁLISE REALIZADA (FOCO ATUAL)".
+2. Ao responder em qual veículo ocorreu a falha similar anteriormente:
+   - Busque no "HISTÓRICO DE MANUTENÇÕES CONCLUÍDAS DA FROTA" uma OS que tenha relação com a falha do FOCO ATUAL.
+   - Responda de forma direta citando o prefixo do veículo encontrado e o serviço executado.
+   - NUNCA confunda o veículo que está sendo analisado agora com o veículo que realizou o serviço no passado.
+3. Responda em no máximo 2 a 3 frases, direto ao ponto e sem saudações formais.
 """
 
     prompt = ChatPromptTemplate.from_template(template)
@@ -197,14 +199,14 @@ DIRETRIZES DE RESPOSTA:
 
     try:
         resposta = chain.invoke({
-            "mensagem_usuario": mensagem_usuario,
-            "contexto_analises": contexto_analises,
-            "contexto_banco": contexto_banco
+            "contexto_foco_atual": contexto_foco_atual,
+            "contexto_banco": contexto_banco,
+            "mensagem_usuario": mensagem_usuario
         })
         return resposta.content.strip()
     except Exception as e:
         return f"Erro ao processar consulta: {str(e)}"
-
+        
 # --- CHAT FLUTUANTE EM CSS/HTML + PYTHON (ALTURA AUMENTADA & SEM DUPLICAÇÃO) ---
 def renderizar_chat_flutuante(emp_id):
     URL_AVATAR = "https://i.postimg.cc/5tBtrL6C/Whats-App-Image-2026-07-23-at-22-35-53.png"
