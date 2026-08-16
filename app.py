@@ -64,7 +64,7 @@ def obter_llm():
     return ChatGroq(
         groq_api_key=api_key,
         model_name="llama-3.3-70b-versatile",
-        temperature=0.0,  # Foco estrito em precisão lógica e determinística
+        temperature=0.0,
         max_retries=2
     )
 
@@ -259,44 +259,6 @@ Se os dados estão preenchidos (mesmo que hora esteja junto na descrição/data)
         )
     except Exception:
         return None
-        
-        # Se for pedido de OS, mas faltam dados, retorna a pergunta do Mr. Halley
-        if dados.get("dados_completos") is False:
-            return dados.get("pergunta_pendencia", "Para concluir o agendamento da OS, informe o prefixo do veículo, mecânico responsável e a data.")
-
-        # Se todos os dados estiverem presentes, insere no banco
-        engine = get_engine()
-        nova_os = obter_proxima_os(engine, emp_id)[cite: 2]
-        
-        with engine.connect() as conn:
-            conn.execute(
-                text("""
-                    INSERT INTO tarefas (data, executor, prefixo, inicio_disp, fim_disp, descricao, area, turno, origem, empresa_id, numero_os)
-                    VALUES (:dt, :ex, :pr, '00:00', '00:00', :ds, :ar, 'Não definido', 'Chat Mr. Halley', :eid, :nos)
-                """),
-                {
-                    "dt": dados.get("data", hoje_str),
-                    "ex": dados.get("executor", "Não definido"),
-                    "pr": dados.get("prefixo"),
-                    "ds": dados.get("descricao"),
-                    "ar": dados.get("area", "Mecânica"),
-                    "eid": str(emp_id),
-                    "nos": nova_os
-                }
-            )[cite: 2]
-            conn.commit()[cite: 2]
-
-        return (
-            f"✅ **Ordem de Serviço Nº {nova_os} gerada com sucesso!**\n\n"
-            f"- **Veículo:** {dados.get('prefixo')}\n"
-            f"- **Serviço:** {dados.get('descricao')}\n"
-            f"- **Área:** {dados.get('area')}\n"
-            f"- **Data:** {dados.get('data')}\n"
-            f"- **Executor:** {dados.get('executor')}\n\n"
-            f"*A OS já foi enviada diretamente para a Agenda Principal.*"
-        )
-    except Exception:
-        return None
 
 # --- CHATBOX DO MR. HALLEY (FOCO PRECISO NA ÚLTIMA ANÁLISE E CRIAÇÃO DE OS) ---
 def responder_chat_mr_halley(mensagem_usuario, emp_id):
@@ -355,116 +317,6 @@ REGRAS DE RESPOSTA:
         return resposta.content.strip()
     except Exception as e:
         return f"Erro ao processar consulta: {str(e)}"
-        
-# --- PROCESSAMENTO DE ABERTURA DE OS VIA CHAT ---
-def processar_comando_os(texto_usuario, emp_id):
-    """Detecta intenções explícitas ou mensagens com parâmetros de cadastro de OS."""
-    llm = obter_llm()
-    if not llm:
-        return None
-
-    if "rascunho_os" not in st.session_state:
-        st.session_state.rascunho_os = None
-
-    hoje_str = str(datetime.now().date())
-
-    veiculo_contexto = "Não informado"
-    if "analises_halley" in st.session_state and st.session_state.analises_halley:
-        veiculo_contexto = str(st.session_state.analises_halley[-1].get("veiculo", "Não informado"))
-
-    rascunho_existente = st.session_state.rascunho_os or {}
-
-    template_fluxo = """
-Você é o assistente técnico Mr. Halley da plataforma Up 2 Today.
-Sua prioridade máxima é cadastrar Ordens de Serviço (OS) quando o usuário fornecer dados de agendamento ou confirmar parâmetros.
-
-Mensagem Atual: "{mensagem}"
-Rascunho Anterior: {rascunho}
-Veículo em Análise Recente: {veiculo_contexto}
-Data de Hoje: {hoje}
-
-CAMPOS DA OS:
-- prefixo: Número/Placa do veículo (se o usuário não citar número mas houver veículo recente, use "{veiculo_contexto}")
-- descricao: Serviço/problema a ser executado
-- executor: Mecânico/responsável
-- data: Data no formato AAAA-MM-DD (amanhã = data de amanhã)
-- area: Mecânica, Elétrica, Borracharia, Chapeamento ou Limpeza
-
-REGRA: Se a mensagem contiver dados operacionais de agendamento (executor, data/horário, serviço, área) OU intenção de criar OS, classifique como fluxo de OS.
-
-Responda EXCLUSIVAMENTE em JSON puro:
-
-Se NÃO tem nenhuma relação com abrir/agendar OS:
-{{"em_fluxo_os": false}}
-
-Se é agendamento de OS mas AINDA FALTAM dados:
-{{"em_fluxo_os": true, "dados_completos": false, "rascunho": {{"prefixo": "...", "descricao": "...", "executor": "...", "data": "...", "area": "..."}}, "pergunta_pendencia": "Pergunta objetiva sobre o dado faltante"}}
-
-Se os dados estão preenchidos (mesmo que hora esteja junto na descrição/data):
-{{"em_fluxo_os": true, "dados_completos": true, "prefixo": "...", "descricao": "...", "executor": "...", "area": "...", "data": "AAAA-MM-DD"}}
-"""
-
-    prompt = ChatPromptTemplate.from_template(template_fluxo)
-    chain = prompt | llm
-
-    try:
-        resultado = chain.invoke({
-            "mensagem": texto_usuario,
-            "rascunho": json.dumps(rascunho_existente, ensure_ascii=False),
-            "veiculo_contexto": veiculo_contexto,
-            "hoje": hoje_str
-        }).content.strip()
-
-        resultado_limpo = resultado.replace("```json", "").replace("```", "").strip()
-        dados = json.loads(resultado_limpo)
-
-        if not dados.get("em_fluxo_os"):
-            return None
-
-        if dados.get("dados_completos") is False:
-            st.session_state.rascunho_os = dados.get("rascunho", {})
-            return dados.get("pergunta_pendencia", "Para prosseguir, informe os dados complementares da OS.")
-
-        # Inserção direta no banco
-        engine = get_engine()
-        nova_os = obter_proxima_os(engine, emp_id)
-        
-        pref_final = dados.get("prefixo")
-        if not pref_final or pref_final in ["Não informado", "S/P", "..."]:
-            pref_final = veiculo_contexto if veiculo_contexto != "Não informado" else "S/P"
-
-        with engine.connect() as conn:
-            conn.execute(
-                text("""
-                    INSERT INTO tarefas (data, executor, prefixo, inicio_disp, fim_disp, descricao, area, turno, origem, empresa_id, numero_os)
-                    VALUES (:dt, :ex, :pr, '00:00', '00:00', :ds, :ar, 'Não definido', 'Chat Mr. Halley', :eid, :nos)
-                """),
-                {
-                    "dt": dados.get("data", hoje_str),
-                    "ex": dados.get("executor", "Não definido"),
-                    "pr": pref_final,
-                    "ds": dados.get("descricao", "Serviço via chat"),
-                    "ar": dados.get("area", "Mecânica"),
-                    "eid": str(emp_id),
-                    "nos": nova_os
-                }
-            )
-            conn.commit()
-
-        st.session_state.rascunho_os = None
-
-        return (
-            f"✅ **Ordem de Serviço Nº {nova_os} gerada com sucesso!**\n\n"
-            f"- **Veículo:** {pref_final}\n"
-            f"- **Serviço:** {dados.get('descricao')}\n"
-            f"- **Área:** {dados.get('area')}\n"
-            f"- **Data:** {dados.get('data')}\n"
-            f"- **Executor:** {dados.get('executor')}\n\n"
-            f"*A OS já foi enviada diretamente para a Agenda Principal.*"
-        )
-    except Exception:
-        return None
-
 
 # --- CHAT FLUTUANTE EM CSS/HTML + PYTHON ---
 def renderizar_chat_flutuante(emp_id):
@@ -483,7 +335,6 @@ def renderizar_chat_flutuante(emp_id):
 
     st.markdown("""
         <style>
-        /* Largura reduzida para 390px */
         div[data-testid="stExpander"] {
             position: fixed !important;
             bottom: 20px !important;
@@ -500,13 +351,11 @@ def renderizar_chat_flutuante(emp_id):
             max-height: 80vh !important;
         }
 
-        /* Tipografia mais compacta para caber mais conteúdo */
         div[data-testid="stExpander"] div[data-testid="stChatMessage"] p {
             font-size: 0.84rem !important;
             line-height: 1.35 !important;
         }
 
-        /* Foto do Mr. Halley ampliada */
         div[data-testid="stExpander"] div[data-testid="stChatMessage"] img,
         div[data-testid="stExpander"] div[data-testid="stChatMessageAvatarCustom"] {
             width: 44px !important;
@@ -815,7 +664,7 @@ def exibir_painel_pagamento_pro(origem):
             </div>
         """, unsafe_allow_html=True)
         _, col_qr, _ = st.columns([1, 1, 1])
-        col_qr.image("[https://i.postimg.cc/3Nn86MF0/QRcode.png](https://i.postimg.cc/3Nn86MF0/QRcode.png)", use_container_width=True)
+        col_qr.image("https://i.postimg.cc/3Nn86MF0/QRcode.png", use_container_width=True)
         st.markdown("<p style='text-align: center;'><b>Chave Pix (Copie e Cole):</b></p>", unsafe_allow_html=True)
         st.code("3a7713a1-0a98-41b6-86b5-268c70cfe3f8")
         if st.button("❌ Minimizar detalhes", key=f"min_btn_{origem}"):
@@ -1700,7 +1549,7 @@ else:
         st.subheader("🤖 Conversar com Mr. Halley - Telemetria & IA")
         st.caption("Tire dúvidas técnicas sobre falhas, consulte históricos ou solicite a abertura de OS diretamente pelo chat.")
 
-        URL_AVATAR_HALLEY = "[https://i.postimg.cc/5tBtrL6C/Whats-App-Image-2026-07-23-at-22-35-53.png](https://i.postimg.cc/5tBtrL6C/Whats-App-Image-2026-07-23-at-22-35-53.png)"
+        URL_AVATAR_HALLEY = "https://i.postimg.cc/5tBtrL6C/Whats-App-Image-2026-07-23-at-22-35-53.png"
 
         if "mensagens_chat_halley" not in st.session_state:
             st.session_state.mensagens_chat_halley = [
