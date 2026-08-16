@@ -208,7 +208,7 @@ REGRAS DE RESPOSTA:
 
 # --- PROCESSAMENTO DETERMINÍSTICO DE ABERTURA DE OS VIA CHAT ---
 def processar_comando_os(texto_usuario, emp_id):
-    """Gerencia a coleta progressiva solicitando Data, Área e Executor sem erros de execução."""
+    """Gerencia a coleta progressiva exigindo Área, Data, Prefixo, Serviço e Executor."""
     if "rascunho_os" not in st.session_state:
         st.session_state.rascunho_os = None
     if "aguardando_confirmacao_os" not in st.session_state:
@@ -310,18 +310,18 @@ Relato da Análise Recente: "{relato_contexto}"
 Data de Hoje: {hoje}
 
 CAMPOS DA OS:
-- prefixo: Número/placa do veículo (se o usuário disser "este veículo", "mesmo veículo" ou "último veículo", capture do histórico recente)
-- descricao: Descrição do problema/serviço (se disser "mesmo problema", capture do histórico recente)
+- prefixo: Número/placa do veículo (capture do contexto recente se for "esse veículo" ou similar)
+- descricao: Descrição do problema/serviço (capture do contexto recente se for "mesmo problema")
 - executor: Mecânico ou responsável
-- data: Data no formato AAAA-MM-DD (converta termos como "hoje", "amanhã", "dia 20/08")
-- area: Mecânica, Elétrica, Borracharia, Chapeamento ou Limpeza
+- data: Data no formato AAAA-MM-DD (converta termos como "hoje", "amanhã", "17/08")
+- area: APENAS UMA DAS 5 OPÇÕES: Mecânica, Elétrica, Borracharia, Chapeamento ou Limpeza. Deixe nulo/vazio se o usuário NÃO tiver informado explicitamente.
 - turno: Não definido, Dia ou Noite (opcional)
-- inicio: Horário inicial no formato HH:MM (ex: 08:00, opcional)
-- fim: Horário final no formato HH:MM (ex: 10:00, opcional)
+- inicio: Horário inicial no formato HH:MM (ex: 10:00, opcional)
+- fim: Horário final no formato HH:MM (ex: 17:00, opcional)
 
 REGRAS:
-1. Capture os dados da mensagem e do histórico recente.
-2. Não invente a data de agendamento se não tiver sido informada.
+1. NUNCA invente a Área nem defina valor padrão se ela não foi dita pelo usuário.
+2. Se o usuário informar termos de área (ex: "elétrica", "mecânica", "borracharia", "chapeamento", "limpeza"), capture para o campo "area".
 
 Responda EXCLUSIVAMENTE em formato JSON puro:
 
@@ -358,12 +358,13 @@ Se for fluxo de OS:
             if v and v not in ["...", "None", "null", "Não informado"]:
                 novo_rascunho[k] = v
 
+        # Contextos externos de tela
         if not novo_rascunho.get("prefixo") and veiculo_contexto != "Não informado":
             novo_rascunho["prefixo"] = veiculo_contexto
         if not novo_rascunho.get("descricao") and relato_contexto:
             novo_rascunho["descricao"] = relato_contexto
-        if not novo_rascunho.get("area"):
-            novo_rascunho["area"] = "Mecânica"
+
+        # Padrões apenas para campos opcionais
         if not novo_rascunho.get("turno"):
             novo_rascunho["turno"] = "Não definido"
         if not novo_rascunho.get("inicio"):
@@ -373,6 +374,7 @@ Se for fluxo de OS:
 
         st.session_state.rascunho_os = novo_rascunho
 
+        # 4 CAMPOS OBRIGATÓRIOS: Prefixo, Descrição, Executor, Data e Área
         campos_faltantes = []
         if not novo_rascunho.get("prefixo"):
             campos_faltantes.append("Prefixo do Veículo")
@@ -382,13 +384,15 @@ Se for fluxo de OS:
             campos_faltantes.append("Mecânico Responsável")
         if not novo_rascunho.get("data"):
             campos_faltantes.append("Data de Agendamento")
+        if not novo_rascunho.get("area"):
+            campos_faltantes.append("Área Responsável (Mecânica, Elétrica, Borracharia, Chapeamento ou Limpeza)")
 
         if campos_faltantes:
             st.session_state.aguardando_confirmacao_os = False
             return (
                 f"Para prosseguir com a abertura da OS, por favor informe:\n\n"
                 f"- **{', '.join(campos_faltantes)}**\n\n"
-                f"*(Área padrão: {novo_rascunho.get('area')}. Horários e Turno são opcionais)*"
+                f"*(Horários e Turno são opcionais)*"
             )
 
         st.session_state.aguardando_confirmacao_os = True
@@ -401,7 +405,7 @@ Se for fluxo de OS:
             f"- **Turno:** {novo_rascunho.get('turno')}\n"
             f"- **Horário:** {novo_rascunho.get('inicio')} às {novo_rascunho.get('fim')}\n"
             f"- **Executor:** {novo_rascunho.get('executor')}\n\n"
-            f"👉 Digite **Ok** para confirmar ou informe ajustes (ex: *Mudar data para amanhã*, *Área Elétrica* ou *Horário 08:00 às 10:00*)."
+            f"👉 Digite **Ok** para confirmar ou informe ajustes (ex: *Mudar para Elétrica*, *Mudar data para amanhã*)."
         )
     except Exception:
         return None
