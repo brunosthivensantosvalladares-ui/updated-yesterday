@@ -151,9 +151,9 @@ REGRAS DE RESPOSTA:
             return f"Baseado no histórico local da frota, recomenda-se inspeção técnica do sistema de {sintoma}."
         return f"Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se inspeção técnica do sistema de {sintoma}."
 
-# --- PROCESSAMENTO CONVERSACIONAL COM ESTADO DE ABERTURA DE OS ---
+# --- PROCESSAMENTO DE ABERTURA DE OS VIA CHAT ---
 def processar_comando_os(texto_usuario, emp_id):
-    """Gerencia o fluxo de criação de OS passo a passo sem perder o contexto."""
+    """Detecta intenções explícitas ou mensagens com parâmetros de cadastro de OS."""
     llm = obter_llm()
     if not llm:
         return None
@@ -163,44 +163,39 @@ def processar_comando_os(texto_usuario, emp_id):
 
     hoje_str = str(datetime.now().date())
 
-    # Se já havia um rascunho em andamento ou se é uma nova intenção
-    em_andamento = st.session_state.rascunho_os is not None
-    rascunho_atual = st.session_state.rascunho_os if em_andamento else {}
-
     veiculo_contexto = "Não informado"
     if "analises_halley" in st.session_state and st.session_state.analises_halley:
         veiculo_contexto = str(st.session_state.analises_halley[-1].get("veiculo", "Não informado"))
 
+    rascunho_existente = st.session_state.rascunho_os or {}
+
     template_fluxo = """
 Você é o assistente técnico Mr. Halley da plataforma Up 2 Today.
-Você gerencia o cadastro e agendamento de Ordens de Serviço (OS) com o gestor de frota.
+Sua prioridade máxima é cadastrar Ordens de Serviço (OS) quando o usuário fornecer dados de agendamento ou confirmar parâmetros.
 
-Mensagem Atual do Usuário: "{mensagem}"
-Rascunho Atual da OS em Andamento: {rascunho_atual}
+Mensagem Atual: "{mensagem}"
+Rascunho Anterior: {rascunho}
 Veículo em Análise Recente: {veiculo_contexto}
 Data de Hoje: {hoje}
 
-CAMPOS OBRIGATÓRIOS PARA ABRIR A OS:
-1. prefixo (Número/Placa do veículo. Se o usuário disser "esse veículo", use "{veiculo_contexto}")
-2. descricao (O defeito ou serviço a ser realizado)
-3. executor (Nome do mecânico/responsável)
-4. data (Data no formato AAAA-MM-DD. Se disser "hoje" use {hoje}, "amanhã" use o dia seguinte)
-5. area (Mecânica, Elétrica, Borracharia, Chapeamento ou Limpeza)
+CAMPOS DA OS:
+- prefixo: Número/Placa do veículo (se o usuário não citar número mas houver veículo recente, use "{veiculo_contexto}")
+- descricao: Serviço/problema a ser executado
+- executor: Mecânico/responsável
+- data: Data no formato AAAA-MM-DD (amanhã = data de amanhã)
+- area: Mecânica, Elétrica, Borracharia, Chapeamento ou Limpeza
 
-INSTRUÇÕES:
-- Se houver rascunho em andamento OU o usuário manifestar intenção de abrir/agendar OS:
-  Mescle os dados já preenchidos com as novas informações da mensagem atual.
-- Avalie se TODOS os 5 campos estão preenchidos.
+REGRA: Se a mensagem contiver dados operacionais de agendamento (executor, data/horário, serviço, área) OU intenção de criar OS, classifique como fluxo de OS.
 
-Responda EXCLUSIVAMENTE em formato JSON puro, sem blocos markdown:
+Responda EXCLUSIVAMENTE em JSON puro:
 
-Se NÃO tem relação com abertura de OS e NÃO há rascunho:
+Se NÃO tem nenhuma relação com abrir/agendar OS:
 {{"em_fluxo_os": false}}
 
-Se é abertura de OS, mas AINDA FALTAM dados:
-{{"em_fluxo_os": true, "dados_completos": false, "rascunho": {{"prefixo": "...", "descricao": "...", "executor": "...", "data": "...", "area": "..."}}, "pergunta_pendencia": "Frase direta perguntando APENAS as informações que continuam faltando (cite o que já temos preenchido)."}}
+Se é agendamento de OS mas AINDA FALTAM dados:
+{{"em_fluxo_os": true, "dados_completos": false, "rascunho": {{"prefixo": "...", "descricao": "...", "executor": "...", "data": "...", "area": "..."}}, "pergunta_pendencia": "Pergunta objetiva sobre o dado faltante"}}
 
-Se TODOS os dados estão completos:
+Se os dados estão preenchidos (mesmo que hora esteja junto na descrição/data):
 {{"em_fluxo_os": true, "dados_completos": true, "prefixo": "...", "descricao": "...", "executor": "...", "area": "...", "data": "AAAA-MM-DD"}}
 """
 
@@ -210,7 +205,7 @@ Se TODOS os dados estão completos:
     try:
         resultado = chain.invoke({
             "mensagem": texto_usuario,
-            "rascunho_atual": json.dumps(rascunho_atual, ensure_ascii=False),
+            "rascunho": json.dumps(rascunho_existente, ensure_ascii=False),
             "veiculo_contexto": veiculo_contexto,
             "hoje": hoje_str
         }).content.strip()
@@ -223,13 +218,17 @@ Se TODOS os dados estão completos:
 
         if dados.get("dados_completos") is False:
             st.session_state.rascunho_os = dados.get("rascunho", {})
-            return dados.get("pergunta_pendencia", "Quais são o mecânico responsável e a data programada para esta OS?")
+            return dados.get("pergunta_pendencia", "Para prosseguir, informe os dados complementares da OS.")
 
-        # Todos os dados preenchidos -> grava no banco e limpa o rascunho
-        engine = get_engine()
+        # Inserção direta no banco
+        engine = get_engine()[cite: 2]
         nova_os = obter_proxima_os(engine, emp_id)[cite: 2]
         
-        with engine.connect() as conn:
+        pref_final = dados.get("prefixo")
+        if not pref_final or pref_final in ["Não informado", "S/P", "..."]:
+            pref_final = veiculo_contexto if veiculo_contexto != "Não informado" else "S/P"
+
+        with engine.connect() as conn:[cite: 2]
             conn.execute(
                 text("""
                     INSERT INTO tarefas (data, executor, prefixo, inicio_disp, fim_disp, descricao, area, turno, origem, empresa_id, numero_os)
@@ -238,8 +237,8 @@ Se TODOS os dados estão completos:
                 {
                     "dt": dados.get("data", hoje_str),
                     "ex": dados.get("executor", "Não definido"),
-                    "pr": dados.get("prefixo"),
-                    "ds": dados.get("descricao"),
+                    "pr": pref_final,
+                    "ds": dados.get("descricao", "Serviço via chat"),
                     "ar": dados.get("area", "Mecânica"),
                     "eid": str(emp_id),
                     "nos": nova_os
@@ -247,11 +246,11 @@ Se TODOS os dados estão completos:
             )[cite: 2]
             conn.commit()[cite: 2]
 
-        st.session_state.rascunho_os = None  # Reseta o rascunho após concluir
+        st.session_state.rascunho_os = None
 
         return (
             f"✅ **Ordem de Serviço Nº {nova_os} gerada com sucesso!**\n\n"
-            f"- **Veículo:** {dados.get('prefixo')}\n"
+            f"- **Veículo:** {pref_final}\n"
             f"- **Serviço:** {dados.get('descricao')}\n"
             f"- **Área:** {dados.get('area')}\n"
             f"- **Data:** {dados.get('data')}\n"
@@ -357,29 +356,29 @@ REGRAS DE RESPOSTA:
     except Exception as e:
         return f"Erro ao processar consulta: {str(e)}"
         
-# --- CHAT FLUTUANTE EM CSS/HTML + PYTHON (RESPONSIVO E RETRÁTIL) ---
+# --- CHAT FLUTUANTE EM CSS/HTML + PYTHON ---
 def renderizar_chat_flutuante(emp_id):
     URL_AVATAR_HALLEY = "https://i.postimg.cc/5tBtrL6C/Whats-App-Image-2026-07-23-at-22-35-53.png"
     
-    if "abrir_chat_halley" not in st.session_state:
-        st.session_state.abrir_chat_halley = False
+    if "abrir_chat_halley" not in st.session_state:[cite: 2]
+        st.session_state.abrir_chat_halley = False[cite: 2]
 
-    if "mensagens_chat_halley" not in st.session_state:
-        st.session_state.mensagens_chat_halley = [
-            {"role": "assistant", "content": "Olá! Sou o Mr. Halley. Como posso te ajudar com a frota?"}
-        ]
+    if "mensagens_chat_halley" not in st.session_state:[cite: 2]
+        st.session_state.mensagens_chat_halley = [[cite: 2]
+            {"role": "assistant", "content": "Olá! Sou o Mr. Halley. Como posso te ajudar com a frota?"}[cite: 2]
+        ][cite: 2]
         
-    qtd_analises = len(st.session_state.get("analises_halley", []))
-    label_status = f"💬 Mr. Halley ({qtd_analises})" if qtd_analises > 0 else "💬 Mr. Halley (IA)"
+    qtd_analises = len(st.session_state.get("analises_halley", []))[cite: 2]
+    label_status = f"💬 Mr. Halley ({qtd_analises})" if qtd_analises > 0 else "💬 Mr. Halley (IA)"[cite: 2]
 
     st.markdown("""
         <style>
-        /* Estilo base flutuante no canto inferior direito */
+        /* Largura reduzida para 390px */
         div[data-testid="stExpander"] {
             position: fixed !important;
             bottom: 20px !important;
-            right: 25px !important;
-            width: 440px !important;
+            right: 20px !important;
+            width: 390px !important;
             z-index: 999999 !important;
             background-color: #ffffff !important;
             border: 2px solid #C5A059 !important;
@@ -387,39 +386,49 @@ def renderizar_chat_flutuante(emp_id):
             box-shadow: 0px 6px 20px rgba(0, 0, 0, 0.25) !important;
         }
 
-        /* Altura expandida aplicada APENAS quando estiver aberto */
         details[data-testid="stExpander"][open] {
             max-height: 80vh !important;
         }
 
-        /* Ajuste de espaçamento interno para o conteúdo subir */
-        details[data-testid="stExpander"][open] > div[role="region"] {
-            padding: 8px 12px 12px 12px !important;
+        /* Tipografia mais compacta para caber mais conteúdo */
+        div[data-testid="stExpander"] div[data-testid="stChatMessage"] p {
+            font-size: 0.84rem !important;
+            line-height: 1.35 !important;
+        }
+
+        /* Foto do Mr. Halley ampliada */
+        div[data-testid="stExpander"] div[data-testid="stChatMessage"] img,
+        div[data-testid="stExpander"] div[data-testid="stChatMessageAvatarCustom"] {
+            width: 44px !important;
+            height: 44px !important;
+            min-width: 44px !important;
+            min-height: 44px !important;
+            border-radius: 50% !important;
         }
         </style>
     """, unsafe_allow_html=True)
 
-    deve_expandir = st.session_state.abrir_chat_halley
+    deve_expandir = st.session_state.abrir_chat_halley[cite: 2]
 
-    with st.expander(label_status, expanded=deve_expandir):
-        chat_box = st.container(height=380)
+    with st.expander(label_status, expanded=deve_expandir):[cite: 2]
+        chat_box = st.container(height=390)
         with chat_box:
-            for msg in st.session_state.mensagens_chat_halley:
+            for msg in st.session_state.mensagens_chat_halley:[cite: 2]
                 avatar = URL_AVATAR_HALLEY if msg["role"] == "assistant" else "👤"
-                with st.chat_message(msg["role"], avatar=avatar):
-                    st.markdown(msg["content"])
+                with st.chat_message(msg["role"], avatar=avatar):[cite: 2]
+                    st.markdown(msg["content"])[cite: 2]
 
-        if prompt := st.chat_input("Dúvida técnica ou agendar OS...", key="chat_flutuante_input"):
-            st.session_state.mensagens_chat_halley.append({"role": "user", "content": prompt})
+        if prompt := st.chat_input("Dúvida técnica ou agendar OS...", key="chat_flutuante_input"):[cite: 2]
+            st.session_state.mensagens_chat_halley.append({"role": "user", "content": prompt})[cite: 2]
             with chat_box:
-                with st.chat_message("user", avatar="👤"):
-                    st.markdown(prompt)
-                with st.chat_message("assistant", avatar=URL_AVATAR_HALLEY):
-                    with st.spinner("Processando..."):
-                        resp = responder_chat_mr_halley(prompt, emp_id)
-                        st.markdown(resp)
-            st.session_state.mensagens_chat_halley.append({"role": "assistant", "content": resp})
-            st.rerun()
+                with st.chat_message("user", avatar="👤"):[cite: 2]
+                    st.markdown(prompt)[cite: 2]
+                with st.chat_message("assistant", avatar=URL_AVATAR_HALLEY):[cite: 2]
+                    with st.spinner("Processando..."):[cite: 2]
+                        resp = responder_chat_mr_halley(prompt, emp_id)[cite: 2]
+                        st.markdown(resp)[cite: 2]
+            st.session_state.mensagens_chat_halley.append({"role": "assistant", "content": resp})[cite: 2]
+            st.rerun()[cite: 2]
             
 def gerar_pdf_manual_oficial_pro():
     class PDF(FPDF):
