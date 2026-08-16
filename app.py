@@ -208,7 +208,7 @@ REGRAS DE RESPOSTA:
 
 # --- PROCESSAMENTO DETERMINÍSTICO DE ABERTURA DE OS VIA CHAT ---
 def processar_comando_os(texto_usuario, emp_id):
-    """Gerencia a coleta progressiva exigindo Área, Data, Prefixo, Serviço e Executor."""
+    """Gerencia a coleta progressiva exigindo Prefixo, Descrição, Mecânico, Data e Área."""
     if "rascunho_os" not in st.session_state:
         st.session_state.rascunho_os = None
     if "aguardando_confirmacao_os" not in st.session_state:
@@ -307,21 +307,21 @@ Rascunho Existente: {rascunho_json}
 Em Fluxo de OS Ativo? {em_fluxo}
 Veículo em Análise Recente na Tela: {veiculo_contexto}
 Relato da Análise Recente: "{relato_contexto}"
-Data de Hoje: {hoje}
+Referência da Data Atual do Sistema: {hoje}
 
 CAMPOS DA OS:
-- prefixo: Número/placa do veículo (capture do contexto recente se for "esse veículo" ou similar)
-- descricao: Descrição do problema/serviço (capture do contexto recente se for "mesmo problema")
+- prefixo: Número/placa do veículo (capture do contexto se for "esse veículo" ou "último veículo")
+- descricao: Descrição do problema/serviço (capture do contexto se for "mesmo problema")
 - executor: Mecânico ou responsável
-- data: Data no formato AAAA-MM-DD (converta termos como "hoje", "amanhã", "17/08")
-- area: APENAS UMA DAS 5 OPÇÕES: Mecânica, Elétrica, Borracharia, Chapeamento ou Limpeza. Deixe nulo/vazio se o usuário NÃO tiver informado explicitamente.
+- data: Data no formato AAAA-MM-DD. REGRA CRÍTICA: Deixe NULO/VAZIO se o usuário NÃO tiver informado explicitamente uma data ou termos como "hoje", "amanhã", "17/08". NUNCA preencha automaticamente.
+- area: APENAS UMA DAS 5 OPÇÕES: Mecânica, Elétrica, Borracharia, Chapeamento ou Limpeza. Deixe NULO/VAZIO se o usuário não disse explicitamente.
 - turno: Não definido, Dia ou Noite (opcional)
-- inicio: Horário inicial no formato HH:MM (ex: 10:00, opcional)
-- fim: Horário final no formato HH:MM (ex: 17:00, opcional)
+- inicio: Horário inicial no formato HH:MM (opcional)
+- fim: Horário final no formato HH:MM (opcional)
 
 REGRAS:
-1. NUNCA invente a Área nem defina valor padrão se ela não foi dita pelo usuário.
-2. Se o usuário informar termos de área (ex: "elétrica", "mecânica", "borracharia", "chapeamento", "limpeza"), capture para o campo "area".
+1. Capture os dados da mensagem e do histórico recente.
+2. NUNCA assuma a Data nem a Área como padrão; deixe vazias se não forem informadas.
 
 Responda EXCLUSIVAMENTE em formato JSON puro:
 
@@ -358,13 +358,11 @@ Se for fluxo de OS:
             if v and v not in ["...", "None", "null", "Não informado"]:
                 novo_rascunho[k] = v
 
-        # Contextos externos de tela
         if not novo_rascunho.get("prefixo") and veiculo_contexto != "Não informado":
             novo_rascunho["prefixo"] = veiculo_contexto
         if not novo_rascunho.get("descricao") and relato_contexto:
             novo_rascunho["descricao"] = relato_contexto
 
-        # Padrões apenas para campos opcionais
         if not novo_rascunho.get("turno"):
             novo_rascunho["turno"] = "Não definido"
         if not novo_rascunho.get("inicio"):
@@ -374,7 +372,7 @@ Se for fluxo de OS:
 
         st.session_state.rascunho_os = novo_rascunho
 
-        # 4 CAMPOS OBRIGATÓRIOS: Prefixo, Descrição, Executor, Data e Área
+        # Validação estrita dos 5 campos obrigatórios
         campos_faltantes = []
         if not novo_rascunho.get("prefixo"):
             campos_faltantes.append("Prefixo do Veículo")
@@ -385,7 +383,7 @@ Se for fluxo de OS:
         if not novo_rascunho.get("data"):
             campos_faltantes.append("Data de Agendamento")
         if not novo_rascunho.get("area"):
-            campos_faltantes.append("Área Responsável (Mecânica, Elétrica, Borracharia, Chapeamento ou Limpeza)")
+            campos_faltantes.append("Área (Mecânica, Elétrica, Borracharia, Chapeamento ou Limpeza)")
 
         if campos_faltantes:
             st.session_state.aguardando_confirmacao_os = False
@@ -405,11 +403,11 @@ Se for fluxo de OS:
             f"- **Turno:** {novo_rascunho.get('turno')}\n"
             f"- **Horário:** {novo_rascunho.get('inicio')} às {novo_rascunho.get('fim')}\n"
             f"- **Executor:** {novo_rascunho.get('executor')}\n\n"
-            f"👉 Digite **Ok** para confirmar ou informe ajustes (ex: *Mudar para Elétrica*, *Mudar data para amanhã*)."
+            f"👉 Digite **Ok** para confirmar ou informe ajustes (ex: *Mudar data para amanhã*, *Área Elétrica* ou *Horário 08:00 às 10:00*)."
         )
     except Exception:
         return None
-
+        
 # --- RESPOSTAS GERAIS E HISTÓRICOS ---
 def responder_chat_mr_halley(mensagem_usuario, emp_id):
     texto_baixo = mensagem_usuario.lower().strip()
