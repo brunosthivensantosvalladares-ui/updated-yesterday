@@ -1,7 +1,11 @@
 streamlit
 pandas
-SQLAlchemy
+sqlalchemy
 psycopg2-binary
 fpdf
 xlsxwriter
-google-genai
+requests
+langchain
+langchain-groq
+langchain-community
+duckduckgo-search
