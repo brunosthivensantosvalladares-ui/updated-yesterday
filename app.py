@@ -11,8 +11,8 @@ import re
 
 # --- INTEGRAÇÃO LLAMA 3 VIA GROQ + LANGCHAIN + BUSCA WEB ---
 from langchain_groq import ChatGroq
-from langchain_community.tools import DuckDuckGoSearchRun
 from langchain_core.prompts import ChatPromptTemplate
+from duckduckgo_search import DDGS
 
 def formatar_acao_infinitivo(texto_bruto):
     """ Converte textos passados/relatórios do banco para recomendações no infinitivo. """
@@ -70,10 +70,15 @@ def obter_llm():
 busca_web_tool = DuckDuckGoSearchRun()
 
 def pesquisar_solucao_web(termo_busca: str) -> str:
-    """Pesquisa dados técnicos e diagnósticos na internet de forma 100% gratuita."""
+    """Pesquisa dados técnicos e diagnósticos na internet de forma direta e sem quebras."""
     try:
-        query = f"manutenção automotiva frota defeito {termo_busca} causa solução"
-        return busca_web_tool.run(query)
+        query = f"manutencao automotiva defeito {termo_busca} causa solucao"
+        with DDGS() as ddgs:
+            resultados = list(ddgs.text(query, max_results=2))
+            if resultados:
+                trechos = [r.get("body", "") for r in resultados if "body" in r]
+                return " ".join(trechos)
+        return ""
     except Exception:
         return ""
 
