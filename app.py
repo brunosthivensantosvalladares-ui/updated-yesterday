@@ -110,41 +110,39 @@ def buscar_historico_relevante(sintoma_motorista, emp_id):
 
 # --- TRIAGEM DO MR. HALLEY COM LLAMA 3 (GROQ + RAG + WEB) ---
 def triagem_mr_halley(sintoma, emp_id, prefixo=None, incluir_saudacao=False):
+    llm = obter_llm()
     historicos = buscar_historico_relevante(sintoma, emp_id)
     tem_historico_local = len(historicos) > 0
 
-    llm = obter_llm()
-    
-    # Fallback seguro caso a chave da Groq não esteja conectada
     if not llm:
         if tem_historico_local:
-            return f"Baseado no histórico local da frota, recomenda-se realizar inspeção e reparo no sistema de {sintoma}."
-        else:
-            return f"Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se verificar alinhamento e suspensão."
+            return f"Baseado no histórico local da frota, recomenda-se realizar manutenção preventiva do sistema de {sintoma}."
+        return "Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se verificar trambulador, cabos de comando e nível de óleo do câmbio."
 
     if tem_historico_local:
         historico_formatado = "\n".join([f"- {h}" for h in historicos])
-        contexto = f"Histórico Interno da Frota:\n{historico_formatado}"
-        regra_abertura = 'Inicie OBRIGATORIAMENTE com: "Baseado no histórico local da frota, recomenda-se"'
+        contexto = f"HISTÓRICO REAL DA FROTA:\n{historico_formatado}"
+        frase_inicio = "Baseado no histórico local da frota, recomenda-se"
     else:
         resultado_web = pesquisar_solucao_web(sintoma)
-        contexto = f"Dados Técnicos Externos (Pesquisa Web):\n{resultado_web[:600] if resultado_web else 'Inspeção mecânica geral'}"
-        regra_abertura = 'Inicie OBRIGATORIAMENTE com: "Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se"'
+        contexto = f"DADOS TÉCNICOS EXTERNOS (WEB):\n{resultado_web[:600] if resultado_web else 'Defeito mecânico/elétrico'}"
+        frase_inicio = "Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se"
 
     template = """
 Você é o assistente técnico Mr. Halley da plataforma Updated Yesterday.
-Analise a relação entre o problema relatado no veículo e as informações técnicas disponíveis.
+Analise a falha informada com base estritamente no contexto fornecido.
 
-Veículo Atual: {prefixo}
-Sintoma Relatado: "{sintoma}"
+Veículo: {prefixo}
+Falha/Sintoma: "{sintoma}"
 
+Contexto Técnico:
 {contexto}
 
-REGRAS OBRIGATÓRIAS:
-1. NÃO inclua saudações, apresentações ou cortesias (ex: NÃO diga 'Olá', 'Sou o Mr. Halley').
-2. {regra_abertura}
-3. Complete indicando a ação técnica com VERBOS NO INFINITIVO.
-4. Resposta concisa (10 a 15 palavras no total).
+REGRAS DE FORMATAÇÃO E CONTEÚDO:
+1. NUNCA adicione saudações como "Olá" ou "Prezado".
+2. Comece a sua resposta EXATAMENTE com a frase: "{frase_inicio}" (sem cortar palavras dessa frase).
+3. Após a frase obrigatória, cite claramente os componentes mecânicos prováveis e ações específicas no infinitivo (ex: inspecionar trambulador, verificar embreagem, checar sincronizadores, trocar óleo da caixa).
+4. Forneça uma resposta técnica objetiva de 25 a 40 palavras.
 """
 
     prompt = ChatPromptTemplate.from_template(template)
@@ -155,55 +153,60 @@ REGRAS OBRIGATÓRIAS:
             "prefixo": prefixo if prefixo else "Não informado",
             "sintoma": sintoma,
             "contexto": contexto,
-            "regra_abertura": regra_abertura
+            "frase_inicio": frase_inicio
         })
         return resposta.content.strip()
     except Exception:
         if tem_historico_local:
-            return f"Baseado no histórico local da frota, recomenda-se realizar manutenção preventiva do sistema de {sintoma}."
-        return f"Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se verificar alinhamento, balanceamento e suspensão."
+            return f"Baseado no histórico local da frota, recomenda-se inspeção técnica do sistema de {sintoma}."
+        return "Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se inspecionar trambulador, articulações e sincronizadores."
 
-# --- CHATBOX DO MR. HALLEY (INTERAÇÃO DIRETA VIA CHAT COM LLAMA 3) ---
+
+# --- CHATBOX DO MR. HALLEY (INTERAÇÃO COM CONTEXTO E SEM ALUCINAÇÕES) ---
 def responder_chat_mr_halley(mensagem_usuario, emp_id):
     llm = obter_llm()
     if not llm:
         return "Desculpe, minha conexão com a IA (GROQ_API_KEY) não está configurada nos Secrets do Streamlit."
 
+    # Recupera a última análise feita na sessão para dar contexto ao chat
+    contexto_analise_recente = ""
+    if "analises_halley" in st.session_state and st.session_state.analises_halley:
+        ultimas = st.session_state.analises_halley[-3:]
+        linhas = [f"Veículo {a['veiculo']} relatou '{a['relato']}'. Diagnóstico: {a['parecer']}" for a in ultimas]
+        contexto_analise_recente = "ÚLTIMOS CHAMADOS ANALISADOS NESTA SESSÃO:\n" + "\n".join(linhas)
+
     historicos = buscar_historico_relevante(mensagem_usuario, emp_id)
-    tem_historico = len(historicos) > 0
-    
-    if tem_historico:
-        contexto = "Histórico Encontrado no Banco da Frota:\n" + "\n".join([f"- {h}" for h in historicos])
-    else:
-        info_web = pesquisar_solucao_web(mensagem_usuario)
-        contexto = f"Dados Técnicos da Internet:\n{info_web[:700] if info_web else 'Sem histórico específico.'}"
+    historico_bd = "\n".join([f"- {h}" for h in historicos]) if historicos else "Nenhum histórico idêntico encontrado no banco."
 
     template = """
-Você é o Mr. Halley, assistente virtual inteligente do sistema Updated Yesterday.
-Sua missão é ajudar o gestor de frota e a equipe de manutenção tirando dúvidas técnicas, diagnosticando sintomas e consultando históricos de manutenção.
+Você é o Mr. Halley, assistente técnico de manutenção da plataforma Updated Yesterday.
 
-Pergunta/Sintoma do Usuário: "{mensagem_usuario}"
+Pergunta do Gestor: "{mensagem_usuario}"
 
-Contexto Disponível:
-{contexto}
+{contexto_analise}
 
-REGRAS:
-1. Seja cortês, técnico, direto e profissional.
-2. Priorize o histórico da frota se for exatamente do mesmo defeito.
-3. Se não houver histórico interno ou for de outro sistema, informe com clareza e forneça a recomendação técnica correta.
-4. Responda de forma estruturada e concisa.
+Registros Encontrados no Banco da Frota:
+{historico_bd}
+
+DIRETRIZES DE RESPOSTA:
+1. Responda de forma direta e técnica, SEM saudações longas e formais (NÃO use "Prezado gestor de frota e equipe de manutenção").
+2. Se a pergunta for sobre um veículo ou falha analisada recentemente, utilize as informações da sessão.
+3. Se a falha do histórico no banco for de um sistema TOTALMENTE DIFERENTE (ex: perguntou de direção/marcha e o banco trouxe bico injetor), informe claramente: "Não encontramos registros anteriores com essa falha específica no histórico da frota." NUNCA invente relação entre peças diferentes.
+4. Caso não haja histórico interno similar, forneça o diagnóstico técnico direto dos componentes envolvidos.
 """
+
     prompt = ChatPromptTemplate.from_template(template)
     chain = prompt | llm
 
     try:
         resposta = chain.invoke({
             "mensagem_usuario": mensagem_usuario,
-            "contexto": contexto
+            "contexto_analise": contexto_analise_recente,
+            "historico_bd": historico_bd
         })
         return resposta.content.strip()
     except Exception as e:
-        return f"Erro ao comunicar com a IA: {str(e)}"
+        return f"Erro ao processar resposta: {str(e)}"
 
 # --- CHAT FLUTUANTE EM CSS/HTML + PYTHON (ALTURA AUMENTADA & SEM DUPLICAÇÃO) ---
 def renderizar_chat_flutuante(emp_id):
