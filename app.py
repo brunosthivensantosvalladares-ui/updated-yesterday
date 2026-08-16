@@ -63,7 +63,7 @@ def obter_llm():
     return ChatGroq(
         groq_api_key=api_key,
         model_name="llama-3.3-70b-versatile",
-        temperature=0.2,
+        temperature=0.0,  # Foco estrito em precisão lógica e determinística
         max_retries=2
     )
 
@@ -110,30 +110,29 @@ def triagem_mr_halley(sintoma, emp_id, prefixo=None, incluir_saudacao=False):
     resultado_web = pesquisar_solucao_web(sintoma)
 
     template = """
-Você é o assistente técnico Mr. Halley da plataforma de manutenção Up 2 Today.
+Você é o assistente técnico Mr. Halley da plataforma Up 2 Today.
+Sua função é realizar a triagem técnica de manutenção com rigor de causa raiz.
 
-Tarefa: Analisar a falha informada no veículo atual e verificar se há qualquer relação técnica com os serviços anteriores já realizados na frota.
-
-Veículo Atual: {prefixo}
+Veículo: {prefixo}
 Sintoma Relatado: "{sintoma}"
 
-Histórico Geral de Manutenções da Frota:
+Histórico de Manutenções da Frota:
 {historico_formatado}
 
 Dados Técnicos Externos (Web):
 {contexto_web}
 
-INSTRUÇÕES DE CLASSIFICAÇÃO:
-1. Avalie tecnicamente se algum item do "Histórico Geral de Manutenções da Frota" envolve o mesmo sistema mecânico, elétrico ou funcional da falha relatada.
-2. SE HOUVER serviço anterior relacionado na frota:
-   - Inicie OBRIGATORIAMENTE com: "Baseado no histórico local da frota, recomenda-se"
-3. SE NÃO HOUVER nenhum serviço anterior relacionado na frota:
-   - Inicie OBRIGATORIAMENTE com: "Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se"
+CRITÉRIO DE AVALIAÇÃO DE HISTÓRICO:
+- Só considere que existe histórico local correlato se uma OS anterior compartilhar da MESMA CAUSA RAIZ e MECANISMO DE FALHA do sintoma atual.
+- Se o histórico contiver manutenções em componentes adjacentes ou gerais que não explicam a falha pontual relatada, considere que NÃO há histórico correspondente.
 
-DIRETRIZES DE RESPOSTA:
-- NUNCA use saudações, cumprimentos ou introduções (como 'Olá', 'Prezado', etc.).
-- Complete a recomendação técnica indicando ações e componentes com verbos no infinitivo.
-- Mantenha a resposta concisa e direta (entre 18 e 35 palavras no total).
+REGRAS DE RESPOSTA:
+1. Se houver correspondência exata de causa raiz no histórico da frota:
+   - Inicie OBRIGATORIAMENTE com: "Baseado no histórico local da frota, recomenda-se"
+2. Se não houver registro com a mesma causa raiz:
+   - Inicie OBRIGATORIAMENTE com: "Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se"
+3. Proibido usar saudações ou apresentações.
+4. Complete a recomendação indicando ações no infinitivo com precisão de diagnóstico (20 a 35 palavras).
 """
 
     prompt = ChatPromptTemplate.from_template(template)
