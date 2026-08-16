@@ -357,7 +357,7 @@ REGRAS DE RESPOSTA:
     except Exception as e:
         return f"Erro ao processar consulta: {str(e)}"
         
-# --- CHAT FLUTUANTE EM CSS/HTML + PYTHON (EXPANDIDO, FIXO E COM FOTO) ---
+# --- CHAT FLUTUANTE EM CSS/HTML + PYTHON (RESPONSIVO E RETRÁTIL) ---
 def renderizar_chat_flutuante(emp_id):
     URL_AVATAR_HALLEY = "https://i.postimg.cc/5tBtrL6C/Whats-App-Image-2026-07-23-at-22-35-53.png"
     
@@ -372,39 +372,29 @@ def renderizar_chat_flutuante(emp_id):
     qtd_analises = len(st.session_state.get("analises_halley", []))
     label_status = f"💬 Mr. Halley ({qtd_analises})" if qtd_analises > 0 else "💬 Mr. Halley (IA)"
 
-    # CSS de alta precisão: fixa o container e fixa o campo de entrada no rodapé
     st.markdown("""
         <style>
+        /* Estilo base flutuante no canto inferior direito */
         div[data-testid="stExpander"] {
             position: fixed !important;
-            bottom: 15px !important;
-            right: 20px !important;
-            width: 480px !important;
-            height: 75vh !important;
-            max-height: 75vh !important;
+            bottom: 20px !important;
+            right: 25px !important;
+            width: 440px !important;
             z-index: 999999 !important;
             background-color: #ffffff !important;
             border: 2px solid #C5A059 !important;
             border-radius: 12px !important;
-            box-shadow: 0px 6px 24px rgba(0, 0, 0, 0.25) !important;
-            display: flex !important;
-            flex-direction: column !important;
-            overflow: hidden !important;
+            box-shadow: 0px 6px 20px rgba(0, 0, 0, 0.25) !important;
         }
 
-        /* Área interna do expander sem margens desnecessárias no topo */
-        div[data-testid="stExpander"] > div:nth-child(2) {
-            display: flex !important;
-            flex-direction: column !important;
-            height: calc(75vh - 50px) !important;
-            padding: 8px 12px !important;
-            overflow: hidden !important;
+        /* Altura expandida aplicada APENAS quando estiver aberto */
+        details[data-testid="stExpander"][open] {
+            max-height: 80vh !important;
         }
 
-        /* Garante que o input de chat fique sempre fixado no rodapé */
-        div[data-testid="stExpander"] div[data-testid="stChatInput"] {
-            margin-top: auto !important;
-            padding-top: 8px !important;
+        /* Ajuste de espaçamento interno para o conteúdo subir */
+        details[data-testid="stExpander"][open] > div[role="region"] {
+            padding: 8px 12px 12px 12px !important;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -412,8 +402,7 @@ def renderizar_chat_flutuante(emp_id):
     deve_expandir = st.session_state.abrir_chat_halley
 
     with st.expander(label_status, expanded=deve_expandir):
-        # Container de rolagem direto no topo (sem divisórias empurrando para baixo)
-        chat_box = st.container(height=430)
+        chat_box = st.container(height=380)
         with chat_box:
             for msg in st.session_state.mensagens_chat_halley:
                 avatar = URL_AVATAR_HALLEY if msg["role"] == "assistant" else "👤"
