@@ -67,10 +67,8 @@ def obter_llm():
         max_retries=2
     )
 
-busca_web_tool = DuckDuckGoSearchRun()
-
 def pesquisar_solucao_web(termo_busca: str) -> str:
-    """Pesquisa dados técnicos e diagnósticos na internet de forma direta e sem quebras."""
+    """Pesquisa dados técnicos e diagnósticos na internet diretamente via DDGS."""
     try:
         query = f"manutencao automotiva defeito {termo_busca} causa solucao"
         with DDGS() as ddgs:
