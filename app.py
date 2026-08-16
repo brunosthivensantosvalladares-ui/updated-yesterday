@@ -151,9 +151,9 @@ REGRAS DE RESPOSTA:
             return f"Baseado no histórico local da frota, recomenda-se inspeção técnica do sistema de {sintoma}."
         return f"Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se inspeção técnica do sistema de {sintoma}."
 
-# --- PROCESSAMENTO CONVERSACIONAL DE ABERTURA DE OS VIA CHAT ---
+# --- PROCESSAMENTO DETERMINÍSTICO DE ABERTURA DE OS VIA CHAT ---
 def processar_comando_os(texto_usuario, emp_id):
-    """Gerencia a coleta progressiva dos campos de OS sem perder a memória."""
+    """Gerencia a coleta progressiva dos campos de OS e grava imediatamente ao completar."""
     llm = obter_llm()
     if not llm:
         return None
@@ -168,37 +168,51 @@ def processar_comando_os(texto_usuario, emp_id):
     veiculo_contexto = "Não informado"
     if "analises_halley" in st.session_state and st.session_state.analises_halley:
         veiculo_contexto = str(st.session_state.analises_halley[-1].get("veiculo", "Não informado"))
+        relato_contexto = str(st.session_state.analises_halley[-1].get("relato", ""))
+    else:
+        relato_contexto = ""
+
+    # Se não houver rascunho prévio mas o contexto tiver veículo e relato, inicializa valores base
+    if not rascunho_atual and veiculo_contexto != "Não informado":
+        rascunho_atual["prefixo"] = veiculo_contexto
+        if relato_contexto:
+            rascunho_atual["descricao"] = relato_contexto
 
     template_fluxo = """
-Você é o assistente técnico Mr. Halley da plataforma Up 2 Today.
-Você gerencia o fluxo de criação de Ordens de Serviço (OS) com o gestor.
+Você é o Mr. Halley, assistente da plataforma Up 2 Today, responsável por agendar Ordens de Serviço (OS).
 
-Mensagem Atual do Usuário: "{mensagem}"
-Rascunho Atual: {rascunho_json}
-Existe OS sendo preenchida agora? {em_andamento}
-Veículo em Análise Recente: {veiculo_contexto}
+Mensagem do Usuário: "{mensagem}"
+Rascunho de OS Atual: {rascunho_json}
+Há processo de OS em andamento? {em_andamento}
+Veículo em Análise na Tela: {veiculo_contexto}
 Data de Hoje: {hoje}
 
-CAMPOS NECESSÁRIOS:
-1. prefixo (se o usuário disser "esse veículo", use "{veiculo_contexto}")
-2. descricao (serviço ou sintoma)
-3. executor (nome do mecânico/responsável)
-4. data (formato AAAA-MM-DD; se disser "hoje" use {hoje}, "amanhã" use o dia seguinte)
-5. area (Mecânica, Elétrica, Borracharia, Chapeamento ou Limpeza - deduza do serviço se não for dita)
+CAMPOS OBRIGATÓRIOS DA OS:
+1. prefixo (Número/Placa do veículo. Se o usuário referir "esse carro/veículo", use "{veiculo_contexto}")
+2. descricao (Serviço ou defeito a ser corrigido)
+3. executor (Nome do mecânico/responsável)
+4. data (Formato AAAA-MM-DD. Converta datas como "dia 17/08", "hoje", "amanhã" para o formato AAAA-MM-DD no ano atual)
+5. area (Mecânica, Elétrica, Borracharia, Chapeamento ou Limpeza - infira pelo serviço se não dita)
 
-REGRAS:
-- Se 'Existe OS sendo preenchida agora?' for True: OBRIGATORIAMENTE continue no fluxo de OS, mesclando a nova informação (mesmo que seja só um nome como "Bruno" ou data) com o rascunho.
-- Se o usuário disser para cancelar ou abortar, responda {{"em_fluxo_os": false, "cancelar": true}}.
+REGRAS DE CONDUTA:
+1. Se o usuário confirmar ("tudo certo", "sim", "pode agendar", "ok", "confirmo") ou informar dados que completem a OS:
+   - Marque OBRIGATORIAMENTE "dados_completos": true.
+   - NUNCA pergunte se confirma se todos os campos já estiverem definidos.
+2. Se faltar algum campo essencial (como faltar o executor OU a data):
+   - Marque "dados_completos": false.
+   - Na "pergunta_pendencia", pergunte DIRETAMENTE apenas o que ainda falta (ex: "Qual a data programada para a OS?").
+3. Se o usuário mandar cancelar ("cancela", "esquece", "não quero mais"):
+   - Retorne {{"em_fluxo_os": false, "cancelar": true}}.
 
-Responda EXCLUSIVAMENTE em JSON puro:
+Responda EXCLUSIVAMENTE em formato JSON puro, sem marcações markdown:
 
-Se NÃO há OS em andamento e a mensagem NÃO pede para abrir/agendar OS:
+CASO 1 - Não tem relação com abertura de OS e não há processo ativo:
 {{"em_fluxo_os": false}}
 
-Se o fluxo de OS está ativo mas FALTAM campos:
-{{"em_fluxo_os": true, "dados_completos": false, "rascunho": {{"prefixo": "...", "descricao": "...", "executor": "...", "data": "...", "area": "..."}}, "pergunta_pendencia": "Pergunta direta apenas sobre os dados que ainda faltam"}}
+CASO 2 - OS em andamento, mas AINDA FALTAM dados:
+{{"em_fluxo_os": true, "dados_completos": false, "rascunho": {{"prefixo": "...", "descricao": "...", "executor": "...", "data": "...", "area": "..."}}, "pergunta_pendencia": "Pergunta objetiva sobre o dado que falta"}}
 
-Se TODOS os dados mínimos estão preenchidos:
+CASO 3 - Todos os dados estão preenchidos ou o usuário confirmou:
 {{"em_fluxo_os": true, "dados_completos": true, "prefixo": "...", "descricao": "...", "executor": "...", "area": "...", "data": "AAAA-MM-DD"}}
 """
 
@@ -224,6 +238,7 @@ Se TODOS os dados mínimos estão preenchidos:
         if not dados.get("em_fluxo_os"):
             return None
 
+        # Se ainda faltam dados
         if dados.get("dados_completos") is False:
             novo_rascunho = rascunho_atual.copy()
             if isinstance(dados.get("rascunho"), dict):
@@ -231,20 +246,20 @@ Se TODOS os dados mínimos estão preenchidos:
                     if v and v not in ["...", "None", "null", "Não informado"]:
                         novo_rascunho[k] = v
             st.session_state.rascunho_os = novo_rascunho
-            return dados.get("pergunta_pendencia", "Por favor, informe os dados complementares para a OS.")
+            return dados.get("pergunta_pendencia", "Informe o mecânico e a data para o agendamento.")
 
-        # Conclusão e persistência no banco de dados
-        engine = get_engine()
-        nova_os = obter_proxima_os(engine, emp_id)[cite: 1]
-        
-        pref_final = dados.get("prefixo") or rascunho_atual.get("prefixo")
-        if not pref_final or pref_final in ["Não informado", "S/P", "..."]:
-            pref_final = veiculo_contexto if veiculo_contexto != "Não informado" else "S/P"
+        # Conclusão definitiva da OS
+        pref_final = dados.get("prefixo") or rascunho_atual.get("prefixo") or veiculo_contexto
+        if pref_final in ["Não informado", "S/P", "..."]:
+            pref_final = "S/P"
 
         data_final = dados.get("data") or rascunho_atual.get("data") or hoje_str
         exec_final = dados.get("executor") or rascunho_atual.get("executor") or "Não definido"
         desc_final = dados.get("descricao") or rascunho_atual.get("descricao") or "Serviço via chat"
         area_final = dados.get("area") or rascunho_atual.get("area") or "Mecânica"
+
+        engine = get_engine()[cite: 2]
+        nova_os = obter_proxima_os(engine, emp_id)[cite: 1, 2]
 
         with engine.connect() as conn:
             conn.execute(
@@ -261,10 +276,10 @@ Se TODOS os dados mínimos estão preenchidos:
                     "eid": str(emp_id),
                     "nos": nova_os
                 }
-            )[cite: 1]
-            conn.commit()[cite: 1]
+            )[cite: 1, 2]
+            conn.commit()[cite: 1, 2]
 
-        st.session_state.rascunho_os = None
+        st.session_state.rascunho_os = None  # Limpa o rascunho
 
         return (
             f"✅ **Ordem de Serviço Nº {nova_os} gerada com sucesso!**\n\n"
