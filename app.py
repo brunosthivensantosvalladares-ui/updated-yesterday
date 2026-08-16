@@ -206,9 +206,9 @@ REGRAS DE RESPOSTA:
             return f"Baseado no histórico local da frota, recomenda-se inspeção técnica do sistema de {sintoma}."
         return f"Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se inspeção técnica do sistema de {sintoma}."
 
-# --- 2. PROCESSAMENTO DETERMINÍSTICO DE ABERTURA DE OS VIA CHAT ---
+# --- PROCESSAMENTO DETERMINÍSTICO DE ABERTURA DE OS VIA CHAT ---
 def processar_comando_os(texto_usuario, emp_id):
-    """Gerencia a coleta progressiva solicitando Data, Área e Executor sem repetições."""
+    """Gerencia a coleta progressiva solicitando Data, Área e Executor sem erros de execução."""
     if "rascunho_os" not in st.session_state:
         st.session_state.rascunho_os = None
     if "aguardando_confirmacao_os" not in st.session_state:
@@ -232,7 +232,7 @@ def processar_comando_os(texto_usuario, emp_id):
     if eh_confirmacao:
         try:
             engine = get_engine()
-            nova_os = obter_proxima_os(engine, emp_id)[cite: 3]
+            nova_os = obter_proxima_os(engine, emp_id)
 
             pref_final = rascunho.get("prefixo", "S/P")
             desc_final = rascunho.get("descricao", "Serviço via chat")
@@ -259,10 +259,10 @@ def processar_comando_os(texto_usuario, emp_id):
                         "ar": str(area_final),
                         "tu": str(turno_final),
                         "eid": str(emp_id),
-                        "nos": nova_os
+                        "nos": int(nova_os)
                     }
-                )[cite: 3]
-                conn.commit()[cite: 3]
+                )
+                conn.commit()
 
             st.session_state.rascunho_os = None
             st.session_state.aguardando_confirmacao_os = False
@@ -310,8 +310,8 @@ Relato da Análise Recente: "{relato_contexto}"
 Data de Hoje: {hoje}
 
 CAMPOS DA OS:
-- prefixo: Número/placa do veículo (se o usuário disser "este mesmo veículo", capture do contexto recente)
-- descricao: Descrição do problema/serviço (se o usuário disser "mesmo problema", capture do contexto recente)
+- prefixo: Número/placa do veículo (se o usuário disser "este veículo", "mesmo veículo" ou "último veículo", capture do histórico recente)
+- descricao: Descrição do problema/serviço (se disser "mesmo problema", capture do histórico recente)
 - executor: Mecânico ou responsável
 - data: Data no formato AAAA-MM-DD (converta termos como "hoje", "amanhã", "dia 20/08")
 - area: Mecânica, Elétrica, Borracharia, Chapeamento ou Limpeza
@@ -321,7 +321,7 @@ CAMPOS DA OS:
 
 REGRAS:
 1. Capture os dados da mensagem e do histórico recente.
-2. Não invente a data de agendamento nem a área se não tiverem sido informadas ou deduzidas claramente.
+2. Não invente a data de agendamento se não tiver sido informada.
 
 Responda EXCLUSIVAMENTE em formato JSON puro:
 
@@ -362,7 +362,8 @@ Se for fluxo de OS:
             novo_rascunho["prefixo"] = veiculo_contexto
         if not novo_rascunho.get("descricao") and relato_contexto:
             novo_rascunho["descricao"] = relato_contexto
-
+        if not novo_rascunho.get("area"):
+            novo_rascunho["area"] = "Mecânica"
         if not novo_rascunho.get("turno"):
             novo_rascunho["turno"] = "Não definido"
         if not novo_rascunho.get("inicio"):
@@ -372,7 +373,6 @@ Se for fluxo de OS:
 
         st.session_state.rascunho_os = novo_rascunho
 
-        # Validação ativa de campos obrigatórios
         campos_faltantes = []
         if not novo_rascunho.get("prefixo"):
             campos_faltantes.append("Prefixo do Veículo")
@@ -382,15 +382,13 @@ Se for fluxo de OS:
             campos_faltantes.append("Mecânico Responsável")
         if not novo_rascunho.get("data"):
             campos_faltantes.append("Data de Agendamento")
-        if not novo_rascunho.get("area"):
-            campos_faltantes.append("Área (Mecânica, Elétrica, Borracharia, Chapeamento ou Limpeza)")
 
         if campos_faltantes:
             st.session_state.aguardando_confirmacao_os = False
             return (
                 f"Para prosseguir com a abertura da OS, por favor informe:\n\n"
                 f"- **{', '.join(campos_faltantes)}**\n\n"
-                f"*(Horários e Turno são opcionais)*"
+                f"*(Área padrão: {novo_rascunho.get('area')}. Horários e Turno são opcionais)*"
             )
 
         st.session_state.aguardando_confirmacao_os = True
@@ -408,7 +406,7 @@ Se for fluxo de OS:
     except Exception:
         return None
 
-# --- 3. RESPOSTAS GERAIS E HISTÓRICOS (SEM REDUNDÂNCIA) ---
+# --- RESPOSTAS GERAIS E HISTÓRICOS ---
 def responder_chat_mr_halley(mensagem_usuario, emp_id):
     texto_baixo = mensagem_usuario.lower().strip()
 
@@ -454,8 +452,8 @@ Pergunta do Usuário: "{mensagem_usuario}"
 
 DIRETRIZES DE RESPOSTA:
 1. Responda de forma direta e concisa (2 a 3 frases no máximo).
-2. PROIBIÇÃO DE REPETIÇÃO: Nunca repita a mesma informação, veículo ou data duas vezes na mesma resposta sob nenhuma circunstância. Apresente cada evento uma única vez.
-3. Se o usuário perguntar datas de falhas anteriores, cite apenas as datas e veículos correspondentes encontrados no histórico.
+2. Se houver registros no histórico, liste os veículos e datas encontrados diretamente, sem tentar adivinhar ou antecipar o número total se não for exato.
+3. Não repita informações na mesma frase.
 """
 
     prompt = ChatPromptTemplate.from_template(template)
