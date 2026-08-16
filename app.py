@@ -5,16 +5,19 @@ from sqlalchemy import create_engine, text
 from datetime import datetime, time, timedelta
 from io import BytesIO
 from fpdf import FPDF
-from google import genai
 import time as time_module
 import requests
 import re
+
+# --- INTEGRAÇÃO LLAMA 3 VIA GROQ + LANGCHAIN + BUSCA WEB ---
+from langchain_groq import ChatGroq
+from langchain_community.tools import DuckDuckGoSearchRun
+from langchain_core.prompts import ChatPromptTemplate
 
 def formatar_acao_infinitivo(texto_bruto):
     """ Converte textos passados/relatórios do banco para recomendações no infinitivo. """
     txt = texto_bruto.strip()
     
-    # Mapeamento de vícios de escrita e tempo passado para o infinitivo
     substituicoes = [
         (r"(?i)^foi realizada a troca d[eo]s?\s*", "Realizar a troca do "),
         (r"(?i)^foi realizada a?\s*", "Realizar "),
@@ -31,7 +34,6 @@ def formatar_acao_infinitivo(texto_bruto):
             txt = re.sub(padrao, subst, txt).strip()
             break
             
-    # Se ainda começar com frases de relato passadas longas, ajusta o início
     if txt.lower().startswith("foi "):
         txt = "Verificar " + txt[4:]
         
@@ -52,6 +54,28 @@ def get_engine():
         st.error("Erro crítico: Configuração do banco de dados não encontrada.")
         st.stop()
     return create_engine(db_url.replace("postgres://", "postgresql://", 1), pool_pre_ping=True)
+
+# --- CONFIGURAÇÃO DO MODELO LLAMA 3 (GROQ) & BUSCA WEB ---
+def obter_llm():
+    api_key = st.secrets.get("GROQ_API_KEY") or os.environ.get("GROQ_API_KEY")
+    if not api_key:
+        return None
+    return ChatGroq(
+        groq_api_key=api_key,
+        model_name="llama-3.3-70b-versatile",
+        temperature=0.2,
+        max_retries=2
+    )
+
+busca_web_tool = DuckDuckGoSearchRun()
+
+def pesquisar_solucao_web(termo_busca: str) -> str:
+    """Pesquisa dados técnicos e diagnósticos na internet de forma 100% gratuita."""
+    try:
+        query = f"manutenção automotiva frota defeito {termo_busca} causa solução"
+        return busca_web_tool.run(query)
+    except Exception:
+        return ""
 
 # --- BUSCA NO BANCO PARA TODA A FROTA (TRAZENDO O PREFIXO DO HISTÓRICO) ---
 def buscar_historico_relevante(sintoma_motorista, emp_id):
@@ -77,122 +101,104 @@ def buscar_historico_relevante(sintoma_motorista, emp_id):
         with engine.connect() as conn:
             resultados = conn.execute(query, {"eid": str(emp_id)}).fetchall()
         
-        # Retorna indicando qual veículo executou a OS
         return [f"Veículo {r[0]}: {str(r[1]).strip()}" for r in resultados]
     except Exception:
         return []
 
-# --- TRIAGEM DO MR. HALLEY (RESPOSTA DIRETA SEM SAUDAÇÃO REPETIDA) ---
+# --- TRIAGEM DO MR. HALLEY COM LLAMA 3 (GROQ + RAG + WEB) ---
 def triagem_mr_halley(sintoma, emp_id, prefixo=None, incluir_saudacao=False):
+    llm = obter_llm()
+    if not llm:
+        return f"Recomenda-se inspeção técnica preventiva padrão para o sistema de {sintoma} (GROQ_API_KEY não configurada)."
+
     historicos = buscar_historico_relevante(sintoma, emp_id)
-    gemini_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
-    
-    if not gemini_key:
-        return "Baseado no histórico da frota (Chave GEMINI_API_KEY não encontrada)."
+    tem_historico_local = len(historicos) > 0
 
-    historico_formatado = "\n".join([f"- {h}" for h in historicos]) if historicos else "Nenhum histórico encontrado na frota."
+    if tem_historico_local:
+        historico_formatado = "\n".join([f"- {h}" for h in historicos])
+        contexto = f"Histórico Interno da Frota:\n{historico_formatado}"
+        regra_abertura = 'Inicie OBRIGATORIAMENTE com: "Baseado no histórico local da frota, recomenda-se"'
+    else:
+        resultado_web = pesquisar_solucao_web(sintoma)
+        contexto = f"Dados Técnicos Externos (Pesquisa Web):\n{resultado_web[:600] if resultado_web else 'Inspeção mecânica geral'}"
+        regra_abertura = 'Inicie OBRIGATORIAMENTE com: "Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se"'
 
-    prompt = f"""
+    template = """
 Você é o assistente técnico Mr. Halley da plataforma Updated Yesterday.
-Analise a relação entre o problema relatado no veículo atual e o histórico de manutenção geral da frota.
+Analise a relação entre o problema relatado no veículo e as informações técnicas disponíveis.
 
-Veículo Atual Analisado: {prefixo if prefixo else 'Não informado'}
-Sintoma Relatado Atual: "{sintoma}"
+Veículo Atual: {prefixo}
+Sintoma Relatado: "{sintoma}"
 
-Histórico Geral de Outros Veículos da Frota:
-{historico_formatado}
+{contexto}
 
-REGRA DE APRESENTAÇÃO:
-NÃO inclua nenhuma saudação, apresentação ou cortesia inicial (ex: NÃO diga 'Olá', 'Sou o Mr. Halley', etc). Vá DIRETO ao parecer técnico.
-
-REGRAS ESTRITAS DE DISTINÇÃO DE HISTÓRICO:
-1. O histórico fornecido pertence a OUTROS veículos da frota. NUNCA afirme ou dê a entender que o veículo atual ({prefixo}) realizou, trocou ou passou por essa manutenção anteriormente se a OS pertencer a outro prefixo.
-2. Se o histórico fornecido tratar de OUTRO sistema mecânico sem relação técnica real (exemplo: o sintoma atual é 'direção puxando' e as OSs antigas da frota falam sobre 'buzina' ou 'troca de pneu traseiro'), desconsidere o histórico local e aplique obrigatoriamente a SITUAÇÃO B.
-3. Mantenha a resposta concisa (10 a 15 palavras) e use VERBOS NO INFINITIVO.
-
-DIRETRIZES DE RESPOSTA:
-
-SITUAÇÃO A: Se existir histórico na frota que trate REALMENTE do mesmo defeito ou sintoma equivalente:
-1. Inicie OBRIGATORIAMENTE com: "Baseado no histórico local da frota, recomenda-se"
-2. Complete indicando a ação técnica necessária de forma impessoal (ex: "...recomenda-se realizar o alinhamento...").
-
-SITUAÇÃO B: Se NÃO existir histórico correlacionado na frota para este defeito específico:
-1. Inicie OBRIGATORIAMENTE com: "Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se"
-2. Complete fornecendo a recomendação preventiva genérica ideal para o sintoma "{sintoma}".
+REGRAS:
+1. NÃO inclua saudações, apresentações ou cortesias (ex: NÃO diga 'Olá', 'Sou o Mr. Halley'). Vá direto ao ponto.
+2. {regra_abertura}
+3. Complete indicando a ação técnica com VERBOS NO INFINITIVO.
+4. Mantenha a resposta concisa (10 a 15 palavras).
 """
 
-    time_module.sleep(0.5)
+    prompt = ChatPromptTemplate.from_template(template)
+    chain = prompt | llm
 
     try:
-        client = genai.Client(api_key=gemini_key)
-        response = client.models.generate_content(
-            model='gemini-2.5-flash',
-            contents=prompt,
-        )
-        return response.text.strip()
-        
+        resposta = chain.invoke({
+            "prefixo": prefixo if prefixo else "Não informado",
+            "sintoma": sintoma,
+            "contexto": contexto,
+            "regra_abertura": regra_abertura
+        })
+        return resposta.content.strip()
     except Exception:
-        try:
-            time_module.sleep(0.5)
-            client = genai.Client(api_key=gemini_key)
-            response = client.models.generate_content(
-                model='gemini-2.0-flash',
-                contents=prompt,
-            )
-            return response.text.strip()
-        except Exception:
-            return f"Não identificamos registros locais da frota; recomenda-se inspeção técnica do sistema de {sintoma}."
-            
-# --- CHATBOX DO MR. HALLEY (INTERAÇÃO DIRETA VIA CHAT) ---
-def responder_chat_mr_halley(mensagem_usuario, emp_id):
-    historicos = buscar_historico_relevante(mensagem_usuario, emp_id)
-    gemini_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
-    
-    if not gemini_key:
-        return "Desculpe, minha conexão com a IA (GEMINI_API_KEY) não está configurada nos Secrets do Streamlit."
+        return f"Não identificamos registros locais da frota; recomenda-se inspeção técnica do sistema de {sintoma}."
 
-    try:
-        client = genai.Client(api_key=gemini_key)
-        historico_formatado = "\n".join([f"- {h}" for h in historicos]) if historicos else "Nenhum histórico direto encontrado no banco da frota."
-        
-        prompt = f"""
+# --- CHATBOX DO MR. HALLEY (INTERAÇÃO DIRETA VIA CHAT COM LLAMA 3) ---
+def responder_chat_mr_halley(mensagem_usuario, emp_id):
+    llm = obter_llm()
+    if not llm:
+        return "Desculpe, minha conexão com a IA (GROQ_API_KEY) não está configurada nos Secrets do Streamlit."
+
+    historicos = buscar_historico_relevante(mensagem_usuario, emp_id)
+    tem_historico = len(historicos) > 0
+    
+    if tem_historico:
+        contexto = "Histórico Encontrado no Banco da Frota:\n" + "\n".join([f"- {h}" for h in historicos])
+    else:
+        info_web = pesquisar_solucao_web(mensagem_usuario)
+        contexto = f"Dados Técnicos da Internet:\n{info_web[:700] if info_web else 'Sem histórico específico.'}"
+
+    template = """
 Você é o Mr. Halley, assistente virtual inteligente do sistema Updated Yesterday.
 Sua missão é ajudar o gestor de frota e a equipe de manutenção tirando dúvidas técnicas, diagnosticando sintomas e consultando históricos de manutenção.
 
 Pergunta/Sintoma do Usuário: "{mensagem_usuario}"
 
-Histórico Encontrado na Frota da Empresa:
-{historico_formatado}
+Contexto Disponível:
+{contexto}
 
-REGRAS DE RESPOSTA NO CHAT:
+REGRAS:
 1. Seja cortês, técnico, direto e profissional.
-2. Se houver histórico RELEVANTE e da MESMA falha no banco da frota, priorize citar as ações que resolveram o problema no passado.
-3. Se o histórico for de OUTRO sistema (ex: a dúvida é sobre freio e o histórico trouxe buzina) ou estiver vazio, informe gentilmente que não há registros anteriores idênticos na frota e forneça a orientação técnica correta baseada no seu conhecimento geral.
-4. Mantenha as respostas concisas, claras e estruturadas in tópicos quando necessário.
+2. Priorize o histórico da frota se for exatamente do mesmo defeito.
+3. Se não houver histórico interno ou for de outro sistema, informe com clareza e forneça a recomendação técnica correta.
+4. Responda de forma estruturada e concisa.
 """
+    prompt = ChatPromptTemplate.from_template(template)
+    chain = prompt | llm
 
-        response = client.models.generate_content(
-            model='gemini-2.5-flash',
-            contents=prompt,
-        )
-        return response.text.strip()
-        
+    try:
+        resposta = chain.invoke({
+            "mensagem_usuario": mensagem_usuario,
+            "contexto": contexto
+        })
+        return resposta.content.strip()
     except Exception as e:
-        try:
-            client = genai.Client(api_key=gemini_key)
-            response = client.models.generate_content(
-                model='gemini-2.0-flash',
-                contents=prompt,
-            )
-            return response.text.strip()
-        except Exception:
-            return f"Erro ao comunicar com a IA: {str(e)}"
+        return f"Erro ao comunicar com a IA: {str(e)}"
 
-# --- CHAT FLUTUANTE EM CSS/HTML + PYTHON (ALTURA AUMENTADA & SCROLL AJUSTADO) ---
+# --- CHAT FLUTUANTE EM CSS/HTML + PYTHON (ALTURA AUMENTADA & SEM DUPLICAÇÃO) ---
 def renderizar_chat_flutuante(emp_id):
     URL_AVATAR = "https://i.postimg.cc/5tBtrL6C/Whats-App-Image-2026-07-23-at-22-35-53.png"
     
-    # Controle de abertura automática do chat
     if "abrir_chat_halley" not in st.session_state:
         st.session_state.abrir_chat_halley = False
 
@@ -204,7 +210,6 @@ def renderizar_chat_flutuante(emp_id):
     qtd_analises = len(st.session_state.get("analises_halley", []))
     label_status = f"💬 Mr. Halley ({qtd_analises})" if qtd_analises > 0 else "💬 Mr. Halley (IA)"
 
-    # CSS AJUSTADO: Maior altura (82vh) e largura estendida para leitura confortável
     st.markdown("""
         <style>
         div[data-testid="stExpander"] {
@@ -230,7 +235,6 @@ def renderizar_chat_flutuante(emp_id):
         st.caption("🤖 **Mr. Halley** — Assistente Técnico")
         st.divider()
 
-        # Container de mensagens expandido para 340px
         chat_box = st.container(height=340)
         with chat_box:
             for msg in st.session_state.mensagens_chat_halley:
@@ -249,16 +253,6 @@ def renderizar_chat_flutuante(emp_id):
                         st.markdown(resp)
             st.session_state.mensagens_chat_halley.append({"role": "assistant", "content": resp})
             st.rerun()
-    
-# --- INICIALIZAÇÃO SEGURA DO CLIENTE ---
-if "GEMINI_API_KEY" in st.secrets:
-    try:
-        client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
-        st.session_state["gemini_client"] = client
-    except Exception as e:
-        st.sidebar.error("IA indisponível no momento.")
-else:
-    st.sidebar.warning("IA não configurada.")
 
 def gerar_pdf_manual_oficial_pro():
     class PDF(FPDF):
@@ -676,7 +670,7 @@ if not st.session_state["logado"]:
                                     else:
                                         conn.execute(text("INSERT INTO usuarios (login, senha, perfil, empresa_id) VALUES ('bruno', :p, 'admin', 'U2T_MATRIZ')"), {"p": pw_input})
                                     conn.commit()
-                            except Exception as e:
+                            except Exception:
                                 pass
 
                         with engine.connect() as conn:
@@ -736,7 +730,7 @@ if not st.session_state["logado"]:
                                 conn.execute(text("INSERT INTO empresa (nome, email, senha, data_expiracao) VALUES (:n, :e, :s, :d)"), {"n": n_emp, "e": n_ema, "s": n_sen, "d": expira})
                                 conn.commit()
                             st.success("✅ Conta criada! Agora faça login na aba 'Acessar'.")
-                        except Exception as e:
+                        except Exception:
                             st.error("Este e-mail já está cadastrado.")
                     else:
                         st.warning("Preencha todos os campos.")
@@ -811,44 +805,6 @@ else:
             st.session_state["logado"] = False
             st.rerun()
 
-    # --- CHATBOX FLUTUANTE NA BARRA LATERAL (MR. HALLEY) ---
-        st.divider()
-        qtd_analises = len(st.session_state.get("analises_halley", {}))
-        label_bot = f"💬 Mr. Halley ({qtd_analises})" if qtd_analises > 0 else "💬 Mr. Halley (IA)"
-
-        with st.popover(label_bot, use_container_width=True):
-            st.subheader("🤖 Mr. Halley - Assistente Flutuante")
-            st.caption("Históricos, pareceres e dúvidas técnicas em tempo real.")
-            
-            URL_AVATAR_HALLEY = "https://i.postimg.cc/5tBtrL6C/Whats-App-Image-2026-07-23-at-22-35-53.png"
-            
-            if "analises_halley" in st.session_state and st.session_state.analises_halley:
-                st.markdown("### 📋 ANÁLISES RECENTES DE OS:")
-
-            if "mensagens_chat_halley" not in st.session_state:
-                st.session_state.mensagens_chat_halley = [
-                    {"role": "assistant", "content": "Olá! Sou o Mr. Halley. Como posso te ajudar com a frota agora?"}
-                ]
-
-            chat_container = st.container(height=280)
-            with chat_container:
-                for msg in st.session_state.mensagens_chat_halley:
-                    avatar = URL_AVATAR_HALLEY if msg["role"] == "assistant" else None
-                    with st.chat_message(msg["role"], avatar=avatar):
-                        st.markdown(msg["content"])
-
-            if prompt_flutuante := st.chat_input("Dúvida técnica ou sintoma...", key="chat_input_flutuante"):
-                st.session_state.mensagens_chat_halley.append({"role": "user", "content": prompt_flutuante})
-                with chat_container:
-                    with st.chat_message("user"):
-                        st.markdown(prompt_flutuante)
-                    with st.chat_message("assistant", avatar=URL_AVATAR_HALLEY):
-                        with st.spinner("Analisando..."):
-                            resp = responder_chat_mr_halley(prompt_flutuante, emp_id)
-                            st.markdown(resp)
-                st.session_state.mensagens_chat_halley.append({"role": "assistant", "content": resp})
-                st.rerun()
-
     # --- BOTÕES DE NAVEGAÇÃO DE ABA NO TOPO ---
     cols = st.columns(len(opcoes))
     for i, nome in enumerate(opcoes):
@@ -869,16 +825,13 @@ else:
     if aba_ativa == "👑 Gestão Master" and usuario_ativo == "bruno":
         st.subheader("👑 Painel de Controle Master")
         
-        if "gemini_client" in st.session_state:
+        llm = obter_llm()
+        if llm:
             if st.button("✨ Sugerir Manutenção com IA"):
                 try:
-                    prompt = "O motorista relatou barulho na suspensão do veículo X. O que pode ser?"
-                    response = st.session_state["gemini_client"].models.generate_content(
-                        model='gemini-1.5-flash', 
-                        contents=prompt
-                    )
-                    st.write(response.text)
-                except Exception as e:
+                    resp = llm.invoke("O motorista relatou barulho na suspensão do veículo X. O que pode ser em poucas palavras?")
+                    st.write(resp.content)
+                except Exception:
                     st.error("Erro na comunicação com a IA.")
         
         st.info("💡 Bruno, aqui você ativa os pagamentos e define os prazos das empresas.")
@@ -1369,14 +1322,10 @@ else:
                 colunas_ordenadas = ['Aprovar', 'prefixo', 'descricao', 'motorista', 'Area_Destino', 'Executor', 'Data_Programada', 'Inicio', 'Fim', 'data_solicitacao', 'id']
                 st.session_state.df_ap_work = df_p[colunas_ordenadas]
             
-            if "saudacao_exibida" not in st.session_state:
-                st.session_state.saudacao_exibida = False
-
             # --- LÓGICA DE DETECÇÃO DE MÚLTIPLOS SELECIONADOS ---
             if "editor_chamados" in st.session_state and st.session_state.editor_chamados.get("edited_rows"):
                 alteracoes = st.session_state.editor_chamados["edited_rows"]
                 
-                # Garante que seja sempre uma Lista
                 if "analises_halley" not in st.session_state or not isinstance(st.session_state.analises_halley, list):
                     st.session_state.analises_halley = []
 
@@ -1391,14 +1340,11 @@ else:
                             
                             if not ja_analisado:
                                 with st.spinner(f"🤖 Mr. Halley analisando Veículo {dados_linha['prefixo']}..."):
-                                    primeira_vez = not st.session_state.saudacao_exibida
-                                    deve_saudar = primeira_vez and (len(st.session_state.analises_halley) == 0)
-                                    
                                     diag = triagem_mr_halley(
                                         sintoma=dados_linha['descricao'], 
                                         emp_id=emp_id, 
                                         prefixo=dados_linha['prefixo'], 
-                                        incluir_saudacao=deve_saudar
+                                        incluir_saudacao=False
                                     )
                                     
                                     st.session_state.analises_halley.append({
@@ -1407,10 +1353,10 @@ else:
                                         "relato": dados_linha['descricao'],
                                         "parecer": diag
                                     })
-                                    st.session_state.saudacao_exibida = True
 
                                     if "mensagens_chat_halley" not in st.session_state:
                                         st.session_state.mensagens_chat_halley = []
+                                        
                                     st.session_state.mensagens_chat_halley.append({
                                         "role": "assistant",
                                         "content": f"📌 **Análise Veículo {dados_linha['prefixo']}** ({dados_linha['descricao']}):\n\n{diag}"
@@ -1489,7 +1435,7 @@ else:
                 st.markdown(prompt_user)
 
             with st.chat_message("assistant", avatar=URL_AVATAR_HALLEY):
-                with st.spinner("Mr. Halley consultando banco de dados e analisando..."):
+                with st.spinner("Mr. Halley consultando histórico interno e web..."):
                     resposta = responder_chat_mr_halley(prompt_user, emp_id)
                     st.markdown(resposta)
             
@@ -1599,8 +1545,6 @@ else:
                     time_module.sleep(1)
                     st.rerun()
 
-
-# --- ENCERRAMENTO GLOBAL DO FICHEIRO (FORA DE QUALQUER ABA) ---
-# Ativa o Chat Flutuante em qualquer página, apenas após o utilizador iniciar sessão com sucesso
+# --- ATIVAÇÃO GLOBAL DO CHAT FLUTUANTE ---
 if st.session_state.get("logado") and "empresa" in st.session_state:
     renderizar_chat_flutuante(st.session_state["empresa"])
