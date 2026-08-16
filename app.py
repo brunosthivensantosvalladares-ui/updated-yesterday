@@ -12,17 +12,38 @@ import time as time_module
 import requests
 import re
 
-# --- MÓDULO DE SEGURANÇA E CRIPTOGRAFIA ---
+# --- MÓDULO DE SEGURANÇA AVANÇADA (PBKDF2-HMAC-SHA256 COM SALT) ---
 def gerar_hash_senha(senha_pura: str) -> str:
-    """Gera um hash SHA-256 com salt seguro (sem bloquear ou depender de libs externas)."""
+    """Gera um hash PBKDF2 HMAC SHA-256 com 120.000 iterações (resistente a força bruta em GPU)."""
     salt = secrets.token_hex(16)
-    hash_obj = hashlib.sha256((salt + senha_pura).encode('utf-8')).hexdigest()
-    return f"{salt}${hash_obj}"
+    kdf = hashlib.pbkdf2_hmac(
+        'sha256',
+        senha_pura.encode('utf-8'),
+        salt.encode('utf-8'),
+        120000
+    ).hex()
+    return f"pbkdf2_sha256$120000${salt}${kdf}"
 
 def verificar_senha(senha_pura: str, hash_armazenado: str) -> bool:
-    """Valida a senha com hash seguro e mantém fallback transparente para senhas antigas em texto puro."""
+    """Valida a senha suportando PBKDF2 e mantendo compatibilidade retroativa com hashes legados e texto plano."""
     if not hash_armazenado:
         return False
+    
+    # Formato PBKDF2 moderno
+    if hash_armazenado.startswith("pbkdf2_sha256$"):
+        try:
+            _, iteracoes, salt, hash_esperado = hash_armazenado.split("$", 3)
+            kdf = hashlib.pbkdf2_hmac(
+                'sha256',
+                senha_pura.encode('utf-8'),
+                salt.encode('utf-8'),
+                int(iteracoes)
+            ).hex()
+            return secrets.compare_digest(kdf, hash_esperado)
+        except Exception:
+            return False
+
+    # Formato SHA-256 legado com salt
     if "$" in hash_armazenado:
         try:
             salt, hash_esperado = hash_armazenado.split("$", 1)
@@ -30,7 +51,8 @@ def verificar_senha(senha_pura: str, hash_armazenado: str) -> bool:
             return secrets.compare_digest(hash_calculado, hash_esperado)
         except Exception:
             return False
-    # Compatibilidade retroativa com senhas legadas em texto plano
+
+    # Senha antiga em texto plano (fallback seguro)
     return secrets.compare_digest(senha_pura, hash_armazenado)
 
 # --- INTEGRAÇÃO LLAMA 3 VIA GROQ + LANGCHAIN + BUSCA WEB ---
@@ -630,12 +652,12 @@ def gerar_pdf_manual_oficial_pro():
 def obter_proxima_os(engine, emp_id):
     try:
         with engine.connect() as conn:
-            result = conn.execute(text("SELECT MAX(numero_os) FROM tarefas WHERE empresa_id = :eid"), {"eid": emp_id}).fetchone()
+            result = conn.execute(text("SELECT MAX(numero_os) FROM tarefas WHERE empresa_id = :eid"), {"eid": str(emp_id)}).fetchone()
             maior_os = result[0]
             if maior_os is None:
                 return 1001 
             return int(maior_os) + 1
-    except:
+    except Exception:
         return 1001
 
 COR_BRONZE = "#4A3C31"  
@@ -794,7 +816,8 @@ def inicializar_banco():
             try: conn.execute(text("ALTER TABLE chamados ADD COLUMN IF NOT EXISTS empresa_id TEXT DEFAULT 'U2T_MATRIZ'"))
             except: pass
             conn.commit()
-    except: pass
+    except Exception:
+        pass
 
 def to_excel_native(df):
     output = BytesIO()
@@ -884,13 +907,13 @@ if not st.session_state["logado"]:
                         engine = get_engine()
                         inicializar_banco()
                         
-                        # Provisionamento / atualização segura do Admin Master
+                        # Provisionamento / atualização do Admin Master
                         if user_input == "bruno":
                             try:
                                 with engine.connect() as conn:
                                     check_user = conn.execute(text("SELECT id, senha FROM usuarios WHERE LOWER(login) = 'bruno'")).fetchone()
                                     if check_user:
-                                        if not verificar_senha(pw_input, check_user[1]):
+                                        if not verificar_senha(pw_input, str(check_user[1])):
                                             hash_novo = gerar_hash_senha(pw_input)
                                             conn.execute(text("UPDATE usuarios SET senha = :p, perfil = 'admin', empresa_id = 'U2T_MATRIZ' WHERE LOWER(login) = 'bruno'"), {"p": hash_novo})
                                             conn.commit()
@@ -913,11 +936,11 @@ if not st.session_state["logado"]:
                             ).fetchone()
                         
                         if empresa and verificar_senha(pw_input, str(empresa[2])):
-                            # Migra hash no banco se a senha antiga estava em texto plano
-                            if "$" not in str(empresa[2]):
+                            # Migra hash para PBKDF2 se ainda não for
+                            if not str(empresa[2]).startswith("pbkdf2_sha256$"):
                                 try:
                                     with engine.connect() as conn:
-                                        conn.execute(text("UPDATE empresa SET senha = :p WHERE id = :id"), {"p": gerar_hash_senha(pw_input), "id": empresa[0]})
+                                        conn.execute(text("UPDATE empresa SET senha = :p WHERE id = :id"), {"p": gerar_hash_senha(pw_input), "id": int(empresa[0])})
                                         conn.commit()
                                 except Exception:
                                     pass
@@ -941,11 +964,11 @@ if not st.session_state["logado"]:
                                 ).fetchone()
                                 
                             if usuario and verificar_senha(pw_input, str(usuario[3])):
-                                # Migra hash no banco se a senha antiga estava em texto plano
-                                if "$" not in str(usuario[3]):
+                                # Migra hash para PBKDF2 se ainda não for
+                                if not str(usuario[3]).startswith("pbkdf2_sha256$"):
                                     try:
                                         with engine.connect() as conn:
-                                            conn.execute(text("UPDATE usuarios SET senha = :p WHERE id = :id"), {"p": gerar_hash_senha(pw_input), "id": usuario[0]})
+                                            conn.execute(text("UPDATE usuarios SET senha = :p WHERE id = :id"), {"p": gerar_hash_senha(pw_input), "id": int(usuario[0])})
                                             conn.commit()
                                     except Exception:
                                         pass
@@ -979,7 +1002,7 @@ if not st.session_state["logado"]:
                                 conn.execute(text("INSERT INTO empresa (nome, email, senha, data_expiracao) VALUES (:n, :e, :s, :d)"), 
                                              {"n": n_emp, "e": n_ema, "s": senha_protegida, "d": expira})
                                 conn.commit()
-                            st.success("✅ Conta criada com proteção ativada! Agora faça login na aba 'Acessar'.")
+                            st.success("✅ Conta criada com proteção PBKDF2! Agora faça login na aba 'Acessar'.")
                         except Exception:
                             st.error("Este e-mail já está cadastrado.")
                     else:
@@ -1136,7 +1159,7 @@ else:
     elif aba_ativa == "📜 Status":
         st.subheader("📜 Status dos Meus Veículos")
         st.info("Aqui você pode ver se o seu veículo já foi agendado ou concluído pela oficina.")
-        df_status = pd.read_sql(text("SELECT prefixo, data_solicitacao as data, status, descricao FROM chamados WHERE empresa_id = :eid ORDER BY id DESC"), engine, params={"eid": emp_id})
+        df_status = pd.read_sql(text("SELECT prefixo, data_solicitacao as data, status, descricao FROM chamados WHERE empresa_id = :eid ORDER BY id DESC"), engine, params={"eid": str(emp_id)})
         st.dataframe(df_status, use_container_width=True, hide_index=True)
     
     elif aba_ativa == "📖 Manual do Sistema":
@@ -1153,7 +1176,7 @@ else:
                     use_container_width=True,
                     type="primary"
                 )
-            except:
+            except Exception:
                 st.error("Erro ao gerar o arquivo PDF. Verifique a codificação dos textos.")
 
         st.divider()
@@ -1253,7 +1276,7 @@ else:
                     descricao 
                 FROM tarefas 
                 WHERE realizado = True 
-                AND (TRIM(CAST(empresa_id AS TEXT)) = TRIM(:eid) OR empresa_id IS NULL)
+                AND empresa_id = :eid
                 ORDER BY id DESC
             """)
             with engine.connect() as conn:
@@ -1277,7 +1300,7 @@ else:
         st.subheader("📅 Cronograma Geral de Manutenções")
         
         try:
-            df_stats = pd.read_sql(text("SELECT data, realizado FROM tarefas WHERE empresa_id = :eid"), engine, params={"eid": emp_id})
+            df_stats = pd.read_sql(text("SELECT data, realizado FROM tarefas WHERE empresa_id = :eid"), engine, params={"eid": str(emp_id)})
             if not df_stats.empty:
                 df_stats['data'] = pd.to_datetime(df_stats['data']).dt.date
                 hoje_dt = datetime.now().date()
@@ -1288,7 +1311,7 @@ else:
                 with m2: st.metric("Concluídos", len(df_hoje[df_hoje['realizado'] == True]))
                 with m3: st.metric("Pendentes", len(df_hoje[df_hoje['realizado'] == False]))
                 st.divider()
-        except:
+        except Exception:
             st.warning("⚠️ O banco de dados está iniciando. Aguarde alguns segundos.")
             st.stop()
 
@@ -1330,7 +1353,7 @@ else:
         """, unsafe_allow_html=True)
 
         df_atrasadas = pd.read_sql(text("SELECT * FROM tarefas WHERE data < :hoje AND realizado = False AND empresa_id = :eid"), 
-                                   engine, params={"hoje": str(datetime.now().date()), "eid": emp_id})
+                                   engine, params={"hoje": str(datetime.now().date()), "eid": str(emp_id)})
 
         if not df_atrasadas.empty:
             if st.session_state.exibir_bot:
@@ -1349,14 +1372,14 @@ else:
                             c1, c2 = st.columns(2)
                             if c1.button("✅ Concluir Tudo", use_container_width=True, key="mini_all"):
                                 with engine.connect() as conn:
-                                    conn.execute(text("UPDATE tarefas SET realizado=True WHERE data < :hoje AND realizado=False AND empresa_id=:eid"), {"hoje":str(datetime.now().date()), "eid":emp_id})
+                                    conn.execute(text("UPDATE tarefas SET realizado=True WHERE data < :hoje AND realizado=False AND empresa_id=:eid"), {"hoje":str(datetime.now().date()), "eid":str(emp_id)})
                                     conn.commit()
                                 st.cache_data.clear()
                                 st.rerun()
 
                             if c2.button("📅 Trazer p/ Hoje", use_container_width=True, key="mini_today"):
                                 with engine.connect() as conn:
-                                    conn.execute(text("UPDATE tarefas SET data=:hoje WHERE data < :hoje AND realizado=False AND empresa_id=:eid"), {"hoje":str(datetime.now().date()), "eid":emp_id})
+                                    conn.execute(text("UPDATE tarefas SET data=:hoje WHERE data < :hoje AND realizado=False AND empresa_id=:eid"), {"hoje":str(datetime.now().date()), "eid":str(emp_id)})
                                     conn.commit()
                                 st.cache_data.clear()
                                 st.rerun()
@@ -1405,7 +1428,7 @@ else:
         st.divider()
         st.info("✍️ **Logística:** Clique nas colunas de **Início** ou **Fim** para preencher. **PCM:** Clique em **Área** ou **Executor** para definir. O salvamento é automático.")
         
-        df_a = pd.read_sql(text("SELECT * FROM tarefas WHERE empresa_id = :eid ORDER BY data DESC"), engine, params={"eid": emp_id})
+        df_a = pd.read_sql(text("SELECT * FROM tarefas WHERE empresa_id = :eid ORDER BY data DESC"), engine, params={"eid": str(emp_id)})
         hoje_input, amanha = datetime.now().date(), datetime.now().date() + timedelta(days=1)
         
         c_per, c_area, c_turno = st.columns([0.4, 0.3, 0.3])
@@ -1463,18 +1486,22 @@ else:
                                         realizado = :r, area = :ar, turno = :t, prefixo = :p, 
                                         inicio_disp = :i, fim_disp = :f, 
                                         executor = :ex, descricao = :ds 
-                                        WHERE id = :id
+                                        WHERE id = :id AND empresa_id = :eid
                                     """), {
                                         "r": bool(row['realizado']), "ar": str(row['area']), "t": str(row['turno']), 
                                         "p": str(row['prefixo']), "i": str(row['inicio_disp']), 
                                         "f": str(row['fim_disp']), "ex": str(row['executor']), 
-                                        "ds": str(row['descricao']), "id": int(row_id)
+                                        "ds": str(row['descricao']), "id": int(row_id),
+                                        "eid": str(emp_id)
                                     })
                                     if row['realizado'] and pd.notnull(row['id_chamado']):
-                                        try: conn.execute(text("UPDATE chamados SET status = 'Concluído' WHERE id = :ic"), {"ic": int(row['id_chamado'])})
-                                        except: pass
+                                        try: 
+                                            conn.execute(text("UPDATE chamados SET status = 'Concluído' WHERE id = :ic AND empresa_id = :eid"), 
+                                                         {"ic": int(row['id_chamado']), "eid": str(emp_id)})
+                                        except Exception: 
+                                            pass
                                 conn.commit()
-                            st.toast("Alteração salva!", icon="✅")
+                            st.toast("Alteração salva com isolamento de segurança!", icon="✅")
                             time_module.sleep(0.5); st.rerun()
 
     elif aba_ativa == "📋 Cadastro Direto":
@@ -1503,7 +1530,7 @@ else:
                 nova_os = obter_proxima_os(engine, emp_id)
                 with engine.connect() as conn:
                     conn.execute(text("INSERT INTO tarefas (data, executor, prefixo, inicio_disp, fim_disp, descricao, area, turno, origem, empresa_id, numero_os) VALUES (:dt, :ex, :pr, :ti, :tf, :ds, :ar, :tu, 'Direto', :eid, :nos)"), 
-                                 {"dt": str(d_i), "ex": e_i, "pr": p_i, "ti": t_ini, "tf": t_fim, "ds": ds_i, "ar": a_i, "tu": t_i, "eid": emp_id, "nos": nova_os})
+                                 {"dt": str(d_i), "ex": e_i, "pr": p_i, "ti": t_ini, "tf": t_fim, "ds": ds_i, "ar": a_i, "tu": t_i, "eid": str(emp_id), "nos": nova_os})
                     conn.commit()
                 st.success(f"✅ SERVIÇO AGENDADO!")
                 st.code(f"NÚMERO DA ORDEM DE SERVIÇO: {nova_os}", language="markdown")
@@ -1511,7 +1538,7 @@ else:
         
         st.divider()
         st.subheader("📋 Lista de serviços")
-        df_lista = pd.read_sql(text("SELECT * FROM tarefas WHERE empresa_id = :eid ORDER BY data DESC, id DESC"), engine, params={"eid": emp_id})
+        df_lista = pd.read_sql(text("SELECT * FROM tarefas WHERE empresa_id = :eid ORDER BY data DESC, id DESC"), engine, params={"eid": str(emp_id)})
         
         if not df_lista.empty:
             df_lista['data'] = pd.to_datetime(df_lista['data']).dt.date
@@ -1521,18 +1548,19 @@ else:
             if st.button("🗑️ Excluir Selecionados"):
                 with engine.connect() as conn:
                     for i in ed_l[ed_l['Exc']==True]['id'].tolist(): 
-                        conn.execute(text("DELETE FROM tarefas WHERE id = :id"), {"id": int(i)})
+                        conn.execute(text("DELETE FROM tarefas WHERE id = :id AND empresa_id = :eid"), {"id": int(i), "eid": str(emp_id)})
                     conn.commit()
                 st.warning("🗑️ Itens excluídos.")
                 st.rerun()
                 
             if st.session_state.ed_lista["edited_rows"]:
+                COLUNAS_PERMITIDAS_TAREFAS = {"data", "turno", "executor", "prefixo", "inicio_disp", "fim_disp", "descricao", "area"}
                 with engine.connect() as conn:
                     for idx, changes in st.session_state.ed_lista["edited_rows"].items():
                         rid = int(df_lista.iloc[idx]['id'])
                         for col, val in changes.items():
-                            if col != 'Exc': 
-                                conn.execute(text(f"UPDATE tarefas SET {col} = :v WHERE id = :i"), {"v": str(val), "i": rid})
+                            if col in COLUNAS_PERMITIDAS_TAREFAS: 
+                                conn.execute(text(f"UPDATE tarefas SET {col} = :v WHERE id = :i AND empresa_id = :eid"), {"v": str(val), "i": rid, "eid": str(emp_id)})
                     conn.commit()
                 st.rerun()
 
@@ -1558,7 +1586,7 @@ else:
                 4. **Finalizar:** Clique em **Processar Agendamentos**.
             """)
             
-        df_p = pd.read_sql(text("SELECT id, data_solicitacao, motorista, prefixo, descricao FROM chamados WHERE status = 'Pendente' AND empresa_id = :eid ORDER BY id DESC"), engine, params={"eid": emp_id})
+        df_p = pd.read_sql(text("SELECT id, data_solicitacao, motorista, prefixo, descricao FROM chamados WHERE status = 'Pendente' AND empresa_id = :eid ORDER BY id DESC"), engine, params={"eid": str(emp_id)})
         
         if not df_p.empty:
             if 'df_ap_work' not in st.session_state:
@@ -1643,9 +1671,9 @@ else:
                             v_os = obter_proxima_os(engine, emp_id)
                             conn.execute(
                                 text("INSERT INTO tarefas (data, executor, prefixo, inicio_disp, fim_disp, descricao, area, turno, id_chamado, origem, empresa_id, numero_os) VALUES (:dt, :ex, :pr, :ti, :tf, :ds, :ar, 'Não definido', :ic, 'Chamado', :eid, :nos)"), 
-                                {"dt": str(r['Data_Programada']), "ex": r['Executor'], "pr": r['prefixo'], "ti": r['Inicio'], "tf": r['Fim'], "ds": r['descricao'], "ar": r['Area_Destino'], "ic": r['id'], "eid": emp_id, "nos": v_os}
+                                {"dt": str(r['Data_Programada']), "ex": r['Executor'], "pr": r['prefixo'], "ti": r['Inicio'], "tf": r['Fim'], "ds": r['descricao'], "ar": r['Area_Destino'], "ic": r['id'], "eid": str(emp_id), "nos": v_os}
                             )
-                            conn.execute(text("UPDATE chamados SET status = 'Agendado' WHERE id = :id"), {"id": r['id']})
+                            conn.execute(text("UPDATE chamados SET status = 'Agendado' WHERE id = :id AND empresa_id = :eid"), {"id": int(r['id']), "eid": str(emp_id)})
                         conn.commit()
                     
                     if 'df_ap_work' in st.session_state: del st.session_state.df_ap_work
@@ -1695,7 +1723,7 @@ else:
         st.info("💡 **Dica:** Utilize esses dados para identificar gargalos e planejar a capacidade da oficina.")
         
         query_ind = text("SELECT area, realizado, data, inicio_disp, fim_disp FROM tarefas WHERE empresa_id = :eid")
-        df_ind = pd.read_sql(query_ind, engine, params={"eid": emp_id})
+        df_ind = pd.read_sql(query_ind, engine, params={"eid": str(emp_id)})
         
         c1, c2 = st.columns(2)
         with c1:
@@ -1771,9 +1799,9 @@ else:
                         senha_hash = gerar_hash_senha(s)
                         with engine.connect() as conn:
                             conn.execute(text("INSERT INTO usuarios (login, senha, perfil, empresa_id) VALUES (:u, :s, :p, :eid)"), 
-                                         {"u": u.lower().strip(), "s": senha_hash, "p": p, "eid": emp_id})
+                                         {"u": u.lower().strip(), "s": senha_hash, "p": p, "eid": str(emp_id)})
                             conn.commit()
-                        st.success("Acesso criado com credencial criptografada!")
+                        st.success("Acesso criado com credencial criptografada PBKDF2!")
                         st.rerun()
                     else:
                         st.warning("Preencha todos os campos.")
@@ -1781,7 +1809,7 @@ else:
         st.divider()
         st.subheader("Integrantes Cadastrados")
         
-        df_users = pd.read_sql(text("SELECT id, login, perfil as cargo FROM usuarios WHERE empresa_id = :eid"), engine, params={"eid": emp_id})
+        df_users = pd.read_sql(text("SELECT id, login, perfil as cargo FROM usuarios WHERE empresa_id = :eid"), engine, params={"eid": str(emp_id)})
         
         if not df_users.empty:
             df_users['Exc'] = False
@@ -1802,21 +1830,23 @@ else:
                 if usuarios_para_deletar:
                     with engine.connect() as conn:
                         for u_id in usuarios_para_deletar: 
-                            conn.execute(text("DELETE FROM usuarios WHERE id = :id"), {"id": int(u_id)})
+                            conn.execute(text("DELETE FROM usuarios WHERE id = :id AND empresa_id = :eid"), {"id": int(u_id), "eid": str(emp_id)})
                         conn.commit()
                     st.warning("Integrantes removidos.")
                     time_module.sleep(1)
                     st.rerun()
 
             if st.session_state.editor_equipe.get("edited_rows"):
+                COLUNAS_PERMITIDAS_USUARIOS = {"perfil": "perfil", "login": "login", "cargo": "perfil"}
                 with engine.connect() as conn:
                     for idx, changes in st.session_state.editor_equipe["edited_rows"].items():
                         uid = int(df_users.iloc[idx]['id'])
                         for col, val in changes.items():
-                            if col == 'cargo':
-                                conn.execute(text("UPDATE usuarios SET perfil = :v WHERE id = :i"), {"v": str(val), "i": uid})
-                            elif col == 'login':
-                                conn.execute(text("UPDATE usuarios SET login = :v WHERE id = :i"), {"v": str(val).lower().strip(), "i": uid})
+                            col_real = COLUNAS_PERMITIDAS_USUARIOS.get(col)
+                            if col_real == "perfil":
+                                conn.execute(text("UPDATE usuarios SET perfil = :v WHERE id = :i AND empresa_id = :eid"), {"v": str(val).strip(), "i": uid, "eid": str(emp_id)})
+                            elif col_real == "login":
+                                conn.execute(text("UPDATE usuarios SET login = :v WHERE id = :i AND empresa_id = :eid"), {"v": str(val).lower().strip(), "i": uid, "eid": str(emp_id)})
                     conn.commit()
                 st.rerun()
 
