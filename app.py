@@ -126,20 +126,28 @@ def pesquisar_solucao_web(termo_busca: str) -> str:
     except Exception:
         return ""
 
-# --- BUSCA REAL NO BANCO ---
+# --- 1. BUSCA REAL NO BANCO COM DATAS E DETALHES ---
 def buscar_historico_relevante(sintoma_motorista, emp_id):
-    """Busca as ordens de serviço concluídas da empresa para a IA avaliar semanticamente."""
+    """Busca as ordens de serviço da empresa com data, prefixo, OS e descrição."""
     engine = get_engine()
     query = text("""
-        SELECT prefixo, descricao 
+        SELECT data, prefixo, descricao, COALESCE(executor, 'Não informado') as executor, numero_os 
         FROM tarefas 
-        WHERE empresa_id = :eid AND realizado = True
-        ORDER BY id DESC LIMIT 25
+        WHERE empresa_id = :eid
+        ORDER BY id DESC LIMIT 30
     """)
     try:
         with engine.connect() as conn:
             resultados = conn.execute(query, {"eid": str(emp_id)}).fetchall()
-        return [f"Veículo {r[0]}: {str(r[1]).strip()}" for r in resultados]
+        
+        historico_formatado = []
+        for r in resultados:
+            dt_formatada = str(r[0])
+            os_num = f"OS {r[4]}" if r[4] else "Sem Nº"
+            historico_formatado.append(
+                f"- Data: {dt_formatada} | Veículo {r[1]} | {os_num} | Serviço: {str(r[2]).strip()} | Executor: {r[3]}"
+            )
+        return historico_formatado
     except Exception:
         return []
 
@@ -196,9 +204,9 @@ REGRAS DE RESPOSTA:
             return f"Baseado no histórico local da frota, recomenda-se inspeção técnica do sistema de {sintoma}."
         return f"Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se inspeção técnica do sistema de {sintoma}."
 
-# --- PROCESSAMENTO DETERMINÍSTICO DE ABERTURA DE OS VIA CHAT ---
+# --- 2. PROCESSAMENTO DE OS COM MEMÓRIA DO CHAT ---
 def processar_comando_os(texto_usuario, emp_id):
-    """Gerencia a coleta, edição, resumo e confirmação da OS sem falhas no envio."""
+    """Gerencia a coleta, edição, resumo e confirmação da OS utilizando todo o histórico da conversa."""
     if "rascunho_os" not in st.session_state:
         st.session_state.rascunho_os = None
     if "aguardando_confirmacao_os" not in st.session_state:
@@ -208,11 +216,13 @@ def processar_comando_os(texto_usuario, emp_id):
     rascunho = st.session_state.rascunho_os or {}
     texto_baixo = texto_usuario.lower().strip()
 
+    # Cancelamento
     if texto_baixo in ["cancelar", "cancela", "esquece", "não quero mais", "sair"]:
         st.session_state.rascunho_os = None
         st.session_state.aguardando_confirmacao_os = False
         return "❌ Agendamento de Ordem de Serviço cancelado."
 
+    # Confirmação do resumo
     palavras_confirmacao = ["ok", "sim", "tudo certo", "pode agendar", "confirmo", "confirmar", "fechar", "gerar", "certo", "ok."]
     eh_confirmacao = (
         st.session_state.aguardando_confirmacao_os 
@@ -267,34 +277,45 @@ def processar_comando_os(texto_usuario, emp_id):
     if not llm:
         return None
 
+    # Contexto da tela de chamados (se houver)
     veiculo_contexto = "Não informado"
     relato_contexto = ""
     if "analises_halley" in st.session_state and st.session_state.analises_halley:
         veiculo_contexto = str(st.session_state.analises_halley[-1].get("veiculo", "Não informado"))
         relato_contexto = str(st.session_state.analises_halley[-1].get("relato", ""))
 
+    # Contexto das últimas mensagens do chat
+    ultimas_msgs = ""
+    if "mensagens_chat_halley" in st.session_state and st.session_state.mensagens_chat_halley:
+        mensagens_recentes = st.session_state.mensagens_chat_halley[-6:]
+        ultimas_msgs = "\n".join([f"{m['role'].upper()}: {m['content']}" for m in mensagens_recentes])
+
     template_fluxo = """
 Você é o assistente Mr. Halley da plataforma Up 2 Today, especialista em agendamento de OS.
+
+Histórico Recente da Conversa no Chat:
+{ultimas_msgs}
 
 Mensagem Atual do Usuário: "{mensagem}"
 Rascunho Existente: {rascunho_json}
 Em Fluxo de OS Ativo? {em_fluxo}
-Veículo em Análise Recente: {veiculo_contexto}
+Veículo em Análise Recente na Tela: {veiculo_contexto}
 Relato da Análise Recente: "{relato_contexto}"
 Data de Hoje: {hoje}
 
 CAMPOS DA OS:
-- prefixo: Número/placa do veículo (se o usuário disser "esse carro", use "{veiculo_contexto}")
-- descricao: Descrição do serviço (se não informada, use "{relato_contexto}")
-- executor: Mecânico/responsável
-- data: Formato AAAA-MM-DD (converta termos como "hoje", "amanhã", "dia 17/08")
-- area: Mecânica, Elétrica, Borracharia, Chapeamento ou Limpeza
+- prefixo: Número/placa do veículo. Se o usuário falar "este veículo", "mesmo carro" ou fizer referência ao contexto, capture o veículo citado nas mensagens anteriores ou no veículo em análise recente.
+- descricao: Descrição do problema/serviço. Se o usuário disser "mesmo problema", capture o sintoma/problema debatido nas mensagens anteriores.
+- executor: Mecânico ou responsável.
+- data: Formato AAAA-MM-DD (converta termos como "hoje", "amanhã", "dia 17/08").
+- area: Mecânica, Elétrica, Borracharia, Chapeamento ou Limpeza (se o problema for 'ar condicionado', atribua 'Elétrica' ou 'Mecânica').
 
-REGRAS DE EXTRAÇÃO:
-1. Se "Em Fluxo de OS Ativo?" for True e o usuário enviar uma resposta curta de uma palavra (ex: "Bruno", "Carlos"), atribua esse valor DIRETAMENTE ao campo "executor". Se enviar apenas uma data, atribua ao campo "data".
-2. Preserve todos os dados que já estavam preenchidos no rascunho anterior e mescle com o dado novo.
+REGRAS:
+1. Se a mensagem solicitar abrir/agendar OS ou trouxer parâmetros operacionais:
+   - Extraia as entidades utilizando a mensagem atual e o histórico recente da conversa.
+   - Mescle com o rascunho anterior sem perder informações.
 
-Responda EXCLUSIVAMENTE em formato JSON puro, sem blocos markdown:
+Responda EXCLUSIVAMENTE em formato JSON puro:
 
 Se NÃO for assunto de OS e NÃO houver fluxo em andamento:
 {{"em_fluxo_os": false}}
@@ -308,6 +329,7 @@ Se for fluxo de OS:
 
     try:
         resultado = chain.invoke({
+            "ultimas_msgs": ultimas_msgs if ultimas_msgs else "Nenhuma mensagem anterior.",
             "mensagem": texto_usuario,
             "rascunho_json": json.dumps(rascunho, ensure_ascii=False),
             "em_fluxo": bool(rascunho or st.session_state.aguardando_confirmacao_os),
@@ -337,6 +359,7 @@ Se for fluxo de OS:
 
         st.session_state.rascunho_os = novo_rascunho
 
+        # Identificação de pendências
         campos_faltantes = []
         if not novo_rascunho.get("prefixo"):
             campos_faltantes.append("prefixo do veículo")
@@ -364,7 +387,7 @@ Se for fluxo de OS:
     except Exception:
         return None
 
-# --- CHATBOX DO MR. HALLEY ---
+# --- 3. RESPOSTAS GERAIS E HISTÓRICOS ---
 def responder_chat_mr_halley(mensagem_usuario, emp_id):
     texto_baixo = mensagem_usuario.lower().strip()
 
@@ -376,10 +399,12 @@ def responder_chat_mr_halley(mensagem_usuario, emp_id):
     if texto_baixo in saudacoes:
         return "Olá! Como posso ajudar com as manutenções da frota hoje?"
 
+    # 1. Tenta processar como fluxo de OS (com leitura do contexto)
     resposta_os = processar_comando_os(mensagem_usuario, emp_id)
     if resposta_os:
         return resposta_os
 
+    # 2. Consultas gerais de telemetria e histórico
     llm = obter_llm()
     if not llm:
         return "Desculpe, a conexão com a IA (GROQ_API_KEY) não está configurada nos Secrets do Streamlit."
@@ -395,8 +420,8 @@ def responder_chat_mr_halley(mensagem_usuario, emp_id):
         )
 
     historicos_banco = buscar_historico_relevante(mensagem_usuario, emp_id)
-    contexto_banco = "HISTÓRICO DE MANUTENÇÕES CONCLUÍDAS DA FROTA:\n" + (
-        "\n".join([f"- {h}" for h in historicos_banco]) if historicos_banco else "Nenhum registro anterior no banco."
+    contexto_banco = "REGISTROS E HISTÓRICOS DE MANUTENÇÃO NO BANCO:\n" + (
+        "\n".join(historicos_banco) if historicos_banco else "Nenhum registro anterior no banco."
     )
 
     template = """
@@ -409,10 +434,10 @@ Você é o Mr. Halley, assistente técnico de manutenção e telemetria da plata
 Pergunta do Usuário: "{mensagem_usuario}"
 
 DIRETRIZES DE RESPOSTA:
-1. Se o usuário estiver fazendo uma pergunta sobre "este último problema", "esta falha" ou "em qual veículo ocorreu antes":
-   - Use como base o "FOCO ATUAL" e consulte o histórico de manutenções concluídas.
-   - Responda de forma direta e técnica em 2 a 3 frases.
-2. Seja sempre prestativo e profissional.
+1. Sempre que o usuário perguntar sobre quando ocorreu um problema, datas ou veículos anteriores:
+   - Consulte com atenção as linhas de "REGISTROS E HISTÓRICOS DE MANUTENÇÃO NO BANCO", onde constam as datas e veículos.
+   - Responda informando a data exata em que o serviço foi registrado no banco e o veículo correspondente.
+2. Seja direto, técnico e cordial em 2 a 3 frases.
 """
 
     prompt = ChatPromptTemplate.from_template(template)
