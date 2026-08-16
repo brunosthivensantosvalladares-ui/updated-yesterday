@@ -1,11 +1,10 @@
 streamlit
 pandas
-sqlalchemy
+SQLAlchemy
 psycopg2-binary
 fpdf
 xlsxwriter
 requests
 langchain
 langchain-groq
-langchain-community
 duckduckgo-search
