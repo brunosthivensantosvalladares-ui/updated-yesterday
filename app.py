@@ -108,41 +108,43 @@ def buscar_historico_relevante(sintoma_motorista, emp_id):
     except Exception:
         return []
 
-# --- TRIAGEM DO MR. HALLEY COM LLAMA 3 (GROQ + RAG + WEB) ---
+# --- TRIAGEM DO MR. HALLEY COM VALIDAÇÃO REAL DE HISTÓRICO ---
 def triagem_mr_halley(sintoma, emp_id, prefixo=None, incluir_saudacao=False):
     llm = obter_llm()
     historicos = buscar_historico_relevante(sintoma, emp_id)
-    tem_historico_local = len(historicos) > 0
+    
+    historico_formatado = "\n".join([f"- {h}" for h in historicos]) if historicos else "Nenhum histórico encontrado no banco."
+    resultado_web = pesquisar_solucao_web(sintoma) if not historicos else ""
 
     if not llm:
-        if tem_historico_local:
-            return f"Baseado no histórico local da frota, recomenda-se realizar manutenção preventiva do sistema de {sintoma}."
-        return "Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se verificar trambulador, cabos de comando e nível de óleo do câmbio."
-
-    if tem_historico_local:
-        historico_formatado = "\n".join([f"- {h}" for h in historicos])
-        contexto = f"HISTÓRICO REAL DA FROTA:\n{historico_formatado}"
-        frase_inicio = "Baseado no histórico local da frota, recomenda-se"
-    else:
-        resultado_web = pesquisar_solucao_web(sintoma)
-        contexto = f"DADOS TÉCNICOS EXTERNOS (WEB):\n{resultado_web[:600] if resultado_web else 'Defeito mecânico/elétrico'}"
-        frase_inicio = "Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se"
+        if historicos:
+            return f"Baseado no histórico local da frota, recomenda-se verificar e reparar o sistema de {sintoma}."
+        return f"Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se inspeção do sistema de {sintoma}."
 
     template = """
 Você é o assistente técnico Mr. Halley da plataforma Updated Yesterday.
-Analise a falha informada com base estritamente no contexto fornecido.
+Analise o sintoma relatado e avalie com RIGOR se o histórico interno da frota trata EXATAMENTE da mesma falha mecânica/elétrica.
 
 Veículo: {prefixo}
-Falha/Sintoma: "{sintoma}"
+Sintoma Relatado: "{sintoma}"
 
-Contexto Técnico:
-{contexto}
+Histórico Encontrado no Banco:
+{historico_formatado}
 
-REGRAS DE FORMATAÇÃO E CONTEÚDO:
-1. NUNCA adicione saudações como "Olá" ou "Prezado".
-2. Comece a sua resposta EXATAMENTE com a frase: "{frase_inicio}" (sem cortar palavras dessa frase).
-3. Após a frase obrigatória, cite claramente os componentes mecânicos prováveis e ações específicas no infinitivo (ex: inspecionar trambulador, verificar embreagem, checar sincronizadores, trocar óleo da caixa).
-4. Forneça uma resposta técnica objetiva de 25 a 40 palavras.
+Dados Técnicos Externos (Web):
+{contexto_web}
+
+REGRAS DE CLASSIFICAÇÃO:
+- Se houver OS no histórico que trate REALMENTE da mesma falha (ex: mesmo problema de direção/alinhamento), inicie OBRIGATORIAMENTE com:
+  "Baseado no histórico local da frota, recomenda-se"
+
+- Se o histórico estiver vazio OU contiver apenas OSs de outros sistemas não relacionados (ex: sintoma é direção e o histórico trouxe farol/bico/freio), desconsidere o histórico e inicie OBRIGATORIAMENTE com:
+  "Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se"
+
+DIRETRIZES DE RESPOSTA:
+1. NUNCA use saudações.
+2. Complete a recomendação técnica usando verbos no infinitivo e citando os componentes prováveis.
+3. Resposta técnica e concisa (20 a 35 palavras).
 """
 
     prompt = ChatPromptTemplate.from_template(template)
@@ -152,14 +154,12 @@ REGRAS DE FORMATAÇÃO E CONTEÚDO:
         resposta = chain.invoke({
             "prefixo": prefixo if prefixo else "Não informado",
             "sintoma": sintoma,
-            "contexto": contexto,
-            "frase_inicio": frase_inicio
+            "historico_formatado": historico_formatado,
+            "contexto_web": resultado_web[:600] if resultado_web else "Inspeção técnica padrão de montadora."
         })
         return resposta.content.strip()
     except Exception:
-        if tem_historico_local:
-            return f"Baseado no histórico local da frota, recomenda-se inspeção técnica do sistema de {sintoma}."
-        return "Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se inspecionar trambulador, articulações e sincronizadores."
+        return f"Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se verificar alinhamento, balanceamento e suspensão."
 
 
 # --- CHATBOX DO MR. HALLEY (INTERAÇÃO COM CONTEXTO E SEM ALUCINAÇÕES) ---
