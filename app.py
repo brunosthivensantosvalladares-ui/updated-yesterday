@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import os
 import json
+import hashlib
+import secrets
 from sqlalchemy import create_engine, text
 from datetime import datetime, time, timedelta
 from io import BytesIO
@@ -9,6 +11,27 @@ from fpdf import FPDF
 import time as time_module
 import requests
 import re
+
+# --- MÓDULO DE SEGURANÇA E CRIPTOGRAFIA ---
+def gerar_hash_senha(senha_pura: str) -> str:
+    """Gera um hash SHA-256 com salt seguro (sem bloquear ou depender de libs externas)."""
+    salt = secrets.token_hex(16)
+    hash_obj = hashlib.sha256((salt + senha_pura).encode('utf-8')).hexdigest()
+    return f"{salt}${hash_obj}"
+
+def verificar_senha(senha_pura: str, hash_armazenado: str) -> bool:
+    """Valida a senha com hash seguro e mantém fallback transparente para senhas antigas em texto puro."""
+    if not hash_armazenado:
+        return False
+    if "$" in hash_armazenado:
+        try:
+            salt, hash_esperado = hash_armazenado.split("$", 1)
+            hash_calculado = hashlib.sha256((salt + senha_pura).encode('utf-8')).hexdigest()
+            return secrets.compare_digest(hash_calculado, hash_esperado)
+        except Exception:
+            return False
+    # Compatibilidade retroativa com senhas legadas em texto plano
+    return secrets.compare_digest(senha_pura, hash_armazenado)
 
 # --- INTEGRAÇÃO LLAMA 3 VIA GROQ + LANGCHAIN + BUSCA WEB ---
 from langchain_groq import ChatGroq
@@ -163,13 +186,11 @@ def processar_comando_os(texto_usuario, emp_id):
     rascunho = st.session_state.rascunho_os or {}
     texto_baixo = texto_usuario.lower().strip()
 
-    # 1. CANCELAMENTO DIRETO
     if texto_baixo in ["cancelar", "cancela", "esquece", "não quero mais", "sair"]:
         st.session_state.rascunho_os = None
         st.session_state.aguardando_confirmacao_os = False
         return "❌ Agendamento de Ordem de Serviço cancelado."
 
-    # 2. SE ESTÁ AGUARDANDO CONFIRMAÇÃO E O USUÁRIO DIGITA OK / SIM
     palavras_confirmacao = ["ok", "sim", "tudo certo", "pode agendar", "confirmo", "confirmar", "fechar", "gerar", "certo", "ok."]
     eh_confirmacao = (
         st.session_state.aguardando_confirmacao_os 
@@ -205,7 +226,6 @@ def processar_comando_os(texto_usuario, emp_id):
                 )
                 conn.commit()
 
-            # Limpa o estado após gravar
             st.session_state.rascunho_os = None
             st.session_state.aguardando_confirmacao_os = False
 
@@ -221,7 +241,6 @@ def processar_comando_os(texto_usuario, emp_id):
         except Exception as e:
             return f"❌ Ocorreu um erro ao salvar a OS no banco: {str(e)}"
 
-    # 3. EXTRAÇÃO DE PARÂMETROS VIA LLM
     llm = obter_llm()
     if not llm:
         return None
@@ -281,7 +300,6 @@ Se for fluxo de OS:
         if not dados.get("em_fluxo_os"):
             return None
 
-        # Mescla dados novos com os já preenchidos
         novo_rascunho = rascunho.copy()
         for k in ["prefixo", "descricao", "executor", "data", "area"]:
             v = dados.get(k)
@@ -297,7 +315,6 @@ Se for fluxo de OS:
 
         st.session_state.rascunho_os = novo_rascunho
 
-        # 4. VERIFICAÇÃO DE CAMPOS PENDENTES
         campos_faltantes = []
         if not novo_rascunho.get("prefixo"):
             campos_faltantes.append("prefixo do veículo")
@@ -312,7 +329,6 @@ Se for fluxo de OS:
             st.session_state.aguardando_confirmacao_os = False
             return f"Para abrir a OS, informe: **{', '.join(campos_faltantes)}**."
 
-        # 5. EXIBIÇÃO DO RESUMO E LIBERAÇÃO PARA 'OK'
         st.session_state.aguardando_confirmacao_os = True
         return (
             f"📋 **Resumo da Ordem de Serviço:**\n\n"
@@ -326,11 +342,10 @@ Se for fluxo de OS:
     except Exception:
         return None
 
-# --- CHATBOX DO MR. HALLEY (CORDIAL, TÉCNICO E CONECTADO ÀS OSs) ---
+# --- CHATBOX DO MR. HALLEY ---
 def responder_chat_mr_halley(mensagem_usuario, emp_id):
     texto_baixo = mensagem_usuario.lower().strip()
 
-    # 1. Tratamento de Agradecimentos e Cortesias
     agradecimentos = ["obrigado", "muito obrigado", "valeu", "show", "perfeito", "agradeço", "obrigada", "tmj", "grato"]
     if any(texto_baixo.startswith(term) or texto_baixo == term for term in agradecimentos):
         return "Por nada! Qualquer dúvida técnica ou se precisar agendar uma nova OS, estou à disposição. 🛠️"
@@ -339,12 +354,10 @@ def responder_chat_mr_halley(mensagem_usuario, emp_id):
     if texto_baixo in saudacoes:
         return "Olá! Como posso ajudar com as manutenções da frota hoje?"
 
-    # 2. Tenta processar como fluxo de abertura/edição de OS
     resposta_os = processar_comando_os(mensagem_usuario, emp_id)
     if resposta_os:
         return resposta_os
 
-    # 3. Consultas técnicas e dúvidas gerais
     llm = obter_llm()
     if not llm:
         return "Desculpe, a conexão com a IA (GROQ_API_KEY) não está configurada nos Secrets do Streamlit."
@@ -871,50 +884,75 @@ if not st.session_state["logado"]:
                         engine = get_engine()
                         inicializar_banco()
                         
+                        # Provisionamento / atualização segura do Admin Master
                         if user_input == "bruno":
                             try:
                                 with engine.connect() as conn:
-                                    check_user = conn.execute(text("SELECT id FROM usuarios WHERE LOWER(login) = 'bruno'")).fetchone()
+                                    check_user = conn.execute(text("SELECT id, senha FROM usuarios WHERE LOWER(login) = 'bruno'")).fetchone()
                                     if check_user:
-                                        conn.execute(text("UPDATE usuarios SET senha = :p, perfil = 'admin', empresa_id = 'U2T_MATRIZ' WHERE LOWER(login) = 'bruno'"), {"p": pw_input})
+                                        if not verificar_senha(pw_input, check_user[1]):
+                                            hash_novo = gerar_hash_senha(pw_input)
+                                            conn.execute(text("UPDATE usuarios SET senha = :p, perfil = 'admin', empresa_id = 'U2T_MATRIZ' WHERE LOWER(login) = 'bruno'"), {"p": hash_novo})
+                                            conn.commit()
                                     else:
-                                        conn.execute(text("INSERT INTO usuarios (login, senha, perfil, empresa_id) VALUES ('bruno', :p, 'admin', 'U2T_MATRIZ')"), {"p": pw_input})
-                                    conn.commit()
+                                        hash_novo = gerar_hash_senha(pw_input)
+                                        conn.execute(text("INSERT INTO usuarios (login, senha, perfil, empresa_id) VALUES ('bruno', :p, 'admin', 'U2T_MATRIZ')"), {"p": hash_novo})
+                                        conn.commit()
                             except Exception:
                                 pass
 
+                        # 1. Autenticação na tabela empresa
                         with engine.connect() as conn:
                             empresa = conn.execute(
                                 text("""
-                                    SELECT nome, senha FROM empresa 
+                                    SELECT id, nome, senha FROM empresa 
                                     WHERE LOWER(TRIM(email)) = LOWER(TRIM(:u)) 
                                        OR LOWER(TRIM(nome)) = LOWER(TRIM(:u))
                                 """), 
                                 {"u": user_input}
                             ).fetchone()
                         
-                        if empresa and empresa[1].strip() == pw_input:
+                        if empresa and verificar_senha(pw_input, str(empresa[2])):
+                            # Migra hash no banco se a senha antiga estava em texto plano
+                            if "$" not in str(empresa[2]):
+                                try:
+                                    with engine.connect() as conn:
+                                        conn.execute(text("UPDATE empresa SET senha = :p WHERE id = :id"), {"p": gerar_hash_senha(pw_input), "id": empresa[0]})
+                                        conn.commit()
+                                except Exception:
+                                    pass
+
                             st.session_state["logado"] = True
-                            st.session_state["empresa"] = empresa[0]
+                            st.session_state["empresa"] = empresa[1]
                             st.session_state["perfil"] = "admin"
                             st.session_state["usuario_ativo"] = user_input
                             st.success("✅ Login efetuado com sucesso!")
                             st.rerun()
                         
                         else:
+                            # 2. Autenticação na tabela usuarios
                             with engine.connect() as conn:
                                 usuario = conn.execute(
                                     text("""
-                                        SELECT empresa_id, perfil, senha FROM usuarios 
+                                        SELECT id, empresa_id, perfil, senha FROM usuarios 
                                         WHERE LOWER(TRIM(login)) = LOWER(TRIM(:u))
                                     """), 
                                     {"u": user_input}
                                 ).fetchone()
                                 
-                            if usuario and usuario[2].strip() == pw_input:
+                            if usuario and verificar_senha(pw_input, str(usuario[3])):
+                                # Migra hash no banco se a senha antiga estava em texto plano
+                                if "$" not in str(usuario[3]):
+                                    try:
+                                        with engine.connect() as conn:
+                                            conn.execute(text("UPDATE usuarios SET senha = :p WHERE id = :id"), {"p": gerar_hash_senha(pw_input), "id": usuario[0]})
+                                            conn.commit()
+                                    except Exception:
+                                        pass
+
                                 st.session_state["logado"] = True
-                                st.session_state["empresa"] = usuario[0]
-                                st.session_state["perfil"] = usuario[1]
+                                st.session_state["empresa"] = usuario[1]
+                                st.session_state["perfil"] = usuario[2]
                                 st.session_state["usuario_ativo"] = user_input
                                 st.success("✅ Login efetuado com sucesso!")
                                 st.rerun()
@@ -936,10 +974,12 @@ if not st.session_state["logado"]:
                             engine = get_engine()
                             inicializar_banco()
                             expira = datetime.now().date() + timedelta(days=7)
+                            senha_protegida = gerar_hash_senha(n_sen)
                             with engine.connect() as conn:
-                                conn.execute(text("INSERT INTO empresa (nome, email, senha, data_expiracao) VALUES (:n, :e, :s, :d)"), {"n": n_emp, "e": n_ema, "s": n_sen, "d": expira})
+                                conn.execute(text("INSERT INTO empresa (nome, email, senha, data_expiracao) VALUES (:n, :e, :s, :d)"), 
+                                             {"n": n_emp, "e": n_ema, "s": senha_protegida, "d": expira})
                                 conn.commit()
-                            st.success("✅ Conta criada! Agora faça login na aba 'Acessar'.")
+                            st.success("✅ Conta criada com proteção ativada! Agora faça login na aba 'Acessar'.")
                         except Exception:
                             st.error("Este e-mail já está cadastrado.")
                     else:
@@ -1460,11 +1500,11 @@ else:
             with c6: t_fim = st.text_input("Fim (Ex: 10:00)", "00:00")
             ds_i, t_i = st.text_area("Descrição"), st.selectbox("Turno", LISTA_TURNOS)
             if st.form_submit_button("Confirmar Agendamento"):
-                nova_os = obter_proxima_os(engine, emp_id)[cite: 1, 2]
+                nova_os = obter_proxima_os(engine, emp_id)
                 with engine.connect() as conn:
                     conn.execute(text("INSERT INTO tarefas (data, executor, prefixo, inicio_disp, fim_disp, descricao, area, turno, origem, empresa_id, numero_os) VALUES (:dt, :ex, :pr, :ti, :tf, :ds, :ar, :tu, 'Direto', :eid, :nos)"), 
-                                 {"dt": str(d_i), "ex": e_i, "pr": p_i, "ti": t_ini, "tf": t_fim, "ds": ds_i, "ar": a_i, "tu": t_i, "eid": emp_id, "nos": nova_os})[cite: 1, 2]
-                    conn.commit()[cite: 1, 2]
+                                 {"dt": str(d_i), "ex": e_i, "pr": p_i, "ti": t_ini, "tf": t_fim, "ds": ds_i, "ar": a_i, "tu": t_i, "eid": emp_id, "nos": nova_os})
+                    conn.commit()
                 st.success(f"✅ SERVIÇO AGENDADO!")
                 st.code(f"NÚMERO DA ORDEM DE SERVIÇO: {nova_os}", language="markdown")
                 st.rerun()
@@ -1600,13 +1640,13 @@ else:
                 if not selecionados.empty:
                     with engine.connect() as conn:
                         for _, r in selecionados.iterrows():
-                            v_os = obter_proxima_os(engine, emp_id)[cite: 1, 2]
+                            v_os = obter_proxima_os(engine, emp_id)
                             conn.execute(
                                 text("INSERT INTO tarefas (data, executor, prefixo, inicio_disp, fim_disp, descricao, area, turno, id_chamado, origem, empresa_id, numero_os) VALUES (:dt, :ex, :pr, :ti, :tf, :ds, :ar, 'Não definido', :ic, 'Chamado', :eid, :nos)"), 
                                 {"dt": str(r['Data_Programada']), "ex": r['Executor'], "pr": r['prefixo'], "ti": r['Inicio'], "tf": r['Fim'], "ds": r['descricao'], "ar": r['Area_Destino'], "ic": r['id'], "eid": emp_id, "nos": v_os}
-                            )[cite: 1, 2]
-                            conn.execute(text("UPDATE chamados SET status = 'Agendado' WHERE id = :id"), {"id": r['id']})[cite: 1, 2]
-                        conn.commit()[cite: 1, 2]
+                            )
+                            conn.execute(text("UPDATE chamados SET status = 'Agendado' WHERE id = :id"), {"id": r['id']})
+                        conn.commit()
                     
                     if 'df_ap_work' in st.session_state: del st.session_state.df_ap_work
                     if 'analises_halley' in st.session_state: del st.session_state.analises_halley
@@ -1721,26 +1761,41 @@ else:
             st.stop()
             
         st.subheader("👥 Gestão de Equipe e Acessos")
-        st.info("💡 **Dica profissional:** Para editar senhas ou cargos, altere diretamente na tabela. Para excluir, marque 'Exc' e clique no botão abaixo.")
+        st.info("💡 **Dica profissional:** Para cadastrar novos membros ou alterar permissões, preencha o formulário. Senhas são criptografadas automaticamente.")
         
         with st.expander("➕ Novo Integrante", expanded=True):
             with st.form("f_u", clear_on_submit=True):
-                u, s, p = st.text_input("Login"), st.text_input("Senha"), st.selectbox("Cargo", ["motorista", "admin"])
+                u, s, p = st.text_input("Login"), st.text_input("Senha", type="password"), st.selectbox("Cargo", ["motorista", "admin"])
                 if st.form_submit_button("Criar Acesso"):
-                    with engine.connect() as conn:
-                        conn.execute(text("INSERT INTO usuarios (login, senha, perfil, empresa_id) VALUES (:u, :s, :p, :eid)"), {"u": u.lower(), "s": s, "p": p, "eid": emp_id})
-                        conn.commit()
-                    st.success("Acesso criado!")
-                    st.rerun()
+                    if u and s:
+                        senha_hash = gerar_hash_senha(s)
+                        with engine.connect() as conn:
+                            conn.execute(text("INSERT INTO usuarios (login, senha, perfil, empresa_id) VALUES (:u, :s, :p, :eid)"), 
+                                         {"u": u.lower().strip(), "s": senha_hash, "p": p, "eid": emp_id})
+                            conn.commit()
+                        st.success("Acesso criado com credencial criptografada!")
+                        st.rerun()
+                    else:
+                        st.warning("Preencha todos os campos.")
                     
         st.divider()
         st.subheader("Integrantes Cadastrados")
         
-        df_users = pd.read_sql(text("SELECT id, login, senha, perfil as cargo FROM usuarios WHERE empresa_id = :eid"), engine, params={"eid": emp_id})
+        df_users = pd.read_sql(text("SELECT id, login, perfil as cargo FROM usuarios WHERE empresa_id = :eid"), engine, params={"eid": emp_id})
         
         if not df_users.empty:
             df_users['Exc'] = False
-            ed_users = st.data_editor(df_users[['Exc', 'login', 'senha', 'cargo', 'id']], hide_index=True, use_container_width=True, column_config={"id": None, "Exc": st.column_config.CheckboxColumn("Excluir", width="small"), "cargo": st.column_config.SelectboxColumn("Cargo", options=["motorista", "admin"])}, key="editor_equipe")
+            ed_users = st.data_editor(
+                df_users[['Exc', 'login', 'cargo', 'id']], 
+                hide_index=True, 
+                use_container_width=True, 
+                column_config={
+                    "id": None, 
+                    "Exc": st.column_config.CheckboxColumn("Excluir", width="small"), 
+                    "cargo": st.column_config.SelectboxColumn("Cargo", options=["motorista", "admin"])
+                }, 
+                key="editor_equipe"
+            )
             
             if st.button("🗑️ Excluir Selecionados da Equipe"):
                 usuarios_para_deletar = ed_users[ed_users['Exc'] == True]['id'].tolist()
@@ -1752,6 +1807,18 @@ else:
                     st.warning("Integrantes removidos.")
                     time_module.sleep(1)
                     st.rerun()
+
+            if st.session_state.editor_equipe.get("edited_rows"):
+                with engine.connect() as conn:
+                    for idx, changes in st.session_state.editor_equipe["edited_rows"].items():
+                        uid = int(df_users.iloc[idx]['id'])
+                        for col, val in changes.items():
+                            if col == 'cargo':
+                                conn.execute(text("UPDATE usuarios SET perfil = :v WHERE id = :i"), {"v": str(val), "i": uid})
+                            elif col == 'login':
+                                conn.execute(text("UPDATE usuarios SET login = :v WHERE id = :i"), {"v": str(val).lower().strip(), "i": uid})
+                    conn.commit()
+                st.rerun()
 
 # --- ATIVAÇÃO GLOBAL DO CHAT FLUTUANTE ---
 if st.session_state.get("logado") and "empresa" in st.session_state:
