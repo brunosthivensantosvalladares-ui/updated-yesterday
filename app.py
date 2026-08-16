@@ -155,11 +155,14 @@ DIRETRIZES DE RESPOSTA:
             "prefixo": prefixo if prefixo else "Não informado",
             "sintoma": sintoma,
             "historico_formatado": historico_formatado,
-            "contexto_web": resultado_web[:600] if resultado_web else "Inspeção técnica padrão de montadora."
+            "contexto_web": resultado_web[:600] if resultado_web else "Inspeção mecânica geral."
         })
         return resposta.content.strip()
     except Exception:
-        return f"Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se verificar alinhamento, balanceamento e suspensão."
+        # Fallback 100% genérico para qualquer sistema (freio, motor, elétrica, ar, etc.)
+        if historicos:
+            return f"Baseado no histórico local da frota, recomenda-se realizar inspeção técnica e manutenção do sistema relacionado a {sintoma}."
+        return f"Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se diagnóstico preventivo para {sintoma}."
 
 
 # --- CHATBOX DO MR. HALLEY (INTERAÇÃO COM CONTEXTO E SEM ALUCINAÇÕES) ---
