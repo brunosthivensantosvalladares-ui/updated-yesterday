@@ -151,13 +151,9 @@ REGRAS DE RESPOSTA:
             return f"Baseado no histórico local da frota, recomenda-se inspeção técnica do sistema de {sintoma}."
         return f"Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se inspeção técnica do sistema de {sintoma}."
 
-# --- PROCESSAMENTO ROBUSTO DE OS COM RESUMO E CONFIRMAÇÃO ---
+# --- PROCESSAMENTO DETERMINÍSTICO DE ABERTURA DE OS VIA CHAT ---
 def processar_comando_os(texto_usuario, emp_id):
-    """Gerencia a coleta, edição, resumo e confirmação da OS de forma determinística."""
-    llm = obter_llm()
-    if not llm:
-        return None
-
+    """Gerencia a coleta, edição, resumo e confirmação da OS sem falhas no envio."""
     if "rascunho_os" not in st.session_state:
         st.session_state.rascunho_os = None
     if "aguardando_confirmacao_os" not in st.session_state:
@@ -167,56 +163,69 @@ def processar_comando_os(texto_usuario, emp_id):
     rascunho = st.session_state.rascunho_os or {}
     texto_baixo = texto_usuario.lower().strip()
 
-    # 1. CANCELAMENTO
+    # 1. CANCELAMENTO DIRETO
     if texto_baixo in ["cancelar", "cancela", "esquece", "não quero mais", "sair"]:
         st.session_state.rascunho_os = None
         st.session_state.aguardando_confirmacao_os = False
         return "❌ Agendamento de Ordem de Serviço cancelado."
 
-    # 2. SE ESTIVER AGUARDANDO CONFIRMAÇÃO E O USUÁRIO DIGITAR OK
+    # 2. SE ESTÁ AGUARDANDO CONFIRMAÇÃO E O USUÁRIO DIGITA OK / SIM
     palavras_confirmacao = ["ok", "sim", "tudo certo", "pode agendar", "confirmo", "confirmar", "fechar", "gerar", "certo", "ok."]
-    if st.session_state.aguardando_confirmacao_os and (texto_baixo in palavras_confirmacao or any(texto_baixo.startswith(p) for p in ["ok", "sim", "confirmo"])):
-        engine = get_engine()
-        nova_os = obter_proxima_os(engine, emp_id)[cite: 1, 2]
+    eh_confirmacao = (
+        st.session_state.aguardando_confirmacao_os 
+        and (texto_baixo in palavras_confirmacao or any(texto_baixo.startswith(p) for p in ["ok", "sim", "confirmo"]))
+    )
 
-        pref_final = rascunho.get("prefixo", "S/P")
-        desc_final = rascunho.get("descricao", "Serviço via chat")
-        exec_final = rascunho.get("executor", "Não definido")
-        data_final = rascunho.get("data", hoje_str)
-        area_final = rascunho.get("area", "Mecânica")
+    if eh_confirmacao:
+        try:
+            engine = get_engine()
+            nova_os = obter_proxima_os(engine, emp_id)
 
-        with engine.connect() as conn:
-            conn.execute(
-                text("""
-                    INSERT INTO tarefas (data, executor, prefixo, inicio_disp, fim_disp, descricao, area, turno, origem, empresa_id, numero_os)
-                    VALUES (:dt, :ex, :pr, '00:00', '00:00', :ds, :ar, 'Não definido', 'Chat Mr. Halley', :eid, :nos)
-                """),
-                {
-                    "dt": str(data_final),
-                    "ex": str(exec_final),
-                    "pr": str(pref_final),
-                    "ds": str(desc_final),
-                    "ar": str(area_final),
-                    "eid": str(emp_id),
-                    "nos": nova_os
-                }
-            )[cite: 1, 2]
-            conn.commit()[cite: 1, 2]
+            pref_final = rascunho.get("prefixo", "S/P")
+            desc_final = rascunho.get("descricao", "Serviço via chat")
+            exec_final = rascunho.get("executor", "Não definido")
+            data_final = rascunho.get("data", hoje_str)
+            area_final = rascunho.get("area", "Mecânica")
 
-        st.session_state.rascunho_os = None
-        st.session_state.aguardando_confirmacao_os = False
+            with engine.connect() as conn:
+                conn.execute(
+                    text("""
+                        INSERT INTO tarefas (data, executor, prefixo, inicio_disp, fim_disp, descricao, area, turno, origem, empresa_id, numero_os)
+                        VALUES (:dt, :ex, :pr, '00:00', '00:00', :ds, :ar, 'Não definido', 'Chat Mr. Halley', :eid, :nos)
+                    """),
+                    {
+                        "dt": str(data_final),
+                        "ex": str(exec_final),
+                        "pr": str(pref_final),
+                        "ds": str(desc_final),
+                        "ar": str(area_final),
+                        "eid": str(emp_id),
+                        "nos": nova_os
+                    }
+                )
+                conn.commit()
 
-        return (
-            f"✅ **Ordem de Serviço Nº {nova_os} gerada com sucesso!**\n\n"
-            f"- **Veículo:** {pref_final}\n"
-            f"- **Serviço:** {desc_final}\n"
-            f"- **Área:** {area_final}\n"
-            f"- **Data:** {data_final}\n"
-            f"- **Executor:** {exec_final}\n\n"
-            f"*A OS já foi enviada diretamente para a Agenda Principal.*"
-        )
+            # Limpa o estado após gravar
+            st.session_state.rascunho_os = None
+            st.session_state.aguardando_confirmacao_os = False
 
-    # 3. EXTRAÇÃO E ATUALIZAÇÃO VIA IA
+            return (
+                f"✅ **Ordem de Serviço Nº {nova_os} gerada com sucesso!**\n\n"
+                f"- **Veículo:** {pref_final}\n"
+                f"- **Serviço:** {desc_final}\n"
+                f"- **Área:** {area_final}\n"
+                f"- **Data:** {data_final}\n"
+                f"- **Executor:** {exec_final}\n\n"
+                f"*A OS já foi enviada diretamente para a Agenda Principal.*"
+            )
+        except Exception as e:
+            return f"❌ Ocorreu um erro ao salvar a OS no banco: {str(e)}"
+
+    # 3. EXTRAÇÃO DE PARÂMETROS VIA LLM
+    llm = obter_llm()
+    if not llm:
+        return None
+
     veiculo_contexto = "Não informado"
     relato_contexto = ""
     if "analises_halley" in st.session_state and st.session_state.analises_halley:
@@ -226,7 +235,7 @@ def processar_comando_os(texto_usuario, emp_id):
     template_fluxo = """
 Você é o assistente Mr. Halley da plataforma Up 2 Today, especialista em agendamento de OS.
 
-Mensagem Atual: "{mensagem}"
+Mensagem Atual do Usuário: "{mensagem}"
 Rascunho Existente: {rascunho_json}
 Em Fluxo de OS Ativo? {em_fluxo}
 Veículo em Análise Recente: {veiculo_contexto}
@@ -240,12 +249,11 @@ CAMPOS DA OS:
 - data: Formato AAAA-MM-DD (converta termos como "hoje", "amanhã", "dia 17/08")
 - area: Mecânica, Elétrica, Borracharia, Chapeamento ou Limpeza
 
-INSTRUÇÕES:
-1. Se a mensagem contiver dados para agendar OS, intenção de abrir OS ou editar campos:
-   - Atualize os campos preenchidos e mantenha os anteriores.
-2. Identifique os campos já preenchidos.
+REGRAS DE EXTRAÇÃO:
+1. Se "Em Fluxo de OS Ativo?" for True e o usuário enviar uma resposta curta de uma palavra (ex: "Bruno", "Carlos"), atribua esse valor DIRETAMENTE ao campo "executor". Se enviar apenas uma data, atribua ao campo "data".
+2. Preserve todos os dados que já estavam preenchidos no rascunho anterior e mescle com o dado novo.
 
-Responda EXCLUSIVAMENTE em JSON puro, sem blocos markdown:
+Responda EXCLUSIVAMENTE em formato JSON puro, sem blocos markdown:
 
 Se NÃO for assunto de OS e NÃO houver fluxo em andamento:
 {{"em_fluxo_os": false}}
@@ -273,7 +281,7 @@ Se for fluxo de OS:
         if not dados.get("em_fluxo_os"):
             return None
 
-        # Mescla dados
+        # Mescla dados novos com os já preenchidos
         novo_rascunho = rascunho.copy()
         for k in ["prefixo", "descricao", "executor", "data", "area"]:
             v = dados.get(k)
@@ -289,7 +297,7 @@ Se for fluxo de OS:
 
         st.session_state.rascunho_os = novo_rascunho
 
-        # 4. VERIFICAÇÃO DE PENDÊNCIAS
+        # 4. VERIFICAÇÃO DE CAMPOS PENDENTES
         campos_faltantes = []
         if not novo_rascunho.get("prefixo"):
             campos_faltantes.append("prefixo do veículo")
@@ -304,7 +312,7 @@ Se for fluxo de OS:
             st.session_state.aguardando_confirmacao_os = False
             return f"Para abrir a OS, informe: **{', '.join(campos_faltantes)}**."
 
-        # 5. RESUMO DE CONFIRMAÇÃO
+        # 5. EXIBIÇÃO DO RESUMO E LIBERAÇÃO PARA 'OK'
         st.session_state.aguardando_confirmacao_os = True
         return (
             f"📋 **Resumo da Ordem de Serviço:**\n\n"
@@ -313,7 +321,7 @@ Se for fluxo de OS:
             f"- **Área:** {novo_rascunho.get('area')}\n"
             f"- **Data:** {novo_rascunho.get('data')}\n"
             f"- **Executor:** {novo_rascunho.get('executor')}\n\n"
-            f"👉 Digite **Ok** para confirmar ou digite o que deseja alterar (ex: *Mudar data para amanhã*)."
+            f"👉 Digite **Ok** para confirmar ou informe o que deseja alterar (ex: *Mudar data para amanhã*)."
         )
     except Exception:
         return None
