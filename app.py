@@ -29,7 +29,6 @@ def verificar_senha(senha_pura: str, hash_armazenado: str) -> bool:
     if not hash_armazenado:
         return False
     
-    # Formato PBKDF2 moderno
     if hash_armazenado.startswith("pbkdf2_sha256$"):
         try:
             _, iteracoes, salt, hash_esperado = hash_armazenado.split("$", 3)
@@ -43,7 +42,6 @@ def verificar_senha(senha_pura: str, hash_armazenado: str) -> bool:
         except Exception:
             return False
 
-    # Formato SHA-256 legado com salt
     if "$" in hash_armazenado:
         try:
             salt, hash_esperado = hash_armazenado.split("$", 1)
@@ -52,7 +50,6 @@ def verificar_senha(senha_pura: str, hash_armazenado: str) -> bool:
         except Exception:
             return False
 
-    # Senha antiga em texto plano (fallback seguro)
     return secrets.compare_digest(senha_pura, hash_armazenado)
 
 # --- INTEGRAÇÃO LLAMA 3 VIA GROQ + LANGCHAIN + BUSCA WEB ---
@@ -126,7 +123,7 @@ def pesquisar_solucao_web(termo_busca: str) -> str:
     except Exception:
         return ""
 
-# --- 1. BUSCA REAL NO BANCO COM DATAS E DETALHES ---
+# --- BUSCA REAL NO BANCO COM DATAS E DETALHES ---
 def buscar_historico_relevante(sintoma_motorista, emp_id):
     """Busca as ordens de serviço da empresa com data, prefixo, OS e descrição."""
     engine = get_engine()
@@ -159,7 +156,7 @@ def triagem_mr_halley(sintoma, emp_id, prefixo=None, incluir_saudacao=False):
     if not llm:
         return f"Recomenda-se verificação técnica preventiva para o sistema de {sintoma}."
 
-    historico_formatado = "\n".join([f"- {h}" for h in historicos]) if historicos else "Nenhum registro anterior cadastrado no banco."
+    historico_formatado = "\n".join(historicos) if historicos else "Nenhum registro anterior cadastrado no banco."
     resultado_web = pesquisar_solucao_web(sintoma)
 
     template = """
@@ -204,9 +201,9 @@ REGRAS DE RESPOSTA:
             return f"Baseado no histórico local da frota, recomenda-se inspeção técnica do sistema de {sintoma}."
         return f"Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se inspeção técnica do sistema de {sintoma}."
 
-# --- 2. PROCESSAMENTO DE OS COM MEMÓRIA DO CHAT ---
+# --- PROCESSAMENTO DETERMINÍSTICO DE ABERTURA DE OS VIA CHAT ---
 def processar_comando_os(texto_usuario, emp_id):
-    """Gerencia a coleta, edição, resumo e confirmação da OS utilizando todo o histórico da conversa."""
+    """Gerencia a coleta, edição, resumo e confirmação da OS utilizando data, área, turno e horários."""
     if "rascunho_os" not in st.session_state:
         st.session_state.rascunho_os = None
     if "aguardando_confirmacao_os" not in st.session_state:
@@ -216,13 +213,11 @@ def processar_comando_os(texto_usuario, emp_id):
     rascunho = st.session_state.rascunho_os or {}
     texto_baixo = texto_usuario.lower().strip()
 
-    # Cancelamento
     if texto_baixo in ["cancelar", "cancela", "esquece", "não quero mais", "sair"]:
         st.session_state.rascunho_os = None
         st.session_state.aguardando_confirmacao_os = False
         return "❌ Agendamento de Ordem de Serviço cancelado."
 
-    # Confirmação do resumo
     palavras_confirmacao = ["ok", "sim", "tudo certo", "pode agendar", "confirmo", "confirmar", "fechar", "gerar", "certo", "ok."]
     eh_confirmacao = (
         st.session_state.aguardando_confirmacao_os 
@@ -239,19 +234,25 @@ def processar_comando_os(texto_usuario, emp_id):
             exec_final = rascunho.get("executor", "Não definido")
             data_final = rascunho.get("data", hoje_str)
             area_final = rascunho.get("area", "Mecânica")
+            turno_final = rascunho.get("turno", "Não definido")
+            inicio_final = rascunho.get("inicio", "00:00")
+            fim_final = rascunho.get("fim", "00:00")
 
             with engine.connect() as conn:
                 conn.execute(
                     text("""
                         INSERT INTO tarefas (data, executor, prefixo, inicio_disp, fim_disp, descricao, area, turno, origem, empresa_id, numero_os)
-                        VALUES (:dt, :ex, :pr, '00:00', '00:00', :ds, :ar, 'Não definido', 'Chat Mr. Halley', :eid, :nos)
+                        VALUES (:dt, :ex, :pr, :ti, :tf, :ds, :ar, :tu, 'Chat Mr. Halley', :eid, :nos)
                     """),
                     {
                         "dt": str(data_final),
                         "ex": str(exec_final),
                         "pr": str(pref_final),
+                        "ti": str(inicio_final),
+                        "tf": str(fim_final),
                         "ds": str(desc_final),
                         "ar": str(area_final),
+                        "tu": str(turno_final),
                         "eid": str(emp_id),
                         "nos": nova_os
                     }
@@ -267,6 +268,8 @@ def processar_comando_os(texto_usuario, emp_id):
                 f"- **Serviço:** {desc_final}\n"
                 f"- **Área:** {area_final}\n"
                 f"- **Data:** {data_final}\n"
+                f"- **Turno:** {turno_final}\n"
+                f"- **Horário:** {inicio_final} às {fim_final}\n"
                 f"- **Executor:** {exec_final}\n\n"
                 f"*A OS já foi enviada diretamente para a Agenda Principal.*"
             )
@@ -277,14 +280,12 @@ def processar_comando_os(texto_usuario, emp_id):
     if not llm:
         return None
 
-    # Contexto da tela de chamados (se houver)
     veiculo_contexto = "Não informado"
     relato_contexto = ""
     if "analises_halley" in st.session_state and st.session_state.analises_halley:
         veiculo_contexto = str(st.session_state.analises_halley[-1].get("veiculo", "Não informado"))
         relato_contexto = str(st.session_state.analises_halley[-1].get("relato", ""))
 
-    # Contexto das últimas mensagens do chat
     ultimas_msgs = ""
     if "mensagens_chat_halley" in st.session_state and st.session_state.mensagens_chat_halley:
         mensagens_recentes = st.session_state.mensagens_chat_halley[-6:]
@@ -304,16 +305,19 @@ Relato da Análise Recente: "{relato_contexto}"
 Data de Hoje: {hoje}
 
 CAMPOS DA OS:
-- prefixo: Número/placa do veículo. Se o usuário falar "este veículo", "mesmo carro" ou fizer referência ao contexto, capture o veículo citado nas mensagens anteriores ou no veículo em análise recente.
-- descricao: Descrição do problema/serviço. Se o usuário disser "mesmo problema", capture o sintoma/problema debatido nas mensagens anteriores.
-- executor: Mecânico ou responsável.
-- data: Formato AAAA-MM-DD (converta termos como "hoje", "amanhã", "dia 17/08").
-- area: Mecânica, Elétrica, Borracharia, Chapeamento ou Limpeza (se o problema for 'ar condicionado', atribua 'Elétrica' ou 'Mecânica').
+- prefixo: Número/placa do veículo (capture do contexto se for 'mesmo carro')
+- descricao: Descrição do problema/serviço (capture do contexto se for 'mesmo problema')
+- executor: Mecânico ou responsável
+- data: Data no formato AAAA-MM-DD (converta termos como "hoje", "amanhã", "dia 20/08")
+- area: Mecânica, Elétrica, Borracharia, Chapeamento ou Limpeza (se não informada, deduza pelo tipo de serviço)
+- turno: Não definido, Dia ou Noite (opcional)
+- inicio: Horário inicial no formato HH:MM (ex: 08:00, opcional)
+- fim: Horário final no formato HH:MM (ex: 10:00, opcional)
 
-REGRAS:
-1. Se a mensagem solicitar abrir/agendar OS ou trouxer parâmetros operacionais:
-   - Extraia as entidades utilizando a mensagem atual e o histórico recente da conversa.
-   - Mescle com o rascunho anterior sem perder informações.
+REGRAS DE EXTRAÇÃO:
+1. Se a mensagem solicitar abertura de OS ou trouxer parâmetros operacionais:
+   - Extraia os campos da mensagem e do histórico recente.
+   - Mescle com o rascunho anterior sem perder dados já validados.
 
 Responda EXCLUSIVAMENTE em formato JSON puro:
 
@@ -321,7 +325,7 @@ Se NÃO for assunto de OS e NÃO houver fluxo em andamento:
 {{"em_fluxo_os": false}}
 
 Se for fluxo de OS:
-{{"em_fluxo_os": true, "prefixo": "...", "descricao": "...", "executor": "...", "data": "...", "area": "..."}}
+{{"em_fluxo_os": true, "prefixo": "...", "descricao": "...", "executor": "...", "data": "...", "area": "...", "turno": "...", "inicio": "...", "fim": "..."}}
 """
 
     prompt = ChatPromptTemplate.from_template(template_fluxo)
@@ -345,7 +349,7 @@ Se for fluxo de OS:
             return None
 
         novo_rascunho = rascunho.copy()
-        for k in ["prefixo", "descricao", "executor", "data", "area"]:
+        for k in ["prefixo", "descricao", "executor", "data", "area", "turno", "inicio", "fim"]:
             v = dados.get(k)
             if v and v not in ["...", "None", "null", "Não informado"]:
                 novo_rascunho[k] = v
@@ -356,10 +360,16 @@ Se for fluxo de OS:
             novo_rascunho["descricao"] = relato_contexto
         if not novo_rascunho.get("area"):
             novo_rascunho["area"] = "Mecânica"
+        if not novo_rascunho.get("turno"):
+            novo_rascunho["turno"] = "Não definido"
+        if not novo_rascunho.get("inicio"):
+            novo_rascunho["inicio"] = "00:00"
+        if not novo_rascunho.get("fim"):
+            novo_rascunho["fim"] = "00:00"
 
         st.session_state.rascunho_os = novo_rascunho
 
-        # Identificação de pendências
+        # Verificação rigorosa de pendências essenciais
         campos_faltantes = []
         if not novo_rascunho.get("prefixo"):
             campos_faltantes.append("prefixo do veículo")
@@ -368,11 +378,11 @@ Se for fluxo de OS:
         if not novo_rascunho.get("executor"):
             campos_faltantes.append("mecânico responsável")
         if not novo_rascunho.get("data"):
-            campos_faltantes.append("data de realização")
+            campos_faltantes.append("data de agendamento")
 
         if campos_faltantes:
             st.session_state.aguardando_confirmacao_os = False
-            return f"Para abrir a OS, informe: **{', '.join(campos_faltantes)}**."
+            return f"Para abrir a OS, informe: **{', '.join(campos_faltantes)}** (Horário e Turno são opcionais)."
 
         st.session_state.aguardando_confirmacao_os = True
         return (
@@ -381,13 +391,15 @@ Se for fluxo de OS:
             f"- **Serviço:** {novo_rascunho.get('descricao')}\n"
             f"- **Área:** {novo_rascunho.get('area')}\n"
             f"- **Data:** {novo_rascunho.get('data')}\n"
+            f"- **Turno:** {novo_rascunho.get('turno')}\n"
+            f"- **Horário:** {novo_rascunho.get('inicio')} às {novo_rascunho.get('fim')}\n"
             f"- **Executor:** {novo_rascunho.get('executor')}\n\n"
-            f"👉 Digite **Ok** para confirmar ou informe o que deseja alterar (ex: *Mudar data para amanhã*)."
+            f"👉 Digite **Ok** para confirmar ou informe ajustes (ex: *Mudar área para Elétrica*, *Horário das 08:00 às 10:00* ou *Turno Dia*)."
         )
     except Exception:
         return None
 
-# --- 3. RESPOSTAS GERAIS E HISTÓRICOS ---
+# --- CHATBOX DO MR. HALLEY ---
 def responder_chat_mr_halley(mensagem_usuario, emp_id):
     texto_baixo = mensagem_usuario.lower().strip()
 
@@ -399,12 +411,10 @@ def responder_chat_mr_halley(mensagem_usuario, emp_id):
     if texto_baixo in saudacoes:
         return "Olá! Como posso ajudar com as manutenções da frota hoje?"
 
-    # 1. Tenta processar como fluxo de OS (com leitura do contexto)
     resposta_os = processar_comando_os(mensagem_usuario, emp_id)
     if resposta_os:
         return resposta_os
 
-    # 2. Consultas gerais de telemetria e histórico
     llm = obter_llm()
     if not llm:
         return "Desculpe, a conexão com a IA (GROQ_API_KEY) não está configurada nos Secrets do Streamlit."
@@ -453,12 +463,12 @@ DIRETRIZES DE RESPOSTA:
     except Exception as e:
         return f"Erro ao processar consulta: {str(e)}"
 
-# --- CHAT FLUTUANTE EM CSS/HTML + PYTHON ---
+# --- CHAT FLUTUANTE EM CSS/HTML + PYTHON COM ESTADO PERSISTENTE ---
 def renderizar_chat_flutuante(emp_id):
     URL_AVATAR_HALLEY = "https://i.postimg.cc/5tBtrL6C/Whats-App-Image-2026-07-23-at-22-35-53.png"
     
-    if "abrir_chat_halley" not in st.session_state:
-        st.session_state.abrir_chat_halley = False
+    if "chat_aberto_usuario" not in st.session_state:
+        st.session_state.chat_aberto_usuario = False
 
     if "mensagens_chat_halley" not in st.session_state:
         st.session_state.mensagens_chat_halley = [
@@ -502,9 +512,7 @@ def renderizar_chat_flutuante(emp_id):
         </style>
     """, unsafe_allow_html=True)
 
-    deve_expandir = st.session_state.abrir_chat_halley
-
-    with st.expander(label_status, expanded=deve_expandir):
+    with st.expander(label_status, expanded=st.session_state.chat_aberto_usuario):
         chat_box = st.container(height=390)
         with chat_box:
             for msg in st.session_state.mensagens_chat_halley:
@@ -513,6 +521,7 @@ def renderizar_chat_flutuante(emp_id):
                     st.markdown(msg["content"])
 
         if prompt := st.chat_input("Dúvida técnica ou agendar OS...", key="chat_flutuante_input"):
+            st.session_state.chat_aberto_usuario = True
             st.session_state.mensagens_chat_halley.append({"role": "user", "content": prompt})
             with chat_box:
                 with st.chat_message("user", avatar="👤"):
@@ -961,7 +970,6 @@ if not st.session_state["logado"]:
                             ).fetchone()
                         
                         if empresa and verificar_senha(pw_input, str(empresa[2])):
-                            # Migra hash para PBKDF2 se ainda não for
                             if not str(empresa[2]).startswith("pbkdf2_sha256$"):
                                 try:
                                     with engine.connect() as conn:
@@ -989,7 +997,6 @@ if not st.session_state["logado"]:
                                 ).fetchone()
                                 
                             if usuario and verificar_senha(pw_input, str(usuario[3])):
-                                # Migra hash para PBKDF2 se ainda não for
                                 if not str(usuario[3]).startswith("pbkdf2_sha256$"):
                                     try:
                                         with engine.connect() as conn:
@@ -1664,7 +1671,7 @@ else:
                                         "content": f"📌 **Análise Veículo {dados_linha['prefixo']}** ({dados_linha['descricao']}):\n\n{diag}"
                                     })
                                     
-                                    st.session_state.abrir_chat_halley = True
+                                    st.session_state.chat_aberto_usuario = True
                                     st.rerun()
 
                         elif campos.get("Aprovar") is False:
@@ -1814,22 +1821,49 @@ else:
             st.stop()
             
         st.subheader("👥 Gestão de Equipe e Acessos")
-        st.info("💡 **Dica profissional:** Para cadastrar novos membros ou alterar permissões, preencha o formulário. Senhas são criptografadas automaticamente.")
+        st.info("💡 **Segurança:** As senhas são criptografadas e não podem ser lidas por ninguém. Para alterar a senha de um integrante, use o formulário de redefinição abaixo.")
         
-        with st.expander("➕ Novo Integrante", expanded=True):
-            with st.form("f_u", clear_on_submit=True):
-                u, s, p = st.text_input("Login"), st.text_input("Senha", type="password"), st.selectbox("Cargo", ["motorista", "admin"])
-                if st.form_submit_button("Criar Acesso"):
-                    if u and s:
-                        senha_hash = gerar_hash_senha(s)
-                        with engine.connect() as conn:
-                            conn.execute(text("INSERT INTO usuarios (login, senha, perfil, empresa_id) VALUES (:u, :s, :p, :eid)"), 
-                                         {"u": u.lower().strip(), "s": senha_hash, "p": p, "eid": str(emp_id)})
-                            conn.commit()
-                        st.success("Acesso criado com credencial criptografada PBKDF2!")
-                        st.rerun()
-                    else:
-                        st.warning("Preencha todos os campos.")
+        col_cad, col_reset = st.columns(2)
+
+        with col_cad:
+            with st.expander("➕ Novo Integrante", expanded=True):
+                with st.form("f_u", clear_on_submit=True):
+                    u = st.text_input("Login")
+                    s = st.text_input("Senha", type="password")
+                    p = st.selectbox("Cargo", ["motorista", "admin"])
+                    if st.form_submit_button("Criar Acesso"):
+                        if u and s:
+                            senha_hash = gerar_hash_senha(s)
+                            with engine.connect() as conn:
+                                conn.execute(text("INSERT INTO usuarios (login, senha, perfil, empresa_id) VALUES (:u, :s, :p, :eid)"), 
+                                             {"u": u.lower().strip(), "s": senha_hash, "p": p, "eid": str(emp_id)})
+                                conn.commit()
+                            st.success("Acesso criado com sucesso!")
+                            st.rerun()
+                        else:
+                            st.warning("Preencha todos os campos.")
+
+        with col_reset:
+            with st.expander("🔑 Redefinir Senha de Integrante", expanded=True):
+                df_users_list = pd.read_sql(text("SELECT login FROM usuarios WHERE empresa_id = :eid ORDER BY login ASC"), engine, params={"eid": str(emp_id)})
+                lista_logins = df_users_list['login'].tolist() if not df_users_list.empty else []
+                
+                with st.form("form_reset_senha", clear_on_submit=True):
+                    user_alvo = st.selectbox("Selecionar Usuário", lista_logins) if lista_logins else None
+                    nova_senha_input = st.text_input("Nova Senha", type="password")
+                    
+                    if st.form_submit_button("Atualizar Senha"):
+                        if user_alvo and nova_senha_input:
+                            novo_hash = gerar_hash_senha(nova_senha_input)
+                            with engine.connect() as conn:
+                                conn.execute(
+                                    text("UPDATE usuarios SET senha = :p WHERE login = :u AND empresa_id = :eid"),
+                                    {"p": novo_hash, "u": user_alvo, "eid": str(emp_id)}
+                                )
+                                conn.commit()
+                            st.success(f"Senha de **{user_alvo}** alterada com sucesso!")
+                        else:
+                            st.warning("Selecione o usuário e digite a nova senha.")
                     
         st.divider()
         st.subheader("Integrantes Cadastrados")
@@ -1875,6 +1909,7 @@ else:
                     conn.commit()
                 st.rerun()
 
-# --- ATIVAÇÃO GLOBAL DO CHAT FLUTUANTE ---
+# --- ATIVAÇÃO GLOBAL DO CHAT FLUTUANTE (EXCETO NA ABA DO CHAT PRINCIPAL) ---
 if st.session_state.get("logado") and "empresa" in st.session_state:
-    renderizar_chat_flutuante(st.session_state["empresa"])
+    if st.session_state.get("opcao_selecionada") != "🤖 Chat Mr. Halley":
+        renderizar_chat_flutuante(st.session_state["empresa"])
