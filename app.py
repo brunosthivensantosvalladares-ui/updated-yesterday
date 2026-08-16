@@ -357,9 +357,9 @@ REGRAS DE RESPOSTA:
     except Exception as e:
         return f"Erro ao processar consulta: {str(e)}"
         
-# --- CHAT FLUTUANTE EM CSS/HTML + PYTHON (EXPANDIDO & SEM CORTES) ---
+# --- CHAT FLUTUANTE EM CSS/HTML + PYTHON (EXPANDIDO, FIXO E COM FOTO) ---
 def renderizar_chat_flutuante(emp_id):
-    AVATAR_HALLEY = "🤖"
+    URL_AVATAR_HALLEY = "https://i.postimg.cc/5tBtrL6C/Whats-App-Image-2026-07-23-at-22-35-53.png"
     
     if "abrir_chat_halley" not in st.session_state:
         st.session_state.abrir_chat_halley = False
@@ -372,22 +372,39 @@ def renderizar_chat_flutuante(emp_id):
     qtd_analises = len(st.session_state.get("analises_halley", []))
     label_status = f"💬 Mr. Halley ({qtd_analises})" if qtd_analises > 0 else "💬 Mr. Halley (IA)"
 
-    # CSS: Janela aumentada (460px de largura e até 88vh de altura)
+    # CSS de alta precisão: fixa o container e fixa o campo de entrada no rodapé
     st.markdown("""
         <style>
         div[data-testid="stExpander"] {
             position: fixed !important;
-            bottom: 20px !important;
+            bottom: 15px !important;
             right: 20px !important;
-            width: 460px !important;
-            max-height: 88vh !important;
+            width: 480px !important;
+            height: 75vh !important;
+            max-height: 75vh !important;
             z-index: 999999 !important;
             background-color: #ffffff !important;
             border: 2px solid #C5A059 !important;
-            border-radius: 14px !important;
+            border-radius: 12px !important;
             box-shadow: 0px 6px 24px rgba(0, 0, 0, 0.25) !important;
-            overflow-y: auto !important;
-            scroll-behavior: smooth !important;
+            display: flex !important;
+            flex-direction: column !important;
+            overflow: hidden !important;
+        }
+
+        /* Área interna do expander sem margens desnecessárias no topo */
+        div[data-testid="stExpander"] > div:nth-child(2) {
+            display: flex !important;
+            flex-direction: column !important;
+            height: calc(75vh - 50px) !important;
+            padding: 8px 12px !important;
+            overflow: hidden !important;
+        }
+
+        /* Garante que o input de chat fique sempre fixado no rodapé */
+        div[data-testid="stExpander"] div[data-testid="stChatInput"] {
+            margin-top: auto !important;
+            padding-top: 8px !important;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -395,14 +412,11 @@ def renderizar_chat_flutuante(emp_id):
     deve_expandir = st.session_state.abrir_chat_halley
 
     with st.expander(label_status, expanded=deve_expandir):
-        st.caption("🤖 **Mr. Halley** — Assistente Técnico & Gestão de OS")
-        st.divider()
-
-        # Altura do container de rolagem aumentada para 460px
-        chat_box = st.container(height=460)
+        # Container de rolagem direto no topo (sem divisórias empurrando para baixo)
+        chat_box = st.container(height=430)
         with chat_box:
             for msg in st.session_state.mensagens_chat_halley:
-                avatar = AVATAR_HALLEY if msg["role"] == "assistant" else "👤"
+                avatar = URL_AVATAR_HALLEY if msg["role"] == "assistant" else "👤"
                 with st.chat_message(msg["role"], avatar=avatar):
                     st.markdown(msg["content"])
 
@@ -411,7 +425,7 @@ def renderizar_chat_flutuante(emp_id):
             with chat_box:
                 with st.chat_message("user", avatar="👤"):
                     st.markdown(prompt)
-                with st.chat_message("assistant", avatar=AVATAR_HALLEY):
+                with st.chat_message("assistant", avatar=URL_AVATAR_HALLEY):
                     with st.spinner("Processando..."):
                         resp = responder_chat_mr_halley(prompt, emp_id)
                         st.markdown(resp)
