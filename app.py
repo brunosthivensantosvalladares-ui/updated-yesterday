@@ -123,9 +123,9 @@ def pesquisar_solucao_web(termo_busca: str) -> str:
     except Exception:
         return ""
 
-# --- BUSCA REAL NO BANCO COM DATAS E DETALHES ---
+# --- 1. BUSCA REAL NO BANCO SEM DUPLICIDADES ---
 def buscar_historico_relevante(sintoma_motorista, emp_id):
-    """Busca as ordens de serviço da empresa com data, prefixo, OS e descrição."""
+    """Busca as ordens de serviço da empresa sem duplicatas e com dados consolidados."""
     engine = get_engine()
     query = text("""
         SELECT data, prefixo, descricao, COALESCE(executor, 'Não informado') as executor, numero_os 
@@ -138,12 +138,17 @@ def buscar_historico_relevante(sintoma_motorista, emp_id):
             resultados = conn.execute(query, {"eid": str(emp_id)}).fetchall()
         
         historico_formatado = []
+        vistos = set()
         for r in resultados:
             dt_formatada = str(r[0])
             os_num = f"OS {r[4]}" if r[4] else "Sem Nº"
-            historico_formatado.append(
-                f"- Data: {dt_formatada} | Veículo {r[1]} | {os_num} | Serviço: {str(r[2]).strip()} | Executor: {r[3]}"
-            )
+            linha = f"- Data: {dt_formatada} | Veículo {r[1]} | {os_num} | Serviço: {str(r[2]).strip()} | Executor: {r[3]}"
+            chave_duplicata = (dt_formatada, str(r[1]), str(r[2]).strip().lower())
+            
+            if chave_duplicata not in vistos:
+                vistos.add(chave_duplicata)
+                historico_formatado.append(linha)
+
         return historico_formatado
     except Exception:
         return []
@@ -201,9 +206,9 @@ REGRAS DE RESPOSTA:
             return f"Baseado no histórico local da frota, recomenda-se inspeção técnica do sistema de {sintoma}."
         return f"Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se inspeção técnica do sistema de {sintoma}."
 
-# --- PROCESSAMENTO DETERMINÍSTICO DE ABERTURA DE OS VIA CHAT ---
+# --- 2. PROCESSAMENTO DETERMINÍSTICO DE ABERTURA DE OS VIA CHAT ---
 def processar_comando_os(texto_usuario, emp_id):
-    """Gerencia a coleta, edição, resumo e confirmação da OS utilizando data, área, turno e horários."""
+    """Gerencia a coleta progressiva solicitando Data, Área e Executor sem repetições."""
     if "rascunho_os" not in st.session_state:
         st.session_state.rascunho_os = None
     if "aguardando_confirmacao_os" not in st.session_state:
@@ -227,7 +232,7 @@ def processar_comando_os(texto_usuario, emp_id):
     if eh_confirmacao:
         try:
             engine = get_engine()
-            nova_os = obter_proxima_os(engine, emp_id)
+            nova_os = obter_proxima_os(engine, emp_id)[cite: 3]
 
             pref_final = rascunho.get("prefixo", "S/P")
             desc_final = rascunho.get("descricao", "Serviço via chat")
@@ -256,8 +261,8 @@ def processar_comando_os(texto_usuario, emp_id):
                         "eid": str(emp_id),
                         "nos": nova_os
                     }
-                )
-                conn.commit()
+                )[cite: 3]
+                conn.commit()[cite: 3]
 
             st.session_state.rascunho_os = None
             st.session_state.aguardando_confirmacao_os = False
@@ -305,19 +310,18 @@ Relato da Análise Recente: "{relato_contexto}"
 Data de Hoje: {hoje}
 
 CAMPOS DA OS:
-- prefixo: Número/placa do veículo (capture do contexto se for 'mesmo carro')
-- descricao: Descrição do problema/serviço (capture do contexto se for 'mesmo problema')
+- prefixo: Número/placa do veículo (se o usuário disser "este mesmo veículo", capture do contexto recente)
+- descricao: Descrição do problema/serviço (se o usuário disser "mesmo problema", capture do contexto recente)
 - executor: Mecânico ou responsável
 - data: Data no formato AAAA-MM-DD (converta termos como "hoje", "amanhã", "dia 20/08")
-- area: Mecânica, Elétrica, Borracharia, Chapeamento ou Limpeza (se não informada, deduza pelo tipo de serviço)
+- area: Mecânica, Elétrica, Borracharia, Chapeamento ou Limpeza
 - turno: Não definido, Dia ou Noite (opcional)
 - inicio: Horário inicial no formato HH:MM (ex: 08:00, opcional)
 - fim: Horário final no formato HH:MM (ex: 10:00, opcional)
 
-REGRAS DE EXTRAÇÃO:
-1. Se a mensagem solicitar abertura de OS ou trouxer parâmetros operacionais:
-   - Extraia os campos da mensagem e do histórico recente.
-   - Mescle com o rascunho anterior sem perder dados já validados.
+REGRAS:
+1. Capture os dados da mensagem e do histórico recente.
+2. Não invente a data de agendamento nem a área se não tiverem sido informadas ou deduzidas claramente.
 
 Responda EXCLUSIVAMENTE em formato JSON puro:
 
@@ -358,8 +362,7 @@ Se for fluxo de OS:
             novo_rascunho["prefixo"] = veiculo_contexto
         if not novo_rascunho.get("descricao") and relato_contexto:
             novo_rascunho["descricao"] = relato_contexto
-        if not novo_rascunho.get("area"):
-            novo_rascunho["area"] = "Mecânica"
+
         if not novo_rascunho.get("turno"):
             novo_rascunho["turno"] = "Não definido"
         if not novo_rascunho.get("inicio"):
@@ -369,20 +372,26 @@ Se for fluxo de OS:
 
         st.session_state.rascunho_os = novo_rascunho
 
-        # Verificação rigorosa de pendências essenciais
+        # Validação ativa de campos obrigatórios
         campos_faltantes = []
         if not novo_rascunho.get("prefixo"):
-            campos_faltantes.append("prefixo do veículo")
+            campos_faltantes.append("Prefixo do Veículo")
         if not novo_rascunho.get("descricao"):
-            campos_faltantes.append("descrição do serviço")
+            campos_faltantes.append("Descrição do Serviço")
         if not novo_rascunho.get("executor"):
-            campos_faltantes.append("mecânico responsável")
+            campos_faltantes.append("Mecânico Responsável")
         if not novo_rascunho.get("data"):
-            campos_faltantes.append("data de agendamento")
+            campos_faltantes.append("Data de Agendamento")
+        if not novo_rascunho.get("area"):
+            campos_faltantes.append("Área (Mecânica, Elétrica, Borracharia, Chapeamento ou Limpeza)")
 
         if campos_faltantes:
             st.session_state.aguardando_confirmacao_os = False
-            return f"Para abrir a OS, informe: **{', '.join(campos_faltantes)}** (Horário e Turno são opcionais)."
+            return (
+                f"Para prosseguir com a abertura da OS, por favor informe:\n\n"
+                f"- **{', '.join(campos_faltantes)}**\n\n"
+                f"*(Horários e Turno são opcionais)*"
+            )
 
         st.session_state.aguardando_confirmacao_os = True
         return (
@@ -394,12 +403,12 @@ Se for fluxo de OS:
             f"- **Turno:** {novo_rascunho.get('turno')}\n"
             f"- **Horário:** {novo_rascunho.get('inicio')} às {novo_rascunho.get('fim')}\n"
             f"- **Executor:** {novo_rascunho.get('executor')}\n\n"
-            f"👉 Digite **Ok** para confirmar ou informe ajustes (ex: *Mudar área para Elétrica*, *Horário das 08:00 às 10:00* ou *Turno Dia*)."
+            f"👉 Digite **Ok** para confirmar ou informe ajustes (ex: *Mudar data para amanhã*, *Área Elétrica* ou *Horário 08:00 às 10:00*)."
         )
     except Exception:
         return None
 
-# --- CHATBOX DO MR. HALLEY ---
+# --- 3. RESPOSTAS GERAIS E HISTÓRICOS (SEM REDUNDÂNCIA) ---
 def responder_chat_mr_halley(mensagem_usuario, emp_id):
     texto_baixo = mensagem_usuario.lower().strip()
 
@@ -444,10 +453,9 @@ Você é o Mr. Halley, assistente técnico de manutenção e telemetria da plata
 Pergunta do Usuário: "{mensagem_usuario}"
 
 DIRETRIZES DE RESPOSTA:
-1. Sempre que o usuário perguntar sobre quando ocorreu um problema, datas ou veículos anteriores:
-   - Consulte com atenção as linhas de "REGISTROS E HISTÓRICOS DE MANUTENÇÃO NO BANCO", onde constam as datas e veículos.
-   - Responda informando a data exata em que o serviço foi registrado no banco e o veículo correspondente.
-2. Seja direto, técnico e cordial em 2 a 3 frases.
+1. Responda de forma direta e concisa (2 a 3 frases no máximo).
+2. PROIBIÇÃO DE REPETIÇÃO: Nunca repita a mesma informação, veículo ou data duas vezes na mesma resposta sob nenhuma circunstância. Apresente cada evento uma única vez.
+3. Se o usuário perguntar datas de falhas anteriores, cite apenas as datas e veículos correspondentes encontrados no histórico.
 """
 
     prompt = ChatPromptTemplate.from_template(template)
