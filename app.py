@@ -81,7 +81,7 @@ def pesquisar_solucao_web(termo_busca: str) -> str:
     except Exception:
         return ""
 
-# --- 1. BUSCA REAL NO BANCO (SEM FILTRO MANUAL POR PALAVRA) ---
+# --- BUSCA REAL NO BANCO ---
 def buscar_historico_relevante(sintoma_motorista, emp_id):
     """Busca as ordens de serviço concluídas da empresa para a IA avaliar semanticamente."""
     engine = get_engine()
@@ -98,7 +98,7 @@ def buscar_historico_relevante(sintoma_motorista, emp_id):
     except Exception:
         return []
 
-# --- 2. TRIAGEM INTELIGENTE DO MR. HALLEY ---
+# --- TRIAGEM DO MR. HALLEY ---
 def triagem_mr_halley(sintoma, emp_id, prefixo=None, incluir_saudacao=False):
     llm = obter_llm()
     historicos = buscar_historico_relevante(sintoma, emp_id)
@@ -151,115 +151,39 @@ REGRAS DE RESPOSTA:
             return f"Baseado no histórico local da frota, recomenda-se inspeção técnica do sistema de {sintoma}."
         return f"Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se inspeção técnica do sistema de {sintoma}."
 
-# --- PROCESSAMENTO DETERMINÍSTICO DE ABERTURA DE OS VIA CHAT ---
+# --- PROCESSAMENTO ROBUSTO DE OS COM RESUMO E CONFIRMAÇÃO ---
 def processar_comando_os(texto_usuario, emp_id):
-    """Gerencia a coleta progressiva dos campos de OS e grava imediatamente ao completar."""
+    """Gerencia a coleta, edição, resumo e confirmação da OS de forma determinística."""
     llm = obter_llm()
     if not llm:
         return None
 
     if "rascunho_os" not in st.session_state:
         st.session_state.rascunho_os = None
+    if "aguardando_confirmacao_os" not in st.session_state:
+        st.session_state.aguardando_confirmacao_os = False
 
     hoje_str = str(datetime.now().date())
-    rascunho_atual = st.session_state.rascunho_os or {}
-    em_andamento = bool(st.session_state.rascunho_os)
+    rascunho = st.session_state.rascunho_os or {}
+    texto_baixo = texto_usuario.lower().strip()
 
-    veiculo_contexto = "Não informado"
-    if "analises_halley" in st.session_state and st.session_state.analises_halley:
-        veiculo_contexto = str(st.session_state.analises_halley[-1].get("veiculo", "Não informado"))
-        relato_contexto = str(st.session_state.analises_halley[-1].get("relato", ""))
-    else:
-        relato_contexto = ""
+    # 1. CANCELAMENTO
+    if texto_baixo in ["cancelar", "cancela", "esquece", "não quero mais", "sair"]:
+        st.session_state.rascunho_os = None
+        st.session_state.aguardando_confirmacao_os = False
+        return "❌ Agendamento de Ordem de Serviço cancelado."
 
-    # Se não houver rascunho prévio mas o contexto tiver veículo e relato, inicializa valores base
-    if not rascunho_atual and veiculo_contexto != "Não informado":
-        rascunho_atual["prefixo"] = veiculo_contexto
-        if relato_contexto:
-            rascunho_atual["descricao"] = relato_contexto
-
-    template_fluxo = """
-Você é o Mr. Halley, assistente da plataforma Up 2 Today, responsável por agendar Ordens de Serviço (OS).
-
-Mensagem do Usuário: "{mensagem}"
-Rascunho de OS Atual: {rascunho_json}
-Há processo de OS em andamento? {em_andamento}
-Veículo em Análise na Tela: {veiculo_contexto}
-Data de Hoje: {hoje}
-
-CAMPOS OBRIGATÓRIOS DA OS:
-1. prefixo (Número/Placa do veículo. Se o usuário referir "esse carro/veículo", use "{veiculo_contexto}")
-2. descricao (Serviço ou defeito a ser corrigido)
-3. executor (Nome do mecânico/responsável)
-4. data (Formato AAAA-MM-DD. Converta datas como "dia 17/08", "hoje", "amanhã" para o formato AAAA-MM-DD no ano atual)
-5. area (Mecânica, Elétrica, Borracharia, Chapeamento ou Limpeza - infira pelo serviço se não dita)
-
-REGRAS DE CONDUTA:
-1. Se o usuário confirmar ("tudo certo", "sim", "pode agendar", "ok", "confirmo") ou informar dados que completem a OS:
-   - Marque OBRIGATORIAMENTE "dados_completos": true.
-   - NUNCA pergunte se confirma se todos os campos já estiverem definidos.
-2. Se faltar algum campo essencial (como faltar o executor OU a data):
-   - Marque "dados_completos": false.
-   - Na "pergunta_pendencia", pergunte DIRETAMENTE apenas o que ainda falta (ex: "Qual a data programada para a OS?").
-3. Se o usuário mandar cancelar ("cancela", "esquece", "não quero mais"):
-   - Retorne {{"em_fluxo_os": false, "cancelar": true}}.
-
-Responda EXCLUSIVAMENTE em formato JSON puro, sem marcações markdown:
-
-CASO 1 - Não tem relação com abertura de OS e não há processo ativo:
-{{"em_fluxo_os": false}}
-
-CASO 2 - OS em andamento, mas AINDA FALTAM dados:
-{{"em_fluxo_os": true, "dados_completos": false, "rascunho": {{"prefixo": "...", "descricao": "...", "executor": "...", "data": "...", "area": "..."}}, "pergunta_pendencia": "Pergunta objetiva sobre o dado que falta"}}
-
-CASO 3 - Todos os dados estão preenchidos ou o usuário confirmou:
-{{"em_fluxo_os": true, "dados_completos": true, "prefixo": "...", "descricao": "...", "executor": "...", "area": "...", "data": "AAAA-MM-DD"}}
-"""
-
-    prompt = ChatPromptTemplate.from_template(template_fluxo)
-    chain = prompt | llm
-
-    try:
-        resultado = chain.invoke({
-            "mensagem": texto_usuario,
-            "rascunho_json": json.dumps(rascunho_atual, ensure_ascii=False),
-            "em_andamento": em_andamento,
-            "veiculo_contexto": veiculo_contexto,
-            "hoje": hoje_str
-        }).content.strip()
-
-        resultado_limpo = resultado.replace("```json", "").replace("```", "").strip()
-        dados = json.loads(resultado_limpo)
-
-        if dados.get("cancelar"):
-            st.session_state.rascunho_os = None
-            return "❌ Agendamento de OS cancelado."
-
-        if not dados.get("em_fluxo_os"):
-            return None
-
-        # Se ainda faltam dados
-        if dados.get("dados_completos") is False:
-            novo_rascunho = rascunho_atual.copy()
-            if isinstance(dados.get("rascunho"), dict):
-                for k, v in dados["rascunho"].items():
-                    if v and v not in ["...", "None", "null", "Não informado"]:
-                        novo_rascunho[k] = v
-            st.session_state.rascunho_os = novo_rascunho
-            return dados.get("pergunta_pendencia", "Informe o mecânico e a data para o agendamento.")
-
-        # Conclusão definitiva da OS
-        pref_final = dados.get("prefixo") or rascunho_atual.get("prefixo") or veiculo_contexto
-        if pref_final in ["Não informado", "S/P", "..."]:
-            pref_final = "S/P"
-
-        data_final = dados.get("data") or rascunho_atual.get("data") or hoje_str
-        exec_final = dados.get("executor") or rascunho_atual.get("executor") or "Não definido"
-        desc_final = dados.get("descricao") or rascunho_atual.get("descricao") or "Serviço via chat"
-        area_final = dados.get("area") or rascunho_atual.get("area") or "Mecânica"
-
-        engine = get_engine()[cite: 2]
+    # 2. SE ESTIVER AGUARDANDO CONFIRMAÇÃO E O USUÁRIO DIGITAR OK
+    palavras_confirmacao = ["ok", "sim", "tudo certo", "pode agendar", "confirmo", "confirmar", "fechar", "gerar", "certo", "ok."]
+    if st.session_state.aguardando_confirmacao_os and (texto_baixo in palavras_confirmacao or any(texto_baixo.startswith(p) for p in ["ok", "sim", "confirmo"])):
+        engine = get_engine()
         nova_os = obter_proxima_os(engine, emp_id)[cite: 1, 2]
+
+        pref_final = rascunho.get("prefixo", "S/P")
+        desc_final = rascunho.get("descricao", "Serviço via chat")
+        exec_final = rascunho.get("executor", "Não definido")
+        data_final = rascunho.get("data", hoje_str)
+        area_final = rascunho.get("area", "Mecânica")
 
         with engine.connect() as conn:
             conn.execute(
@@ -279,7 +203,8 @@ CASO 3 - Todos os dados estão preenchidos ou o usuário confirmou:
             )[cite: 1, 2]
             conn.commit()[cite: 1, 2]
 
-        st.session_state.rascunho_os = None  # Limpa o rascunho
+        st.session_state.rascunho_os = None
+        st.session_state.aguardando_confirmacao_os = False
 
         return (
             f"✅ **Ordem de Serviço Nº {nova_os} gerada com sucesso!**\n\n"
@@ -290,17 +215,115 @@ CASO 3 - Todos os dados estão preenchidos ou o usuário confirmou:
             f"- **Executor:** {exec_final}\n\n"
             f"*A OS já foi enviada diretamente para a Agenda Principal.*"
         )
+
+    # 3. EXTRAÇÃO E ATUALIZAÇÃO VIA IA
+    veiculo_contexto = "Não informado"
+    relato_contexto = ""
+    if "analises_halley" in st.session_state and st.session_state.analises_halley:
+        veiculo_contexto = str(st.session_state.analises_halley[-1].get("veiculo", "Não informado"))
+        relato_contexto = str(st.session_state.analises_halley[-1].get("relato", ""))
+
+    template_fluxo = """
+Você é o assistente Mr. Halley da plataforma Up 2 Today, especialista em agendamento de OS.
+
+Mensagem Atual: "{mensagem}"
+Rascunho Existente: {rascunho_json}
+Em Fluxo de OS Ativo? {em_fluxo}
+Veículo em Análise Recente: {veiculo_contexto}
+Relato da Análise Recente: "{relato_contexto}"
+Data de Hoje: {hoje}
+
+CAMPOS DA OS:
+- prefixo: Número/placa do veículo (se o usuário disser "esse carro", use "{veiculo_contexto}")
+- descricao: Descrição do serviço (se não informada, use "{relato_contexto}")
+- executor: Mecânico/responsável
+- data: Formato AAAA-MM-DD (converta termos como "hoje", "amanhã", "dia 17/08")
+- area: Mecânica, Elétrica, Borracharia, Chapeamento ou Limpeza
+
+INSTRUÇÕES:
+1. Se a mensagem contiver dados para agendar OS, intenção de abrir OS ou editar campos:
+   - Atualize os campos preenchidos e mantenha os anteriores.
+2. Identifique os campos já preenchidos.
+
+Responda EXCLUSIVAMENTE em JSON puro, sem blocos markdown:
+
+Se NÃO for assunto de OS e NÃO houver fluxo em andamento:
+{{"em_fluxo_os": false}}
+
+Se for fluxo de OS:
+{{"em_fluxo_os": true, "prefixo": "...", "descricao": "...", "executor": "...", "data": "...", "area": "..."}}
+"""
+
+    prompt = ChatPromptTemplate.from_template(template_fluxo)
+    chain = prompt | llm
+
+    try:
+        resultado = chain.invoke({
+            "mensagem": texto_usuario,
+            "rascunho_json": json.dumps(rascunho, ensure_ascii=False),
+            "em_fluxo": bool(rascunho or st.session_state.aguardando_confirmacao_os),
+            "veiculo_contexto": veiculo_contexto,
+            "relato_contexto": relato_contexto,
+            "hoje": hoje_str
+        }).content.strip()
+
+        resultado_limpo = resultado.replace("```json", "").replace("```", "").strip()
+        dados = json.loads(resultado_limpo)
+
+        if not dados.get("em_fluxo_os"):
+            return None
+
+        # Mescla dados
+        novo_rascunho = rascunho.copy()
+        for k in ["prefixo", "descricao", "executor", "data", "area"]:
+            v = dados.get(k)
+            if v and v not in ["...", "None", "null", "Não informado"]:
+                novo_rascunho[k] = v
+
+        if not novo_rascunho.get("prefixo") and veiculo_contexto != "Não informado":
+            novo_rascunho["prefixo"] = veiculo_contexto
+        if not novo_rascunho.get("descricao") and relato_contexto:
+            novo_rascunho["descricao"] = relato_contexto
+        if not novo_rascunho.get("area"):
+            novo_rascunho["area"] = "Mecânica"
+
+        st.session_state.rascunho_os = novo_rascunho
+
+        # 4. VERIFICAÇÃO DE PENDÊNCIAS
+        campos_faltantes = []
+        if not novo_rascunho.get("prefixo"):
+            campos_faltantes.append("prefixo do veículo")
+        if not novo_rascunho.get("descricao"):
+            campos_faltantes.append("descrição do serviço")
+        if not novo_rascunho.get("executor"):
+            campos_faltantes.append("mecânico responsável")
+        if not novo_rascunho.get("data"):
+            campos_faltantes.append("data de realização")
+
+        if campos_faltantes:
+            st.session_state.aguardando_confirmacao_os = False
+            return f"Para abrir a OS, informe: **{', '.join(campos_faltantes)}**."
+
+        # 5. RESUMO DE CONFIRMAÇÃO
+        st.session_state.aguardando_confirmacao_os = True
+        return (
+            f"📋 **Resumo da Ordem de Serviço:**\n\n"
+            f"- **Veículo:** {novo_rascunho.get('prefixo')}\n"
+            f"- **Serviço:** {novo_rascunho.get('descricao')}\n"
+            f"- **Área:** {novo_rascunho.get('area')}\n"
+            f"- **Data:** {novo_rascunho.get('data')}\n"
+            f"- **Executor:** {novo_rascunho.get('executor')}\n\n"
+            f"👉 Digite **Ok** para confirmar ou digite o que deseja alterar (ex: *Mudar data para amanhã*)."
+        )
     except Exception:
         return None
 
-# --- CHATBOX DO MR. HALLEY (FOCO PRECISO NA ÚLTIMA ANÁLISE E CRIAÇÃO DE OS) ---
+# --- CHATBOX DO MR. HALLEY ---
 def responder_chat_mr_halley(mensagem_usuario, emp_id):
-    # 1. Verifica se está em fluxo de abertura de OS
     resposta_os = processar_comando_os(mensagem_usuario, emp_id)
     if resposta_os:
         return resposta_os
 
-    # 2. Se não for comando de OS, segue o fluxo normal de consultas técnicas
     llm = obter_llm()
     if not llm:
         return "Desculpe, a conexão com a IA (GROQ_API_KEY) não está configurada nos Secrets do Streamlit."
@@ -384,13 +407,11 @@ def renderizar_chat_flutuante(emp_id):
             max-height: 80vh !important;
         }
 
-        /* Tipografia mais confortável e legível */
         div[data-testid="stExpander"] div[data-testid="stChatMessage"] p {
             font-size: 0.95rem !important;
             line-height: 1.45 !important;
         }
 
-        /* Foto do Mr. Halley ampliada */
         div[data-testid="stExpander"] div[data-testid="stChatMessage"] img,
         div[data-testid="stExpander"] div[data-testid="stChatMessageAvatarCustom"] {
             width: 44px !important;
@@ -590,7 +611,7 @@ COR_OURO = "#C5A059"
 COR_CHAPA = "#E2DFD2"   
 COR_TEXTO = "#231F20"   
 
-# --- 1. CONFIGURAÇÃO DA PÁGINA ---
+# --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title=f"{NOME_SISTEMA} - Painel de Controle", layout="wide", page_icon="⚙️")
 
 st.markdown(f"""
@@ -906,7 +927,7 @@ if not st.session_state["logado"]:
                         st.warning("Preencha todos os campos.")
 
 # ==================================================
-# 2. AMBIENTE LOGADO (Aparece se st.session_state["logado"] == True)
+# 2. AMBIENTE LOGADO
 # ==================================================
 else:
     engine = get_engine()
@@ -991,7 +1012,7 @@ else:
     st.divider()
     aba_ativa = st.session_state.opcao_selecionada
 
-    # --- 3. CONTEÚDO DAS PÁGINAS ---
+    # --- CONTEÚDO DAS PÁGINAS ---
     if aba_ativa == "👑 Gestão Master" and usuario_ativo == "bruno":
         st.subheader("👑 Painel de Controle Master")
         
@@ -1420,11 +1441,11 @@ else:
             with c6: t_fim = st.text_input("Fim (Ex: 10:00)", "00:00")
             ds_i, t_i = st.text_area("Descrição"), st.selectbox("Turno", LISTA_TURNOS)
             if st.form_submit_button("Confirmar Agendamento"):
-                nova_os = obter_proxima_os(engine, emp_id)[cite: 1]
+                nova_os = obter_proxima_os(engine, emp_id)[cite: 1, 2]
                 with engine.connect() as conn:
                     conn.execute(text("INSERT INTO tarefas (data, executor, prefixo, inicio_disp, fim_disp, descricao, area, turno, origem, empresa_id, numero_os) VALUES (:dt, :ex, :pr, :ti, :tf, :ds, :ar, :tu, 'Direto', :eid, :nos)"), 
-                                 {"dt": str(d_i), "ex": e_i, "pr": p_i, "ti": t_ini, "tf": t_fim, "ds": ds_i, "ar": a_i, "tu": t_i, "eid": emp_id, "nos": nova_os})[cite: 1]
-                    conn.commit()[cite: 1]
+                                 {"dt": str(d_i), "ex": e_i, "pr": p_i, "ti": t_ini, "tf": t_fim, "ds": ds_i, "ar": a_i, "tu": t_i, "eid": emp_id, "nos": nova_os})[cite: 1, 2]
+                    conn.commit()[cite: 1, 2]
                 st.success(f"✅ SERVIÇO AGENDADO!")
                 st.code(f"NÚMERO DA ORDEM DE SERVIÇO: {nova_os}", language="markdown")
                 st.rerun()
@@ -1492,7 +1513,6 @@ else:
                 colunas_ordenadas = ['Aprovar', 'prefixo', 'descricao', 'motorista', 'Area_Destino', 'Executor', 'Data_Programada', 'Inicio', 'Fim', 'data_solicitacao', 'id']
                 st.session_state.df_ap_work = df_p[colunas_ordenadas]
             
-            # --- LÓGICA DE DETECÇÃO DE MÚLTIPLOS SELECIONADOS ---
             if "editor_chamados" in st.session_state and st.session_state.editor_chamados.get("edited_rows"):
                 alteracoes = st.session_state.editor_chamados["edited_rows"]
                 
@@ -1538,7 +1558,6 @@ else:
                         elif campos.get("Aprovar") is False:
                             st.session_state.analises_halley = [a for a in st.session_state.analises_halley if a["id"] != id_chamado]
 
-            # --- TABELA DE CHAMADOS ---
             ed_c = st.data_editor(
                 st.session_state.df_ap_work, 
                 hide_index=True, 
@@ -1562,13 +1581,13 @@ else:
                 if not selecionados.empty:
                     with engine.connect() as conn:
                         for _, r in selecionados.iterrows():
-                            v_os = obter_proxima_os(engine, emp_id)[cite: 1]
+                            v_os = obter_proxima_os(engine, emp_id)[cite: 1, 2]
                             conn.execute(
                                 text("INSERT INTO tarefas (data, executor, prefixo, inicio_disp, fim_disp, descricao, area, turno, id_chamado, origem, empresa_id, numero_os) VALUES (:dt, :ex, :pr, :ti, :tf, :ds, :ar, 'Não definido', :ic, 'Chamado', :eid, :nos)"), 
                                 {"dt": str(r['Data_Programada']), "ex": r['Executor'], "pr": r['prefixo'], "ti": r['Inicio'], "tf": r['Fim'], "ds": r['descricao'], "ar": r['Area_Destino'], "ic": r['id'], "eid": emp_id, "nos": v_os}
-                            )[cite: 1]
-                            conn.execute(text("UPDATE chamados SET status = 'Agendado' WHERE id = :id"), {"id": r['id']})[cite: 1]
-                        conn.commit()[cite: 1]
+                            )[cite: 1, 2]
+                            conn.execute(text("UPDATE chamados SET status = 'Agendado' WHERE id = :id"), {"id": r['id']})[cite: 1, 2]
+                        conn.commit()[cite: 1, 2]
                     
                     if 'df_ap_work' in st.session_state: del st.session_state.df_ap_work
                     if 'analises_halley' in st.session_state: del st.session_state.analises_halley
