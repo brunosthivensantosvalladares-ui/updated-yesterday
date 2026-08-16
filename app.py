@@ -151,9 +151,9 @@ REGRAS DE RESPOSTA:
             return f"Baseado no histórico local da frota, recomenda-se inspeção técnica do sistema de {sintoma}."
         return f"Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se inspeção técnica do sistema de {sintoma}."
 
-# --- PROCESSAMENTO DE ABERTURA DE OS VIA CHAT ---
+# --- PROCESSAMENTO CONVERSACIONAL DE ABERTURA DE OS VIA CHAT ---
 def processar_comando_os(texto_usuario, emp_id):
-    """Detecta intenções explícitas ou mensagens com parâmetros de cadastro de OS."""
+    """Gerencia a coleta progressiva dos campos de OS sem perder a memória."""
     llm = obter_llm()
     if not llm:
         return None
@@ -162,40 +162,43 @@ def processar_comando_os(texto_usuario, emp_id):
         st.session_state.rascunho_os = None
 
     hoje_str = str(datetime.now().date())
+    rascunho_atual = st.session_state.rascunho_os or {}
+    em_andamento = bool(st.session_state.rascunho_os)
 
     veiculo_contexto = "Não informado"
     if "analises_halley" in st.session_state and st.session_state.analises_halley:
         veiculo_contexto = str(st.session_state.analises_halley[-1].get("veiculo", "Não informado"))
 
-    rascunho_existente = st.session_state.rascunho_os or {}
-
     template_fluxo = """
 Você é o assistente técnico Mr. Halley da plataforma Up 2 Today.
-Sua prioridade máxima é cadastrar Ordens de Serviço (OS) quando o usuário fornecer dados de agendamento ou confirmar parâmetros.
+Você gerencia o fluxo de criação de Ordens de Serviço (OS) com o gestor.
 
-Mensagem Atual: "{mensagem}"
-Rascunho Anterior: {rascunho}
+Mensagem Atual do Usuário: "{mensagem}"
+Rascunho Atual: {rascunho_json}
+Existe OS sendo preenchida agora? {em_andamento}
 Veículo em Análise Recente: {veiculo_contexto}
 Data de Hoje: {hoje}
 
-CAMPOS DA OS:
-- prefixo: Número/Placa do veículo (se o usuário não citar número mas houver veículo recente, use "{veiculo_contexto}")
-- descricao: Serviço/problema a ser executado
-- executor: Mecânico/responsável
-- data: Data no formato AAAA-MM-DD (amanhã = data de amanhã)
-- area: Mecânica, Elétrica, Borracharia, Chapeamento ou Limpeza
+CAMPOS NECESSÁRIOS:
+1. prefixo (se o usuário disser "esse veículo", use "{veiculo_contexto}")
+2. descricao (serviço ou sintoma)
+3. executor (nome do mecânico/responsável)
+4. data (formato AAAA-MM-DD; se disser "hoje" use {hoje}, "amanhã" use o dia seguinte)
+5. area (Mecânica, Elétrica, Borracharia, Chapeamento ou Limpeza - deduza do serviço se não for dita)
 
-REGRA: Se a mensagem contiver dados operacionais de agendamento (executor, data/horário, serviço, área) OU intenção de criar OS, classifique como fluxo de OS.
+REGRAS:
+- Se 'Existe OS sendo preenchida agora?' for True: OBRIGATORIAMENTE continue no fluxo de OS, mesclando a nova informação (mesmo que seja só um nome como "Bruno" ou data) com o rascunho.
+- Se o usuário disser para cancelar ou abortar, responda {{"em_fluxo_os": false, "cancelar": true}}.
 
 Responda EXCLUSIVAMENTE em JSON puro:
 
-Se NÃO tem nenhuma relação com abrir/agendar OS:
+Se NÃO há OS em andamento e a mensagem NÃO pede para abrir/agendar OS:
 {{"em_fluxo_os": false}}
 
-Se é agendamento de OS mas AINDA FALTAM dados:
-{{"em_fluxo_os": true, "dados_completos": false, "rascunho": {{"prefixo": "...", "descricao": "...", "executor": "...", "data": "...", "area": "..."}}, "pergunta_pendencia": "Pergunta objetiva sobre o dado faltante"}}
+Se o fluxo de OS está ativo mas FALTAM campos:
+{{"em_fluxo_os": true, "dados_completos": false, "rascunho": {{"prefixo": "...", "descricao": "...", "executor": "...", "data": "...", "area": "..."}}, "pergunta_pendencia": "Pergunta direta apenas sobre os dados que ainda faltam"}}
 
-Se os dados estão preenchidos (mesmo que hora esteja junto na descrição/data):
+Se TODOS os dados mínimos estão preenchidos:
 {{"em_fluxo_os": true, "dados_completos": true, "prefixo": "...", "descricao": "...", "executor": "...", "area": "...", "data": "AAAA-MM-DD"}}
 """
 
@@ -205,7 +208,8 @@ Se os dados estão preenchidos (mesmo que hora esteja junto na descrição/data)
     try:
         resultado = chain.invoke({
             "mensagem": texto_usuario,
-            "rascunho": json.dumps(rascunho_existente, ensure_ascii=False),
+            "rascunho_json": json.dumps(rascunho_atual, ensure_ascii=False),
+            "em_andamento": em_andamento,
             "veiculo_contexto": veiculo_contexto,
             "hoje": hoje_str
         }).content.strip()
@@ -213,20 +217,34 @@ Se os dados estão preenchidos (mesmo que hora esteja junto na descrição/data)
         resultado_limpo = resultado.replace("```json", "").replace("```", "").strip()
         dados = json.loads(resultado_limpo)
 
+        if dados.get("cancelar"):
+            st.session_state.rascunho_os = None
+            return "❌ Agendamento de OS cancelado."
+
         if not dados.get("em_fluxo_os"):
             return None
 
         if dados.get("dados_completos") is False:
-            st.session_state.rascunho_os = dados.get("rascunho", {})
-            return dados.get("pergunta_pendencia", "Para prosseguir, informe os dados complementares da OS.")
+            novo_rascunho = rascunho_atual.copy()
+            if isinstance(dados.get("rascunho"), dict):
+                for k, v in dados["rascunho"].items():
+                    if v and v not in ["...", "None", "null", "Não informado"]:
+                        novo_rascunho[k] = v
+            st.session_state.rascunho_os = novo_rascunho
+            return dados.get("pergunta_pendencia", "Por favor, informe os dados complementares para a OS.")
 
-        # Inserção direta no banco
+        # Conclusão e persistência no banco de dados
         engine = get_engine()
-        nova_os = obter_proxima_os(engine, emp_id)
+        nova_os = obter_proxima_os(engine, emp_id)[cite: 1]
         
-        pref_final = dados.get("prefixo")
+        pref_final = dados.get("prefixo") or rascunho_atual.get("prefixo")
         if not pref_final or pref_final in ["Não informado", "S/P", "..."]:
             pref_final = veiculo_contexto if veiculo_contexto != "Não informado" else "S/P"
+
+        data_final = dados.get("data") or rascunho_atual.get("data") or hoje_str
+        exec_final = dados.get("executor") or rascunho_atual.get("executor") or "Não definido"
+        desc_final = dados.get("descricao") or rascunho_atual.get("descricao") or "Serviço via chat"
+        area_final = dados.get("area") or rascunho_atual.get("area") or "Mecânica"
 
         with engine.connect() as conn:
             conn.execute(
@@ -235,26 +253,26 @@ Se os dados estão preenchidos (mesmo que hora esteja junto na descrição/data)
                     VALUES (:dt, :ex, :pr, '00:00', '00:00', :ds, :ar, 'Não definido', 'Chat Mr. Halley', :eid, :nos)
                 """),
                 {
-                    "dt": dados.get("data", hoje_str),
-                    "ex": dados.get("executor", "Não definido"),
-                    "pr": pref_final,
-                    "ds": dados.get("descricao", "Serviço via chat"),
-                    "ar": dados.get("area", "Mecânica"),
+                    "dt": str(data_final),
+                    "ex": str(exec_final),
+                    "pr": str(pref_final),
+                    "ds": str(desc_final),
+                    "ar": str(area_final),
                     "eid": str(emp_id),
                     "nos": nova_os
                 }
-            )
-            conn.commit()
+            )[cite: 1]
+            conn.commit()[cite: 1]
 
         st.session_state.rascunho_os = None
 
         return (
             f"✅ **Ordem de Serviço Nº {nova_os} gerada com sucesso!**\n\n"
             f"- **Veículo:** {pref_final}\n"
-            f"- **Serviço:** {dados.get('descricao')}\n"
-            f"- **Área:** {dados.get('area')}\n"
-            f"- **Data:** {dados.get('data')}\n"
-            f"- **Executor:** {dados.get('executor')}\n\n"
+            f"- **Serviço:** {desc_final}\n"
+            f"- **Área:** {area_final}\n"
+            f"- **Data:** {data_final}\n"
+            f"- **Executor:** {exec_final}\n\n"
             f"*A OS já foi enviada diretamente para a Agenda Principal.*"
         )
     except Exception:
@@ -262,12 +280,12 @@ Se os dados estão preenchidos (mesmo que hora esteja junto na descrição/data)
 
 # --- CHATBOX DO MR. HALLEY (FOCO PRECISO NA ÚLTIMA ANÁLISE E CRIAÇÃO DE OS) ---
 def responder_chat_mr_halley(mensagem_usuario, emp_id):
-    # 1. Tenta processar como comando de abertura de OS
+    # 1. Verifica se está em fluxo de abertura de OS
     resposta_os = processar_comando_os(mensagem_usuario, emp_id)
     if resposta_os:
         return resposta_os
 
-    # 2. Se não for comando de OS, segue o fluxo normal
+    # 2. Se não for comando de OS, segue o fluxo normal de consultas técnicas
     llm = obter_llm()
     if not llm:
         return "Desculpe, a conexão com a IA (GROQ_API_KEY) não está configurada nos Secrets do Streamlit."
@@ -339,7 +357,7 @@ def renderizar_chat_flutuante(emp_id):
             position: fixed !important;
             bottom: 20px !important;
             right: 20px !important;
-            width: 390px !important;
+            width: 410px !important;
             z-index: 999999 !important;
             background-color: #ffffff !important;
             border: 2px solid #C5A059 !important;
@@ -351,11 +369,13 @@ def renderizar_chat_flutuante(emp_id):
             max-height: 80vh !important;
         }
 
+        /* Tipografia mais confortável e legível */
         div[data-testid="stExpander"] div[data-testid="stChatMessage"] p {
-            font-size: 0.84rem !important;
-            line-height: 1.35 !important;
+            font-size: 0.95rem !important;
+            line-height: 1.45 !important;
         }
 
+        /* Foto do Mr. Halley ampliada */
         div[data-testid="stExpander"] div[data-testid="stChatMessage"] img,
         div[data-testid="stExpander"] div[data-testid="stChatMessageAvatarCustom"] {
             width: 44px !important;
@@ -1385,11 +1405,11 @@ else:
             with c6: t_fim = st.text_input("Fim (Ex: 10:00)", "00:00")
             ds_i, t_i = st.text_area("Descrição"), st.selectbox("Turno", LISTA_TURNOS)
             if st.form_submit_button("Confirmar Agendamento"):
-                nova_os = obter_proxima_os(engine, emp_id)
+                nova_os = obter_proxima_os(engine, emp_id)[cite: 1]
                 with engine.connect() as conn:
                     conn.execute(text("INSERT INTO tarefas (data, executor, prefixo, inicio_disp, fim_disp, descricao, area, turno, origem, empresa_id, numero_os) VALUES (:dt, :ex, :pr, :ti, :tf, :ds, :ar, :tu, 'Direto', :eid, :nos)"), 
-                                 {"dt": str(d_i), "ex": e_i, "pr": p_i, "ti": t_ini, "tf": t_fim, "ds": ds_i, "ar": a_i, "tu": t_i, "eid": emp_id, "nos": nova_os})
-                    conn.commit()
+                                 {"dt": str(d_i), "ex": e_i, "pr": p_i, "ti": t_ini, "tf": t_fim, "ds": ds_i, "ar": a_i, "tu": t_i, "eid": emp_id, "nos": nova_os})[cite: 1]
+                    conn.commit()[cite: 1]
                 st.success(f"✅ SERVIÇO AGENDADO!")
                 st.code(f"NÚMERO DA ORDEM DE SERVIÇO: {nova_os}", language="markdown")
                 st.rerun()
@@ -1527,13 +1547,13 @@ else:
                 if not selecionados.empty:
                     with engine.connect() as conn:
                         for _, r in selecionados.iterrows():
-                            v_os = obter_proxima_os(engine, emp_id)
+                            v_os = obter_proxima_os(engine, emp_id)[cite: 1]
                             conn.execute(
                                 text("INSERT INTO tarefas (data, executor, prefixo, inicio_disp, fim_disp, descricao, area, turno, id_chamado, origem, empresa_id, numero_os) VALUES (:dt, :ex, :pr, :ti, :tf, :ds, :ar, 'Não definido', :ic, 'Chamado', :eid, :nos)"), 
                                 {"dt": str(r['Data_Programada']), "ex": r['Executor'], "pr": r['prefixo'], "ti": r['Inicio'], "tf": r['Fim'], "ds": r['descricao'], "ar": r['Area_Destino'], "ic": r['id'], "eid": emp_id, "nos": v_os}
-                            )
-                            conn.execute(text("UPDATE chamados SET status = 'Agendado' WHERE id = :id"), {"id": r['id']})
-                        conn.commit()
+                            )[cite: 1]
+                            conn.execute(text("UPDATE chamados SET status = 'Agendado' WHERE id = :id"), {"id": r['id']})[cite: 1]
+                        conn.commit()[cite: 1]
                     
                     if 'df_ap_work' in st.session_state: del st.session_state.df_ap_work
                     if 'analises_halley' in st.session_state: del st.session_state.analises_halley
