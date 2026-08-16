@@ -151,74 +151,103 @@ REGRAS DE RESPOSTA:
             return f"Baseado no histórico local da frota, recomenda-se inspeção técnica do sistema de {sintoma}."
         return f"Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se inspeção técnica do sistema de {sintoma}."
 
-# --- FUNÇÃO DE PROCESSAMENTO DE ABERTURA DE OS VIA CHAT ---
+# --- PROCESSAMENTO CONVERSACIONAL DE ABERTURA DE OS VIA CHAT ---
 def processar_comando_os(texto_usuario, emp_id):
-    """Verifica se o usuário quer abrir/cadastrar uma OS e realiza o agendamento no banco."""
+    """Verifica se o usuário quer abrir/cadastrar uma OS, valida campos e cadastra se estiver completo."""
     llm = obter_llm()
     if not llm:
         return None
 
+    # 1. Recupera o prefixo do veículo da análise mais recente como contexto
+    veiculo_em_analise = "Não informado"
+    if "analises_halley" in st.session_state and st.session_state.analises_halley:
+        veiculo_em_analise = str(st.session_state.analises_halley[-1].get("veiculo", "Não informado"))
+
     hoje_str = str(datetime.now().date())
+
     template_extracao = """
-Analise a mensagem do gestor de oficina e verifique se ele está solicitando a criação/abertura/cadastro de uma Ordem de Serviço (OS).
+Você é o assistente técnico Mr. Halley da plataforma Up 2 Today.
+Analise a mensagem do gestor e verifique se há intenção de abrir/agendar/cadastrar uma Ordem de Serviço (OS).
 
-Mensagem: "{mensagem}"
-Data Atual: {hoje}
+Mensagem do Gestor: "{mensagem}"
+Veículo em análise recente nesta tela: {veiculo_contexto}
+Data de Hoje: {hoje}
 
-Se a mensagem for uma solicitação de cadastro/abertura de OS, extraia os dados e responda EXCLUSIVAMENTE em formato JSON puro, sem blocos markdown (sem ```json), com as seguintes chaves:
-- "criar_os": true
-- "prefixo": "prefixo do veículo (ou 'S/P' se não informado)"
-- "descricao": "descrição clara do serviço a ser feito"
-- "executor": "nome do mecânico/executor (ou 'A definir' se não informado)"
-- "area": "Mecânica, Elétrica, Borracharia, Chapeamento ou Limpeza (escolha a mais adequada)"
-- "data": "data no formato AAAA-MM-DD (se o usuário disser 'hoje' use {hoje}, se disser 'amanhã' use a data de amanhã)"
+INSTRUÇÕES DE EXTRAÇÃO:
+- Se o gestor disser expressões como "para esse veículo", "nesse carro", "para ele", use o prefixo do veículo em análise recente: {veiculo_contexto}.
+- Verifique se os seguintes campos estão claros:
+  1. "prefixo": Prefixo do veículo (deve ser um número ou placa real, NUNCA 'Não informado' ou 'S/P').
+  2. "descricao": O que será feito (ex: troca de kit de embreagem, revisão de freio).
+  3. "data": Data no formato AAAA-MM-DD (se disser 'hoje' use {hoje}, se disser 'amanhã' use o dia seguinte). Se não informou, marque como nulo.
+  4. "executor": Nome do mecânico/responsável. Se não informou, marque como nulo.
+  5. "area": Mecânica, Elétrica, Borracharia, Chapeamento ou Limpeza.
 
-Se NÃO for um pedido de abertura de OS, responda apenas:
-{{"criar_os": false}}
+Responda EXCLUSIVAMENTE em JSON puro, sem blocos markdown (sem ```json):
+
+CASO 1: NÃO é intenção de criar OS:
+{{"intencao_os": false}}
+
+CASO 2: É intenção de criar OS, mas FALTAM dados essenciais (prefixo indefinido, executor não informado ou data ausente):
+{{"intencao_os": true, "dados_completos": false, "pergunta_pendencia": "Frase curta e direta do Mr. Halley perguntando especificamente os dados que faltam (ex: perguntar o executor e a data programada para agendar o veículo X)."}}
+
+CASO 3: É intenção de criar OS e TODOS os dados mínimos foram fornecidos:
+{{"intencao_os": true, "dados_completos": true, "prefixo": "...", "descricao": "...", "executor": "...", "area": "...", "data": "AAAA-MM-DD"}}
 """
+
     prompt = ChatPromptTemplate.from_template(template_extracao)
     chain = prompt | llm
 
     try:
-        resultado = chain.invoke({"mensagem": texto_usuario, "hoje": hoje_str}).content.strip()
+        resultado = chain.invoke({
+            "mensagem": texto_usuario,
+            "veiculo_contexto": veiculo_em_analise,
+            "hoje": hoje_str
+        }).content.strip()
+
         resultado_limpo = resultado.replace("```json", "").replace("```", "").strip()
         dados = json.loads(resultado_limpo)
 
-        if dados.get("criar_os") is True:
-            engine = get_engine()
-            nova_os = obter_proxima_os(engine, emp_id)
-            
-            with engine.connect() as conn:
-                conn.execute(
-                    text("""
-                        INSERT INTO tarefas (data, executor, prefixo, inicio_disp, fim_disp, descricao, area, turno, origem, empresa_id, numero_os)
-                        VALUES (:dt, :ex, :pr, '00:00', '00:00', :ds, :ar, 'Não definido', 'Chat Mr. Halley', :eid, :nos)
-                    """),
-                    {
-                        "dt": dados.get("data", hoje_str),
-                        "ex": dados.get("executor", "A definir"),
-                        "pr": dados.get("prefixo", "S/P"),
-                        "ds": dados.get("descricao", "Serviço via chat"),
-                        "ar": dados.get("area", "Mecânica"),
-                        "eid": str(emp_id),
-                        "nos": nova_os
-                    }
-                )
-                conn.commit()
-            
-            return (
-                f"✅ **Ordem de Serviço Nº {nova_os} gerada com sucesso!**\n\n"
-                f"- **Veículo:** {dados.get('prefixo')}\n"
-                f"- **Serviço:** {dados.get('descricao')}\n"
-                f"- **Área:** {dados.get('area')}\n"
-                f"- **Data:** {dados.get('data')}\n"
-                f"- **Executor:** {dados.get('executor')}\n\n"
-                f"*A OS já foi enviada diretamente para a Agenda Principal.*"
-            )
+        # Se não for pedido de OS, deixa o chat seguir o fluxo normal de dúvidas
+        if dados.get("intencao_os") is not True:
+            return None
+
+        # Se for pedido de OS, mas faltam dados, retorna a pergunta do Mr. Halley
+        if dados.get("dados_completos") is False:
+            return dados.get("pergunta_pendencia", "Para concluir o agendamento da OS, informe o prefixo do veículo, mecânico responsável e a data.")
+
+        # Se todos os dados estiverem presentes, insere no banco
+        engine = get_engine()
+        nova_os = obter_proxima_os(engine, emp_id)[cite: 2]
+        
+        with engine.connect() as conn:
+            conn.execute(
+                text("""
+                    INSERT INTO tarefas (data, executor, prefixo, inicio_disp, fim_disp, descricao, area, turno, origem, empresa_id, numero_os)
+                    VALUES (:dt, :ex, :pr, '00:00', '00:00', :ds, :ar, 'Não definido', 'Chat Mr. Halley', :eid, :nos)
+                """),
+                {
+                    "dt": dados.get("data", hoje_str),
+                    "ex": dados.get("executor", "Não definido"),
+                    "pr": dados.get("prefixo"),
+                    "ds": dados.get("descricao"),
+                    "ar": dados.get("area", "Mecânica"),
+                    "eid": str(emp_id),
+                    "nos": nova_os
+                }
+            )[cite: 2]
+            conn.commit()[cite: 2]
+
+        return (
+            f"✅ **Ordem de Serviço Nº {nova_os} gerada com sucesso!**\n\n"
+            f"- **Veículo:** {dados.get('prefixo')}\n"
+            f"- **Serviço:** {dados.get('descricao')}\n"
+            f"- **Área:** {dados.get('area')}\n"
+            f"- **Data:** {dados.get('data')}\n"
+            f"- **Executor:** {dados.get('executor')}\n\n"
+            f"*A OS já foi enviada diretamente para a Agenda Principal.*"
+        )
     except Exception:
-        pass
-    
-    return None
+        return None
 
 # --- CHATBOX DO MR. HALLEY (FOCO PRECISO NA ÚLTIMA ANÁLISE E CRIAÇÃO DE OS) ---
 def responder_chat_mr_halley(mensagem_usuario, emp_id):
