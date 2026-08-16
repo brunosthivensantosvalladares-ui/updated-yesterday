@@ -326,12 +326,25 @@ Se for fluxo de OS:
     except Exception:
         return None
 
-# --- CHATBOX DO MR. HALLEY ---
+# --- CHATBOX DO MR. HALLEY (CORDIAL, TÉCNICO E CONECTADO ÀS OSs) ---
 def responder_chat_mr_halley(mensagem_usuario, emp_id):
+    texto_baixo = mensagem_usuario.lower().strip()
+
+    # 1. Tratamento de Agradecimentos e Cortesias
+    agradecimentos = ["obrigado", "muito obrigado", "valeu", "show", "perfeito", "agradeço", "obrigada", "tmj", "grato"]
+    if any(texto_baixo.startswith(term) or texto_baixo == term for term in agradecimentos):
+        return "Por nada! Qualquer dúvida técnica ou se precisar agendar uma nova OS, estou à disposição. 🛠️"
+
+    saudacoes = ["olá", "ola", "bom dia", "boa tarde", "boa noite", "fala halley", "oi"]
+    if texto_baixo in saudacoes:
+        return "Olá! Como posso ajudar com as manutenções da frota hoje?"
+
+    # 2. Tenta processar como fluxo de abertura/edição de OS
     resposta_os = processar_comando_os(mensagem_usuario, emp_id)
     if resposta_os:
         return resposta_os
 
+    # 3. Consultas técnicas e dúvidas gerais
     llm = obter_llm()
     if not llm:
         return "Desculpe, a conexão com a IA (GROQ_API_KEY) não está configurada nos Secrets do Streamlit."
@@ -352,7 +365,7 @@ def responder_chat_mr_halley(mensagem_usuario, emp_id):
     )
 
     template = """
-Você é o Mr. Halley, assistente técnico de manutenção da plataforma Up 2 Today.
+Você é o Mr. Halley, assistente técnico de manutenção e telemetria da plataforma Up 2 Today.
 
 {contexto_foco_atual}
 
@@ -360,13 +373,11 @@ Você é o Mr. Halley, assistente técnico de manutenção da plataforma Up 2 To
 
 Pergunta do Usuário: "{mensagem_usuario}"
 
-REGRAS DE RESPOSTA:
-1. Se o usuário fizer referência a "este último problema", "esta falha", "este sintoma" ou "qual veículo teve falha similar antes", considere OBRIGATORIAMENTE o item descrito em "ÚLTIMA ANÁLISE REALIZADA (FOCO ATUAL)".
-2. Ao responder em qual veículo ocorreu a falha similar anteriormente:
-   - Busque no "HISTÓRICO DE MANUTENÇÕES CONCLUÍDAS DA FROTA" uma OS que tenha relação com a falha do FOCO ATUAL.
-   - Responda de forma direta citando o prefixo do veículo encontrado e o serviço executado.
-   - NUNCA confunda o veículo que está sendo analisado agora com o veículo que realizou o serviço no passado.
-3. Responda em no máximo 2 a 3 frases, direto ao ponto e sem saudações formais.
+DIRETRIZES DE RESPOSTA:
+1. Se o usuário estiver fazendo uma pergunta sobre "este último problema", "esta falha" ou "em qual veículo ocorreu antes":
+   - Use como base o "FOCO ATUAL" e consulte o histórico de manutenções concluídas.
+   - Responda de forma direta e técnica em 2 a 3 frases.
+2. Seja sempre prestativo e profissional.
 """
 
     prompt = ChatPromptTemplate.from_template(template)
