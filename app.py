@@ -280,7 +280,7 @@ REGRAS DE RESPOSTA:
         
 # --- CHAT FLUTUANTE EM CSS/HTML + PYTHON ---
 def renderizar_chat_flutuante(emp_id):
-    URL_AVATAR = "[https://i.postimg.cc/5tBtrL6C/Whats-App-Image-2026-07-23-at-22-35-53.png](https://i.postimg.cc/5tBtrL6C/Whats-App-Image-2026-07-23-at-22-35-53.png)"
+    AVATAR_HALLEY = "🤖"  # Substitui a URL externa que causa a falha no Streamlit
     
     if "abrir_chat_halley" not in st.session_state:
         st.session_state.abrir_chat_halley = False
@@ -321,22 +321,22 @@ def renderizar_chat_flutuante(emp_id):
         chat_box = st.container(height=340)
         with chat_box:
             for msg in st.session_state.mensagens_chat_halley:
-                avatar = URL_AVATAR if msg["role"] == "assistant" else None
+                avatar = AVATAR_HALLEY if msg["role"] == "assistant" else "👤"
                 with st.chat_message(msg["role"], avatar=avatar):
                     st.markdown(msg["content"])
 
-        if prompt := st.chat_input("Dúvida técnica...", key="chat_flutuante_input"):
+        if prompt := st.chat_input("Dúvida técnica ou criar OS...", key="chat_flutuante_input"):
             st.session_state.mensagens_chat_halley.append({"role": "user", "content": prompt})
             with chat_box:
-                with st.chat_message("user"):
+                with st.chat_message("user", avatar="👤"):
                     st.markdown(prompt)
-                with st.chat_message("assistant", avatar=URL_AVATAR):
-                    with st.spinner("Analisando..."):
+                with st.chat_message("assistant", avatar=AVATAR_HALLEY):
+                    with st.spinner("Processando..."):
                         resp = responder_chat_mr_halley(prompt, emp_id)
                         st.markdown(resp)
             st.session_state.mensagens_chat_halley.append({"role": "assistant", "content": resp})
             st.rerun()
-
+            
 def gerar_pdf_manual_oficial_pro():
     class PDF(FPDF):
         def header(self):
