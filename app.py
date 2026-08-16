@@ -221,14 +221,14 @@ Se os dados estão preenchidos (mesmo que hora esteja junto na descrição/data)
             return dados.get("pergunta_pendencia", "Para prosseguir, informe os dados complementares da OS.")
 
         # Inserção direta no banco
-        engine = get_engine()[cite: 2]
-        nova_os = obter_proxima_os(engine, emp_id)[cite: 2]
+        engine = get_engine()
+        nova_os = obter_proxima_os(engine, emp_id)
         
         pref_final = dados.get("prefixo")
         if not pref_final or pref_final in ["Não informado", "S/P", "..."]:
             pref_final = veiculo_contexto if veiculo_contexto != "Não informado" else "S/P"
 
-        with engine.connect() as conn:[cite: 2]
+        with engine.connect() as conn:
             conn.execute(
                 text("""
                     INSERT INTO tarefas (data, executor, prefixo, inicio_disp, fim_disp, descricao, area, turno, origem, empresa_id, numero_os)
@@ -243,8 +243,8 @@ Se os dados estão preenchidos (mesmo que hora esteja junto na descrição/data)
                     "eid": str(emp_id),
                     "nos": nova_os
                 }
-            )[cite: 2]
-            conn.commit()[cite: 2]
+            )
+            conn.commit()
 
         st.session_state.rascunho_os = None
 
@@ -259,7 +259,7 @@ Se os dados estão preenchidos (mesmo que hora esteja junto na descrição/data)
         )
     except Exception:
         return None
-
+        
         # Se for pedido de OS, mas faltam dados, retorna a pergunta do Mr. Halley
         if dados.get("dados_completos") is False:
             return dados.get("pergunta_pendencia", "Para concluir o agendamento da OS, informe o prefixo do veículo, mecânico responsável e a data.")
@@ -356,20 +356,130 @@ REGRAS DE RESPOSTA:
     except Exception as e:
         return f"Erro ao processar consulta: {str(e)}"
         
+# --- PROCESSAMENTO DE ABERTURA DE OS VIA CHAT ---
+def processar_comando_os(texto_usuario, emp_id):
+    """Detecta intenções explícitas ou mensagens com parâmetros de cadastro de OS."""
+    llm = obter_llm()
+    if not llm:
+        return None
+
+    if "rascunho_os" not in st.session_state:
+        st.session_state.rascunho_os = None
+
+    hoje_str = str(datetime.now().date())
+
+    veiculo_contexto = "Não informado"
+    if "analises_halley" in st.session_state and st.session_state.analises_halley:
+        veiculo_contexto = str(st.session_state.analises_halley[-1].get("veiculo", "Não informado"))
+
+    rascunho_existente = st.session_state.rascunho_os or {}
+
+    template_fluxo = """
+Você é o assistente técnico Mr. Halley da plataforma Up 2 Today.
+Sua prioridade máxima é cadastrar Ordens de Serviço (OS) quando o usuário fornecer dados de agendamento ou confirmar parâmetros.
+
+Mensagem Atual: "{mensagem}"
+Rascunho Anterior: {rascunho}
+Veículo em Análise Recente: {veiculo_contexto}
+Data de Hoje: {hoje}
+
+CAMPOS DA OS:
+- prefixo: Número/Placa do veículo (se o usuário não citar número mas houver veículo recente, use "{veiculo_contexto}")
+- descricao: Serviço/problema a ser executado
+- executor: Mecânico/responsável
+- data: Data no formato AAAA-MM-DD (amanhã = data de amanhã)
+- area: Mecânica, Elétrica, Borracharia, Chapeamento ou Limpeza
+
+REGRA: Se a mensagem contiver dados operacionais de agendamento (executor, data/horário, serviço, área) OU intenção de criar OS, classifique como fluxo de OS.
+
+Responda EXCLUSIVAMENTE em JSON puro:
+
+Se NÃO tem nenhuma relação com abrir/agendar OS:
+{{"em_fluxo_os": false}}
+
+Se é agendamento de OS mas AINDA FALTAM dados:
+{{"em_fluxo_os": true, "dados_completos": false, "rascunho": {{"prefixo": "...", "descricao": "...", "executor": "...", "data": "...", "area": "..."}}, "pergunta_pendencia": "Pergunta objetiva sobre o dado faltante"}}
+
+Se os dados estão preenchidos (mesmo que hora esteja junto na descrição/data):
+{{"em_fluxo_os": true, "dados_completos": true, "prefixo": "...", "descricao": "...", "executor": "...", "area": "...", "data": "AAAA-MM-DD"}}
+"""
+
+    prompt = ChatPromptTemplate.from_template(template_fluxo)
+    chain = prompt | llm
+
+    try:
+        resultado = chain.invoke({
+            "mensagem": texto_usuario,
+            "rascunho": json.dumps(rascunho_existente, ensure_ascii=False),
+            "veiculo_contexto": veiculo_contexto,
+            "hoje": hoje_str
+        }).content.strip()
+
+        resultado_limpo = resultado.replace("```json", "").replace("```", "").strip()
+        dados = json.loads(resultado_limpo)
+
+        if not dados.get("em_fluxo_os"):
+            return None
+
+        if dados.get("dados_completos") is False:
+            st.session_state.rascunho_os = dados.get("rascunho", {})
+            return dados.get("pergunta_pendencia", "Para prosseguir, informe os dados complementares da OS.")
+
+        # Inserção direta no banco
+        engine = get_engine()
+        nova_os = obter_proxima_os(engine, emp_id)
+        
+        pref_final = dados.get("prefixo")
+        if not pref_final or pref_final in ["Não informado", "S/P", "..."]:
+            pref_final = veiculo_contexto if veiculo_contexto != "Não informado" else "S/P"
+
+        with engine.connect() as conn:
+            conn.execute(
+                text("""
+                    INSERT INTO tarefas (data, executor, prefixo, inicio_disp, fim_disp, descricao, area, turno, origem, empresa_id, numero_os)
+                    VALUES (:dt, :ex, :pr, '00:00', '00:00', :ds, :ar, 'Não definido', 'Chat Mr. Halley', :eid, :nos)
+                """),
+                {
+                    "dt": dados.get("data", hoje_str),
+                    "ex": dados.get("executor", "Não definido"),
+                    "pr": pref_final,
+                    "ds": dados.get("descricao", "Serviço via chat"),
+                    "ar": dados.get("area", "Mecânica"),
+                    "eid": str(emp_id),
+                    "nos": nova_os
+                }
+            )
+            conn.commit()
+
+        st.session_state.rascunho_os = None
+
+        return (
+            f"✅ **Ordem de Serviço Nº {nova_os} gerada com sucesso!**\n\n"
+            f"- **Veículo:** {pref_final}\n"
+            f"- **Serviço:** {dados.get('descricao')}\n"
+            f"- **Área:** {dados.get('area')}\n"
+            f"- **Data:** {dados.get('data')}\n"
+            f"- **Executor:** {dados.get('executor')}\n\n"
+            f"*A OS já foi enviada diretamente para a Agenda Principal.*"
+        )
+    except Exception:
+        return None
+
+
 # --- CHAT FLUTUANTE EM CSS/HTML + PYTHON ---
 def renderizar_chat_flutuante(emp_id):
     URL_AVATAR_HALLEY = "https://i.postimg.cc/5tBtrL6C/Whats-App-Image-2026-07-23-at-22-35-53.png"
     
-    if "abrir_chat_halley" not in st.session_state:[cite: 2]
-        st.session_state.abrir_chat_halley = False[cite: 2]
+    if "abrir_chat_halley" not in st.session_state:
+        st.session_state.abrir_chat_halley = False
 
-    if "mensagens_chat_halley" not in st.session_state:[cite: 2]
-        st.session_state.mensagens_chat_halley = [[cite: 2]
-            {"role": "assistant", "content": "Olá! Sou o Mr. Halley. Como posso te ajudar com a frota?"}[cite: 2]
-        ][cite: 2]
+    if "mensagens_chat_halley" not in st.session_state:
+        st.session_state.mensagens_chat_halley = [
+            {"role": "assistant", "content": "Olá! Sou o Mr. Halley. Como posso te ajudar com a frota?"}
+        ]
         
-    qtd_analises = len(st.session_state.get("analises_halley", []))[cite: 2]
-    label_status = f"💬 Mr. Halley ({qtd_analises})" if qtd_analises > 0 else "💬 Mr. Halley (IA)"[cite: 2]
+    qtd_analises = len(st.session_state.get("analises_halley", []))
+    label_status = f"💬 Mr. Halley ({qtd_analises})" if qtd_analises > 0 else "💬 Mr. Halley (IA)"
 
     st.markdown("""
         <style>
@@ -408,27 +518,27 @@ def renderizar_chat_flutuante(emp_id):
         </style>
     """, unsafe_allow_html=True)
 
-    deve_expandir = st.session_state.abrir_chat_halley[cite: 2]
+    deve_expandir = st.session_state.abrir_chat_halley
 
-    with st.expander(label_status, expanded=deve_expandir):[cite: 2]
+    with st.expander(label_status, expanded=deve_expandir):
         chat_box = st.container(height=390)
         with chat_box:
-            for msg in st.session_state.mensagens_chat_halley:[cite: 2]
+            for msg in st.session_state.mensagens_chat_halley:
                 avatar = URL_AVATAR_HALLEY if msg["role"] == "assistant" else "👤"
-                with st.chat_message(msg["role"], avatar=avatar):[cite: 2]
-                    st.markdown(msg["content"])[cite: 2]
+                with st.chat_message(msg["role"], avatar=avatar):
+                    st.markdown(msg["content"])
 
-        if prompt := st.chat_input("Dúvida técnica ou agendar OS...", key="chat_flutuante_input"):[cite: 2]
-            st.session_state.mensagens_chat_halley.append({"role": "user", "content": prompt})[cite: 2]
+        if prompt := st.chat_input("Dúvida técnica ou agendar OS...", key="chat_flutuante_input"):
+            st.session_state.mensagens_chat_halley.append({"role": "user", "content": prompt})
             with chat_box:
-                with st.chat_message("user", avatar="👤"):[cite: 2]
-                    st.markdown(prompt)[cite: 2]
-                with st.chat_message("assistant", avatar=URL_AVATAR_HALLEY):[cite: 2]
-                    with st.spinner("Processando..."):[cite: 2]
-                        resp = responder_chat_mr_halley(prompt, emp_id)[cite: 2]
-                        st.markdown(resp)[cite: 2]
-            st.session_state.mensagens_chat_halley.append({"role": "assistant", "content": resp})[cite: 2]
-            st.rerun()[cite: 2]
+                with st.chat_message("user", avatar="👤"):
+                    st.markdown(prompt)
+                with st.chat_message("assistant", avatar=URL_AVATAR_HALLEY):
+                    with st.spinner("Processando..."):
+                        resp = responder_chat_mr_halley(prompt, emp_id)
+                        st.markdown(resp)
+            st.session_state.mensagens_chat_halley.append({"role": "assistant", "content": resp})
+            st.rerun()
             
 def gerar_pdf_manual_oficial_pro():
     class PDF(FPDF):
