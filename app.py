@@ -110,12 +110,17 @@ def buscar_historico_relevante(sintoma_motorista, emp_id):
 
 # --- TRIAGEM DO MR. HALLEY COM LLAMA 3 (GROQ + RAG + WEB) ---
 def triagem_mr_halley(sintoma, emp_id, prefixo=None, incluir_saudacao=False):
-    llm = obter_llm()
-    if not llm:
-        return f"Recomenda-se inspeção técnica preventiva padrão para o sistema de {sintoma} (GROQ_API_KEY não configurada)."
-
     historicos = buscar_historico_relevante(sintoma, emp_id)
     tem_historico_local = len(historicos) > 0
+
+    llm = obter_llm()
+    
+    # Fallback seguro caso a chave da Groq não esteja conectada
+    if not llm:
+        if tem_historico_local:
+            return f"Baseado no histórico local da frota, recomenda-se realizar inspeção e reparo no sistema de {sintoma}."
+        else:
+            return f"Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se verificar alinhamento e suspensão."
 
     if tem_historico_local:
         historico_formatado = "\n".join([f"- {h}" for h in historicos])
@@ -135,11 +140,11 @@ Sintoma Relatado: "{sintoma}"
 
 {contexto}
 
-REGRAS:
-1. NÃO inclua saudações, apresentações ou cortesias (ex: NÃO diga 'Olá', 'Sou o Mr. Halley'). Vá direto ao ponto.
+REGRAS OBRIGATÓRIAS:
+1. NÃO inclua saudações, apresentações ou cortesias (ex: NÃO diga 'Olá', 'Sou o Mr. Halley').
 2. {regra_abertura}
 3. Complete indicando a ação técnica com VERBOS NO INFINITIVO.
-4. Mantenha a resposta concisa (10 a 15 palavras).
+4. Resposta concisa (10 a 15 palavras no total).
 """
 
     prompt = ChatPromptTemplate.from_template(template)
@@ -154,7 +159,9 @@ REGRAS:
         })
         return resposta.content.strip()
     except Exception:
-        return f"Não identificamos registros locais da frota; recomenda-se inspeção técnica do sistema de {sintoma}."
+        if tem_historico_local:
+            return f"Baseado no histórico local da frota, recomenda-se realizar manutenção preventiva do sistema de {sintoma}."
+        return f"Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se verificar alinhamento, balanceamento e suspensão."
 
 # --- CHATBOX DO MR. HALLEY (INTERAÇÃO DIRETA VIA CHAT COM LLAMA 3) ---
 def responder_chat_mr_halley(mensagem_usuario, emp_id):
