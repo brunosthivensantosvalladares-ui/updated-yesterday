@@ -80,71 +80,60 @@ def pesquisar_solucao_web(termo_busca: str) -> str:
     except Exception:
         return ""
 
-# --- BUSCA NO BANCO PARA TODA A FROTA (TRAZENDO O PREFIXO DO HISTÓRICO) ---
+# --- 1. BUSCA REAL NO BANCO (SEM FILTRO MANUAL POR PALAVRA) ---
 def buscar_historico_relevante(sintoma_motorista, emp_id):
+    """Busca as ordens de serviço concluídas da empresa para a IA avaliar semanticamente."""
     engine = get_engine()
-    sintoma_limpo = sintoma_motorista.lower().strip()
-    
-    stop_words = {'carro', 'veiculo', 'caminhao', 'esta', 'estao', 'muita', 'muito', 'problema', 'com', 'para', 'nao', 'sem', 'lado', 'pro'}
-    palavras = [p for p in sintoma_limpo.split() if len(p) > 3 and p not in stop_words]
-    
-    if not palavras:
-        return []
-
-    condicoes = " OR ".join([f"LOWER(descricao) LIKE '%{p}%'" for p in palavras])
-    
-    query = text(f"""
+    query = text("""
         SELECT prefixo, descricao 
         FROM tarefas 
-        WHERE empresa_id = :eid AND realizado = True AND ({condicoes})
-        ORDER BY id DESC LIMIT 5
+        WHERE empresa_id = :eid AND realizado = True
+        ORDER BY id DESC LIMIT 25
     """)
-    
     try:
         with engine.connect() as conn:
             resultados = conn.execute(query, {"eid": str(emp_id)}).fetchall()
-        
         return [f"Veículo {r[0]}: {str(r[1]).strip()}" for r in resultados]
     except Exception:
         return []
 
-# --- TRIAGEM DO MR. HALLEY COM VALIDAÇÃO REAL DE HISTÓRICO ---
+# --- 2. TRIAGEM INTELIGENTE DO MR. HALLEY ---
 def triagem_mr_halley(sintoma, emp_id, prefixo=None, incluir_saudacao=False):
     llm = obter_llm()
     historicos = buscar_historico_relevante(sintoma, emp_id)
     
-    historico_formatado = "\n".join([f"- {h}" for h in historicos]) if historicos else "Nenhum histórico encontrado no banco."
-    resultado_web = pesquisar_solucao_web(sintoma) if not historicos else ""
-
+    # Se não houver IA configurada
     if not llm:
-        if historicos:
-            return f"Baseado no histórico local da frota, recomenda-se verificar e reparar o sistema de {sintoma}."
-        return f"Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se inspeção do sistema de {sintoma}."
+        return f"Recomenda-se verificação técnica preventiva para o sistema de {sintoma}."
+
+    historico_formatado = "\n".join([f"- {h}" for h in historicos]) if historicos else "Nenhum registro anterior cadastrado no banco."
+    resultado_web = pesquisar_solucao_web(sintoma)
 
     template = """
-Você é o assistente técnico Mr. Halley da plataforma Updated Yesterday.
-Analise o sintoma relatado e avalie com RIGOR se o histórico interno da frota trata EXATAMENTE da mesma falha mecânica/elétrica.
+Você é o assistente técnico Mr. Halley da plataforma de manutenção Up 2 Today.
 
-Veículo: {prefixo}
+Tarefa: Analisar a falha informada no veículo atual e verificar se há qualquer relação técnica com os serviços anteriores já realizados na frota.
+
+Veículo Atual: {prefixo}
 Sintoma Relatado: "{sintoma}"
 
-Histórico Encontrado no Banco:
+Histórico Geral de Manutenções da Frota:
 {historico_formatado}
 
 Dados Técnicos Externos (Web):
 {contexto_web}
 
-REGRAS DE CLASSIFICAÇÃO:
-- Se houver OS no histórico que trate REALMENTE da mesma falha (ex: mesmo problema de direção/alinhamento), inicie OBRIGATORIAMENTE com:
-  "Baseado no histórico local da frota, recomenda-se"
-
-- Se o histórico estiver vazio OU contiver apenas OSs de outros sistemas não relacionados (ex: sintoma é direção e o histórico trouxe farol/bico/freio), desconsidere o histórico e inicie OBRIGATORIAMENTE com:
-  "Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se"
+INSTRUÇÕES DE CLASSIFICAÇÃO:
+1. Avalie tecnicamente se algum item do "Histórico Geral de Manutenções da Frota" envolve o mesmo sistema mecânico, elétrico ou funcional da falha relatada.
+2. SE HOUVER serviço anterior relacionado na frota:
+   - Inicie OBRIGATORIAMENTE com: "Baseado no histórico local da frota, recomenda-se"
+3. SE NÃO HOUVER nenhum serviço anterior relacionado na frota:
+   - Inicie OBRIGATORIAMENTE com: "Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se"
 
 DIRETRIZES DE RESPOSTA:
-1. NUNCA use saudações.
-2. Complete a recomendação técnica usando verbos no infinitivo e citando os componentes prováveis.
-3. Resposta técnica e concisa (20 a 35 palavras).
+- NUNCA use saudações, cumprimentos ou introduções (como 'Olá', 'Prezado', etc.).
+- Complete a recomendação técnica indicando ações e componentes com verbos no infinitivo.
+- Mantenha a resposta concisa e direta (entre 18 e 35 palavras no total).
 """
 
     prompt = ChatPromptTemplate.from_template(template)
@@ -155,14 +144,13 @@ DIRETRIZES DE RESPOSTA:
             "prefixo": prefixo if prefixo else "Não informado",
             "sintoma": sintoma,
             "historico_formatado": historico_formatado,
-            "contexto_web": resultado_web[:600] if resultado_web else "Inspeção mecânica geral."
+            "contexto_web": resultado_web[:500] if resultado_web else "Inspeção técnica padrão de montadora."
         })
         return resposta.content.strip()
     except Exception:
-        # Fallback 100% genérico para qualquer sistema (freio, motor, elétrica, ar, etc.)
         if historicos:
-            return f"Baseado no histórico local da frota, recomenda-se realizar inspeção técnica e manutenção do sistema relacionado a {sintoma}."
-        return f"Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se diagnóstico preventivo para {sintoma}."
+            return f"Baseado no histórico local da frota, recomenda-se inspeção técnica do sistema de {sintoma}."
+        return f"Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se inspeção técnica do sistema de {sintoma}."
 
 
 # --- CHATBOX DO MR. HALLEY (INTERAÇÃO COM CONTEXTO E SEM ALUCINAÇÕES) ---
