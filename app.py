@@ -84,7 +84,7 @@ def formatar_acao_infinitivo(texto_bruto):
     
 # --- 1. CONFIGURAÇÕES E ESTILOS ---
 NOME_SISTEMA = "Updated Yesterday"
-SLOGAN = "Seu Controle. Nossa Prioridade."
+SLOGAN = "Seu controle. Nossa prioridade."
 LOGO_URL = "https://i.postimg.cc/6Q7dyFgs/Gemini-Generated-Image.png"
 ORDEM_AREAS = ["Motorista", "Borracharia", "Mecânica", "Elétrica", "Chapeamento", "Limpeza"]
 LISTA_TURNOS = ["Não definido", "Dia", "Noite"]
@@ -704,48 +704,54 @@ def obter_proxima_os(engine, emp_id):
 
 COR_BRONZE = "#4A3C31"  
 COR_OURO = "#C5A059"    
-COR_CHAPA = "#E2DFD2"   
+COR_CHAPA = "#F7F5F0"   
 COR_TEXTO = "#231F20"   
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title=f"{NOME_SISTEMA} - Painel de Controle", layout="wide", page_icon="⚙️")
 
+# --- NOVO DESIGN SYSTEM LUXO / NEUMÓRFICO SUAVE ---
 st.markdown(f"""
     <style>
-    html, body, [data-testid="stAppViewContainer"], .stApp {{ background-color: {COR_CHAPA} !important; }}
-    [data-testid="stSidebar"] {{ background-color: #FFFFFF !important; }}
-
-    [data-testid="stSidebarCollapsedControl"] svg, 
-    button[data-testid="stBaseButton-headerNoPadding"] svg {{
-        fill: {COR_BRONZE} !important;
-        color: {COR_BRONZE} !important;
-    }}
-
-    p, label, span, div, .stMarkdown, [data-testid="stText"] {{
-        color: {COR_TEXTO} !important;
+    /* Fundo Geral da Aplicação */
+    html, body, [data-testid="stAppViewContainer"], .stApp {{ 
+        background-color: {COR_CHAPA} !important; 
+        font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif !important;
     }}
     
-    [data-testid="stSidebar"] p, [data-testid="stSidebar"] label, [data-testid="stSidebar"] span, [data-testid="stSidebar"] div {{
-        color: {COR_BRONZE} !important;
+    /* Sidebar Escura Elegante */
+    [data-testid="stSidebar"] {{ 
+        background: linear-gradient(180deg, #2A211B 0%, #1D1612 100%) !important; 
+        border-right: 1px solid #3D3128 !important;
+    }}
+    [data-testid="stSidebar"] * {{
+        color: #F0EDE6 !important;
+    }}
+    [data-testid="stSidebar"] [data-testid="stRadio"] > div {{
+        background: transparent !important;
+        border: none !important;
+        gap: 4px !important;
+    }}
+    [data-testid="stSidebar"] [data-testid="stRadio"] label {{
+        background-color: transparent !important;
+        padding: 8px 12px !important;
+        border-radius: 8px !important;
+        font-size: 0.95rem !important;
+        transition: all 0.2s ease !important;
+    }}
+    [data-testid="stSidebar"] [data-testid="stRadio"] label:hover {{
+        background-color: rgba(197, 160, 89, 0.15) !important;
     }}
 
-    div[data-testid="stRadio"] > div {{
-        display: flex;
-        justify-content: center;
-        background-color: #FFFFFF;
-        padding: 10px;
-        border-radius: 6px;
-        border: 2px solid {COR_BRONZE};
-    }}
-
+    /* Botões Padrão */
     button, 
     button[kind="primary"], 
     button[kind="secondary"], 
     [data-testid="stBaseButton-primary"], 
     [data-testid="stBaseButton-secondary"] {{
         background-color: {COR_BRONZE} !important;
-        border: 2px solid {COR_OURO} !important;
-        border-radius: 4px !important;
+        border: 1.5px solid {COR_OURO} !important;
+        border-radius: 6px !important;
         color: #FFFFFF !important;
     }}
 
@@ -768,16 +774,90 @@ st.markdown(f"""
         -webkit-text-fill-color: {COR_TEXTO} !important;
     }}
 
-    button svg, [data-testid="stDateInput"] svg {{
-        fill: #FFFFFF !important;
-        color: #FFFFFF !important;
+    /* Cartões Modernos de Dashboard */
+    .quick-card {{
+        background: #FFFFFF;
+        border: 1.5px solid #EDE8DF;
+        border-radius: 18px;
+        padding: 20px;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.03);
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        transition: all 0.25s ease;
+        cursor: pointer;
+        min-height: 110px;
     }}
-
-    div[data-baseweb="calendar"] [aria-selected="true"],
-    div[data-baseweb="calendar"] [class*="Selected"],
-    div[data-baseweb="calendar"] [class*="Highlighted"] {{
-        background-color: {COR_BRONZE} !important;
-        background: {COR_BRONZE} !important;
+    .quick-card.active {{
+        border: 2px solid #C5A059;
+        box-shadow: 0 6px 20px rgba(197, 160, 89, 0.18);
+    }}
+    .quick-card-icon-dark {{
+        background: #3B2E25;
+        color: #C5A059;
+        border-radius: 14px;
+        width: 56px;
+        height: 56px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.8rem;
+    }}
+    .quick-card-icon-light {{
+        background: #FBF8F3;
+        color: #8C7355;
+        border: 1px solid #EAE3D5;
+        border-radius: 14px;
+        width: 56px;
+        height: 56px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.8rem;
+    }}
+    .quick-card-title {{
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: #2D241E;
+        margin: 0;
+    }}
+    .quick-card-sub {{
+        font-size: 0.82rem;
+        color: #8A7E75;
+        margin: 2px 0 0 0;
+    }}
+    
+    /* Cartões de Métricas */
+    .metric-card {{
+        background: #FFFFFF;
+        border-radius: 18px;
+        padding: 22px;
+        border: 1px solid #EFEAE1;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.03);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }}
+    .metric-icon-box {{
+        width: 58px;
+        height: 58px;
+        border-radius: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.9rem;
+    }}
+    .metric-value {{
+        font-size: 2.2rem;
+        font-weight: 800;
+        color: #1F1915;
+        line-height: 1;
+        margin-top: 4px;
+    }}
+    .metric-label {{
+        font-size: 0.9rem;
+        color: #8F847B;
+        font-weight: 600;
     }}
     </style>
 """, unsafe_allow_html=True)
@@ -891,30 +971,31 @@ def gerar_pdf_periodo(df_periodo, data_inicio, data_fim):
     pdf.cell(190, 8, f"Periodo: {data_inicio.strftime('%d/%m/%Y')} ate {data_fim.strftime('%d/%m/%Y')}", ln=True, align="C")
     pdf.ln(5)
     
-    for d_process in sorted(df_periodo['data'].unique(), reverse=True):
-        d_formatada = pd.to_datetime(d_process).strftime('%d/%m/%Y')
-        pdf.set_font("Arial", "B", 11); pdf.set_fill_color(240, 240, 240)
-        pdf.cell(190, 8, f" DATA: {d_formatada}", ln=True, fill=True)
-        
-        for area in ORDEM_AREAS:
-            df_area = df_periodo[(df_periodo['data'] == d_process) & (df_periodo['area'] == area)]
-            if not df_area.empty:
-                pdf.set_font("Arial", "B", 9); pdf.set_text_color(197, 160, 89)
-                pdf.cell(190, 7, f" Setor: {area}", ln=True)
-                
-                pdf.set_font("Arial", "B", 8); pdf.set_text_color(50); pdf.set_fill_color(230, 230, 230)
-                pdf.cell(20, 6, "Prefixo", 1, 0, 'C', True)
-                pdf.cell(35, 6, "Executor", 1, 0, 'C', True)
-                pdf.cell(40, 6, "Disponibilidade", 1, 0, 'C', True)
-                pdf.cell(95, 6, "Descricao", 1, 1, 'C', True)
-                
-                pdf.set_font("Arial", "", 7); pdf.set_text_color(0)
-                for _, row in df_area.iterrows():
-                    pdf.cell(20, 6, str(row['prefixo']), 1, 0, 'C')
-                    pdf.cell(35, 6, str(row['executor'])[:20], 1, 0, 'C')
-                    pdf.cell(40, 6, f"{row['inicio_disp']} - {row['fim_disp']}", 1, 0, 'C')
-                    pdf.cell(95, 6, str(row['descricao'])[:75], 1, 1, 'L')
-                pdf.ln(2)
+    if not df_periodo.empty and 'data' in df_periodo.columns:
+        for d_process in sorted(df_periodo['data'].unique(), reverse=True):
+            d_formatada = pd.to_datetime(d_process).strftime('%d/%m/%Y')
+            pdf.set_font("Arial", "B", 11); pdf.set_fill_color(240, 240, 240)
+            pdf.cell(190, 8, f" DATA: {d_formatada}", ln=True, fill=True)
+            
+            for area in ORDEM_AREAS:
+                df_area = df_periodo[(df_periodo['data'] == d_process) & (df_periodo['area'] == area)]
+                if not df_area.empty:
+                    pdf.set_font("Arial", "B", 9); pdf.set_text_color(197, 160, 89)
+                    pdf.cell(190, 7, f" Setor: {area}", ln=True)
+                    
+                    pdf.set_font("Arial", "B", 8); pdf.set_text_color(50); pdf.set_fill_color(230, 230, 230)
+                    pdf.cell(20, 6, "Prefixo", 1, 0, 'C', True)
+                    pdf.cell(35, 6, "Executor", 1, 0, 'C', True)
+                    pdf.cell(40, 6, "Disponibilidade", 1, 0, 'C', True)
+                    pdf.cell(95, 6, "Descricao", 1, 1, 'C', True)
+                    
+                    pdf.set_font("Arial", "", 7); pdf.set_text_color(0)
+                    for _, row in df_area.iterrows():
+                        pdf.cell(20, 6, str(row['prefixo']), 1, 0, 'C')
+                        pdf.cell(35, 6, str(row['executor'])[:20], 1, 0, 'C')
+                        pdf.cell(40, 6, f"{row['inicio_disp']} - {row['fim_disp']}", 1, 0, 'C')
+                        pdf.cell(95, 6, str(row['descricao'])[:75], 1, 1, 'L')
+                    pdf.ln(2)
                 
     return pdf.output(dest='S').encode('latin-1')
 
@@ -1074,10 +1155,10 @@ else:
     if st.session_state["perfil"] == "motorista":
         opcoes = ["✍️ Abrir Solicitação", "📜 Status"]
     else:
-        opcoes = ["📅 Agenda Principal", "📋 Cadastro Direto", "📥 Chamados Oficina", "🤖 Chat Mr. Halley", "⏳ OSs Pendentes", "✅ OSs Concluídas", "📊 Indicadores", "📖 Manual do Sistema"]
+        opcoes = ["🏠 Dashboard", "📅 Agenda Principal", "📋 Cadastro Direto", "📥 Chamados Oficina", "🤖 Chat Mr. Halley", "⏳ OSs Pendentes", "✅ OSs Concluídas", "📊 Indicadores", "📖 Manual do Sistema"]
         
         if usuario_ativo == "bruno":
-            opcoes.insert(6, "👥 Minha Equipe")
+            opcoes.insert(7, "👥 Minha Equipe")
             opcoes.append("👑 Gestão Master")
 
     if "opcao_selecionada" not in st.session_state or st.session_state.opcao_selecionada not in opcoes:
@@ -1090,12 +1171,15 @@ else:
         st.session_state.opcao_selecionada = target
         st.session_state.radio_key += 1 
 
-    # --- MONTAGEM DA SIDEBAR ---
+    # --- MONTAGEM DA SIDEBAR ELEGANTE ---
     with st.sidebar:
-        _, col_img, _ = st.columns([0.05, 0.9, 0.05])
-        with col_img:
-            st.image(LOGO_URL, use_container_width=True)
-        st.markdown(f"<p style='text-align: center; font-size: 0.8rem; color: {COR_BRONZE}; margin-top: -10px;'>{SLOGAN}</p>", unsafe_allow_html=True)
+        st.markdown(f"""
+            <div style='text-align: center; padding: 10px 0 16px 0;'>
+                <img src='{LOGO_URL}' style='width: 105px; height: 105px; border-radius: 50%; border: 3px solid #C5A059; box-shadow: 0 4px 15px rgba(0,0,0,0.5);'>
+                <h3 style='color: #C5A059; margin: 12px 0 0 0; font-size: 1.15rem; letter-spacing: 1px;'>UPDATED YESTERDAY</h3>
+                <p style='color: #A89C91; font-size: 0.78rem; margin: 2px 0 0 0;'>{SLOGAN}</p>
+            </div>
+        """, unsafe_allow_html=True)
         st.divider()
         
         try:
@@ -1112,30 +1196,163 @@ else:
         )
         
         st.divider()
+        st.markdown("""
+            <div style='background: rgba(197, 160, 89, 0.08); border: 1.5px solid #C5A059; border-radius: 12px; padding: 12px; margin-bottom: 12px;'>
+                <p style='margin:0; font-weight:700; color:#C5A059; font-size:0.9rem;'>💬 Chat com Mr. Halley</p>
+                <p style='margin:2px 0 0 0; font-size:0.75rem; color:#DDD;'>Estamos online para ajudar!</p>
+            </div>
+        """, unsafe_allow_html=True)
+
         st.write(f"🏢 **Empresa:** {emp_id}")
-        st.write(f"👤 **{st.session_state['perfil'].capitalize()}**")
-        if st.button("Sair da Conta", type="primary"): 
+        st.write(f"👤 **{st.session_state['perfil'].capitalize()}** ({usuario_ativo})")
+        if st.button("Sair da Conta", type="primary", use_container_width=True): 
             st.session_state["logado"] = False
             st.rerun()
 
-    # --- BOTÕES DE NAVEGAÇÃO DE ABA NO TOPO ---
-    cols = st.columns(len(opcoes))
-    for i, nome in enumerate(opcoes):
-        eh_ativo = nome == st.session_state.opcao_selecionada
-        cols[i].button(
-            nome, 
-            key=f"btn_tab_{i}", 
-            use_container_width=True, 
-            type="primary" if eh_ativo else "secondary",
-            on_click=set_nav, 
-            args=(nome,)
-        )
+    # --- BARRA DE TOPO (HEADER) ---
+    c_srch, c_tools = st.columns([0.6, 0.4])
+    with c_srch:
+        st.text_input("Buscar...", placeholder="🔍 Buscar veículo, OS, motorista ou serviço...", label_visibility="collapsed")
+    with c_tools:
+        st.markdown(f"""
+            <div style='display: flex; justify-content: flex-end; align-items: center; gap: 20px; padding-top: 5px;'>
+                <span style='color: #3B2E25; font-weight: 600; cursor: pointer; border-bottom: 2px solid #3B2E25;'>Ajuda</span>
+                <span style='color: #6E6259; cursor: pointer;'>Idioma ▾</span>
+                <span style='color: #6E6259; cursor: pointer;'>Ferramentas de tela</span>
+                <span style='position: relative; font-size: 1.3rem; cursor: pointer;'>🔔<span style='position: absolute; top: -5px; right: -8px; background: #E53935; color: white; border-radius: 50%; font-size: 0.65rem; padding: 2px 6px; font-weight: bold;'>2</span></span>
+                <span style='font-size: 1.3rem; cursor: pointer;'>☀️</span>
+                <span style='font-size: 1.4rem; background: #3B2E25; border-radius: 50%; padding: 4px 8px; color: white;'>👤</span>
+            </div>
+        """, unsafe_allow_html=True)
 
-    st.divider()
+    st.markdown("<hr style='margin: 10px 0 20px 0; border: none; border-top: 1px solid #ECE7DE;'>", unsafe_allow_html=True)
+
     aba_ativa = st.session_state.opcao_selecionada
 
-    # --- CONTEÚDO DAS PÁGINAS ---
-    if aba_ativa == "👑 Gestão Master" and usuario_ativo == "bruno":
+    # ==================================================
+    # NOVA ABA: 🏠 DASHBOARD EXCLUSIVA
+    # ==================================================
+    if aba_ativa == "🏠 Dashboard":
+        st.markdown("<h4 style='color: #2D241E; font-weight: 700; margin-bottom: 16px;'>Acesso Rápido</h4>", unsafe_allow_html=True)
+        
+        col_q1, col_q2, col_q3 = st.columns(3)
+        with col_q1:
+            st.markdown("""
+                <div class='quick-card active'>
+                    <div class='quick-card-icon-dark'>📅</div>
+                    <div>
+                        <p class='quick-card-title'>Agenda Principal</p>
+                        <p class='quick-card-sub'>Controle de janelas de box e manutenções programadas.</p>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+            if st.button("Abrir Agenda", key="btn_q_agenda", use_container_width=True):
+                set_nav("📅 Agenda Principal")
+                st.rerun()
+
+        with col_q2:
+            st.markdown("""
+                <div class='quick-card'>
+                    <div class='quick-card-icon-light'>📋</div>
+                    <div>
+                        <p class='quick-card-title'>Cadastro Direto</p>
+                        <p class='quick-card-sub'>Agendamento de preventivas e revisões periódicas.</p>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+            if st.button("Abrir Cadastro", key="btn_q_cadastro", use_container_width=True):
+                set_nav("📋 Cadastro Direto")
+                st.rerun()
+
+        with col_q3:
+            st.markdown("""
+                <div class='quick-card'>
+                    <div class='quick-card-icon-light'>📖</div>
+                    <div>
+                        <p class='quick-card-title'>Chamados Oficina</p>
+                        <p class='quick-card-sub'>Triagem técnica e diagnósticos com o Mr. Halley.</p>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+            if st.button("Ver Chamados", key="btn_q_chamados", use_container_width=True):
+                set_nav("📥 Chamados Oficina")
+                st.rerun()
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("<h4 style='color: #2D241E; font-weight: 700; margin-bottom: 16px;'>Cronograma Geral de Manutenção</h4>", unsafe_allow_html=True)
+        
+        df_dash_stats = pd.read_sql(text("SELECT data, realizado FROM tarefas WHERE empresa_id = :eid"), engine, params={"eid": str(emp_id)})
+        agendados_hoje, concluidos_total, pendentes_total = 0, 0, 0
+        
+        if not df_dash_stats.empty:
+            df_dash_stats['data_dt'] = pd.to_datetime(df_dash_stats['data'], errors='coerce').dt.date
+            hoje_dt = datetime.now().date()
+            agendados_hoje = len(df_dash_stats[df_dash_stats['data_dt'] == hoje_dt])
+            concluidos_total = len(df_dash_stats[df_dash_stats['realizado'] == True])
+            pendentes_total = len(df_dash_stats[df_dash_stats['realizado'] == False])
+
+        col_m1, col_m2, col_m3 = st.columns(3)
+        with col_m1:
+            st.markdown(f"""
+                <div class='metric-card'>
+                    <div class='metric-icon-box' style='background: #F4E8D1; color: #C5A059;'>📅</div>
+                    <div style='text-align: right;'>
+                        <span class='metric-label'>Agendados hoje</span>
+                        <div class='metric-value'>{agendados_hoje}</div>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+
+        with col_m2:
+            st.markdown(f"""
+                <div class='metric-card'>
+                    <div class='metric-icon-box' style='background: #3B2E25; color: #FFFFFF;'>✓</div>
+                    <div style='text-align: right;'>
+                        <span class='metric-label'>Concluídos</span>
+                        <div class='metric-value'>{concluidos_total}</div>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+
+        with col_m3:
+            st.markdown(f"""
+                <div class='metric-card'>
+                    <div class='metric-icon-box' style='background: #FAECE4; color: #E65100;'>🕒</div>
+                    <div style='text-align: right;'>
+                        <span class='metric-label'>Pendentes</span>
+                        <div class='metric-value'>{pendentes_total}</div>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        col_filtro, col_exp = st.columns([0.55, 0.45])
+        
+        with col_filtro:
+            with st.container(border=True):
+                st.markdown("<h5 style='color: #2D241E;'>🔍 Filtro Operacional</h5>", unsafe_allow_html=True)
+                p_sel_dash = st.date_input("Período", [datetime.now().date(), datetime.now().date() + timedelta(days=1)], key="dash_dt_filter")
+                f_area_dash = st.selectbox("Área", ["Todas"] + ORDEM_AREAS, key="dash_f_area")
+                f_turno_dash = st.selectbox("Turno", ["Todos"] + LISTA_TURNOS, key="dash_f_turno")
+
+        with col_exp:
+            with st.container(border=True):
+                st.markdown("<h5 style='color: #2D241E;'>📤 Exportações Rápidas</h5>", unsafe_allow_html=True)
+                c_btn_pdf, c_btn_xls = st.columns(2)
+                with c_btn_pdf:
+                    st.download_button("📄 PDF", gerar_pdf_periodo(pd.DataFrame(), datetime.now().date(), datetime.now().date()), "Relatorio.pdf", use_container_width=True, key="dash_pdf_btn")
+                with c_btn_xls:
+                    st.download_button("📊 EXCEL", to_excel_native(pd.DataFrame()), "Relatorio.xlsx", use_container_width=True, key="dash_xls_btn")
+
+            with st.expander("💡 Como usar a Agenda?", expanded=False):
+                st.write("""
+                1. Selecione a Ordem de Serviço desejada na lista.
+                2. Preencha os horários de início e fim da janela logística.
+                3. Finalize a execução na aba de baixa técnica para atualizar os relatórios em tempo real.
+                """)
+
+    # --- DEMAIS ABAS DO SISTEMA (PRESERVADAS INTEGRALMENTE) ---
+    elif aba_ativa == "👑 Gestão Master" and usuario_ativo == "bruno":
         st.subheader("👑 Painel de Controle Master")
         
         llm = obter_llm()
@@ -1452,7 +1669,7 @@ else:
                                     st.warning(f"OS Selecionada: **{os_label}**")
                                     if st.button(f"🚀 Abrir Baixa Técnica da OS {os_label}", type="primary", use_container_width=True, key="btn_baixa_topo"):
                                         st.session_state.os_em_baixa = os_data_atraso
-                                        st.session_state.opcao_selecionada = "⏳ OSs Pendentes"
+                                        set_nav("⏳ OSs Pendentes")
                                         st.rerun()
                                     st.divider()
 
