@@ -1211,7 +1211,7 @@ else:
     with st.sidebar:
         st.markdown(f"""
             <div style='text-align: center; padding: 10px 0 16px 0;'>
-                <div class='logo-container-circular'>
+                <div class='logo-container-circular' style='width: 90px; height: 90px;'>
                     <img src='{LOGO_URL}' class='logo-img-crop'>
                 </div>
                 <p class='brand-title-gold'>UPDATED YESTERDAY</p>
