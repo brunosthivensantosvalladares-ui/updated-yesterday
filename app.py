@@ -85,7 +85,7 @@ def formatar_acao_infinitivo(texto_bruto):
 # --- 1. CONFIGURAÇÕES E ESTILOS ---
 NOME_SISTEMA = "Updated Yesterday"
 SLOGAN = "Seu controle. Nossa prioridade."
-LOGO_URL = "https://i.postimg.cc/q7H9m6DQ/Design-sem-nome-(1).png"
+LOGO_URL = "https://i.postimg.cc/rwQs1cpc/Design-sem-nome-(2).png"
 ORDEM_AREAS = ["Motorista", "Borracharia", "Mecânica", "Elétrica", "Chapeamento", "Limpeza"]
 LISTA_TURNOS = ["Não definido", "Dia", "Noite"]
 
@@ -721,27 +721,24 @@ st.markdown(f"""
         font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif !important;
     }}
 
-    /* Container do Brasão Circular Centralizado Perfeitamente */
+    /* Container do Brasão Circular Alinhado 100% no Centro */
     .logo-container-circular {{
-        width: 100px;
-        height: 100px;
+        width: 104px;
+        height: 104px;
         margin: 0 auto !important;
         border-radius: 50%;
         overflow: hidden;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
-        position: relative;
     }}
     .logo-img-crop {{
         width: 100%;
         height: 100%;
         object-fit: cover;
-        object-position: 48.5% 53%;
-        transform: scale(1.36);
-        clip-path: circle(39% at 48.5% 53%);
         display: block;
         margin: 0 auto;
+        border-radius: 50%;
     }}
     
     /* Tipografia Dourada Cinzel Unificada (Sidebar e Login) */
@@ -1049,7 +1046,7 @@ if not st.session_state["logado"]:
     with col_login:
         st.markdown(f"""
             <div style='text-align: center; margin-bottom: 5px;'>
-                <div class='logo-container-circular' style='width: 92px; height: 92px;'>
+                <div class='logo-container-circular' style='width: 90px; height: 90px;'>
                     <img src='{LOGO_URL}' class='logo-img-crop'>
                 </div>
                 <p class='login-brand-title'>UPDATED YESTERDAY</p>
