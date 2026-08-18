@@ -85,7 +85,7 @@ def formatar_acao_infinitivo(texto_bruto):
 # --- 1. CONFIGURAÇÕES E ESTILOS ---
 NOME_SISTEMA = "Updated Yesterday"
 SLOGAN = "Seu controle. Nossa prioridade."
-LOGO_URL = "https://i.postimg.cc/6Q7dyFgs/Gemini-Generated-Image.png"
+LOGO_URL = "https://i.postimg.cc/q7H9m6DQ/Design-sem-nome-(1).png"
 ORDEM_AREAS = ["Motorista", "Borracharia", "Mecânica", "Elétrica", "Chapeamento", "Limpeza"]
 LISTA_TURNOS = ["Não definido", "Dia", "Noite"]
 
@@ -710,15 +710,31 @@ COR_TEXTO = "#231F20"
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title=f"{NOME_SISTEMA} - Painel de Controle", layout="wide", page_icon="⚙️")
 
-# --- NOVO DESIGN SYSTEM LUXO / NEUMÓRFICO SUAVE ---
+# --- NOVO DESIGN SYSTEM LUXO / NEUMÓRFICO SUAVE & FONTE CINZEL ROMANA ---
 st.markdown(f"""
     <style>
+    @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&display=swap');
+
     /* Fundo Geral da Aplicação */
     html, body, [data-testid="stAppViewContainer"], .stApp {{ 
         background-color: {COR_CHAPA} !important; 
         font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif !important;
     }}
     
+    /* Título com Fonte Romana Luxo Dourada */
+    .brand-title-gold {{
+        font-family: 'Cinzel', serif !important;
+        font-weight: 800 !important;
+        font-size: 1.25rem !important;
+        letter-spacing: 2px !important;
+        background: linear-gradient(135deg, #E6C875 0%, #C5A059 50%, #9B783E 100%) !important;
+        -webkit-background-clip: text !important;
+        -webkit-text-fill-color: transparent !important;
+        margin: 12px 0 0 0 !important;
+        text-align: center !important;
+        text-transform: uppercase !important;
+    }}
+
     /* Sidebar Escura Elegante */
     [data-testid="stSidebar"] {{ 
         background: linear-gradient(180deg, #2A211B 0%, #1D1612 100%) !important; 
@@ -867,14 +883,17 @@ st.markdown("""
     .logo-u { color: #4A3C31 !important; font-weight: bold; }
     .logo-y { color: #C5A059 !important; font-weight: bold; }
     .login-brand-title {
+        font-family: 'Cinzel', serif !important;
         text-align: center !important;
-        color: #C5A059 !important; 
-        font-size: 2.8rem !important;
-        font-weight: 900 !important;
+        background: linear-gradient(135deg, #E6C875 0%, #C5A059 50%, #9B783E 100%) !important;
+        -webkit-background-clip: text !important;
+        -webkit-text-fill-color: transparent !important;
+        font-size: 2.3rem !important;
+        font-weight: 800 !important;
         margin-bottom: 0px !important;
         margin-top: 10px !important;
         line-height: 1.1 !important;
-        font-family: sans-serif !important;
+        letter-spacing: 2px !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -1015,8 +1034,13 @@ if "usuario_ativo" not in st.session_state:
 if not st.session_state["logado"]:
     _, col_login, _ = st.columns([1.2, 1, 1.2])
     with col_login:
-        st.markdown("<p class='login-brand-title'>UY</p>", unsafe_allow_html=True)
-        st.markdown(f"<p style='text-align: center; font-style: italic; color: #555; margin-top: 0;'>{SLOGAN}</p>", unsafe_allow_html=True)
+        st.markdown(f"""
+            <div style='text-align: center; margin-bottom: 5px;'>
+                <img src='{LOGO_URL}' style='width: 120px; height: 120px; border-radius: 50%; border: 3px solid #C5A059; box-shadow: 0 4px 15px rgba(0,0,0,0.3);'>
+            </div>
+        """, unsafe_allow_html=True)
+        st.markdown("<p class='login-brand-title'>UPDATED YESTERDAY</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='text-align: center; font-style: italic; color: #8F847B; margin-top: 0; margin-bottom: 20px;'>{SLOGAN}</p>", unsafe_allow_html=True)
         
         aba = st.radio("Selecione uma opção", ["Acessar", "Criar Conta"], horizontal=True, label_visibility="collapsed")
         
@@ -1171,13 +1195,13 @@ else:
         st.session_state.opcao_selecionada = target
         st.session_state.radio_key += 1 
 
-    # --- MONTAGEM DA SIDEBAR ELEGANTE ---
+    # --- MONTAGEM DA SIDEBAR ELEGANTE COM FONTE DOURADA CINZEL ---
     with st.sidebar:
         st.markdown(f"""
             <div style='text-align: center; padding: 10px 0 16px 0;'>
                 <img src='{LOGO_URL}' style='width: 105px; height: 105px; border-radius: 50%; border: 3px solid #C5A059; box-shadow: 0 4px 15px rgba(0,0,0,0.5);'>
-                <h3 style='color: #C5A059; margin: 12px 0 0 0; font-size: 1.15rem; letter-spacing: 1px;'>UPDATED YESTERDAY</h3>
-                <p style='color: #A89C91; font-size: 0.78rem; margin: 2px 0 0 0;'>{SLOGAN}</p>
+                <p class='brand-title-gold'>UPDATED YESTERDAY</p>
+                <p style='color: #A89C91; font-size: 0.78rem; margin: 4px 0 0 0;'>{SLOGAN}</p>
             </div>
         """, unsafe_allow_html=True)
         st.divider()
@@ -1351,7 +1375,7 @@ else:
                 3. Finalize a execução na aba de baixa técnica para atualizar os relatórios em tempo real.
                 """)
 
-    # --- DEMAIS ABAS DO SISTEMA (PRESERVADAS INTEGRALMENTE) ---
+    # --- DEMAIS ABAS DO SISTEMA ---
     elif aba_ativa == "👑 Gestão Master" and usuario_ativo == "bruno":
         st.subheader("👑 Painel de Controle Master")
         
