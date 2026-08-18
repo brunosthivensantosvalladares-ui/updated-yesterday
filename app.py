@@ -311,7 +311,7 @@ Referência da Data Atual do Sistema: {hoje}
 
 CAMPOS DA OS:
 - prefixo: Número/placa do veículo (capture do contexto se for "esse veículo" ou "último veículo")
-- descricao: Descrição do problem/serviço (capture do contexto se for "mesmo problema")
+- descricao: Descrição do problema/serviço (capture do contexto se for "mesmo problema")
 - executor: Mecânico ou responsável
 - data: Data no formato AAAA-MM-DD. REGRA CRÍTICA: Deixe NULO/VAZIO se o usuário NÃO tiver informado explicitamente uma data ou termos como "hoje", "amanhã", "17/08". NUNCA preencha automaticamente.
 - area: APENAS UMA DAS 5 OPÇÕES: Mecânica, Elétrica, Borracharia, Chapeamento ou Limpeza. Deixe NULO/VAZIO se o usuário não disse explicitamente.
@@ -721,10 +721,10 @@ st.markdown(f"""
         font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif !important;
     }}
 
-    /* Container do Brasão Centralizado Perfeitamente Sem Bordas Brancas */
+    /* Container do Brasão Circular Centralizado Perfeitamente */
     .logo-container-circular {{
-        width: 110px;
-        height: 110px;
+        width: 100px;
+        height: 100px;
         margin: 0 auto !important;
         border-radius: 50%;
         overflow: hidden;
@@ -737,9 +737,9 @@ st.markdown(f"""
         width: 100%;
         height: 100%;
         object-fit: cover;
-        object-position: center;
-        transform: scale(1.28);
-        clip-path: circle(40.5% at 50% 50%);
+        object-position: 48.5% 53%;
+        transform: scale(1.36);
+        clip-path: circle(39% at 48.5% 53%);
         display: block;
         margin: 0 auto;
     }}
@@ -1049,7 +1049,7 @@ if not st.session_state["logado"]:
     with col_login:
         st.markdown(f"""
             <div style='text-align: center; margin-bottom: 5px;'>
-                <div class='logo-container-circular'>
+                <div class='logo-container-circular' style='width: 92px; height: 92px;'>
                     <img src='{LOGO_URL}' class='logo-img-crop'>
                 </div>
                 <p class='login-brand-title'>UPDATED YESTERDAY</p>
