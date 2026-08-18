@@ -721,10 +721,8 @@ st.markdown(f"""
         font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif !important;
     }}
 
-    /* Container do Brasão Circular Alinhado 100% no Centro */
+    /* Container do Brasão Circular */
     .logo-container-circular {{
-        width: 104px;
-        height: 104px;
         margin: 0 auto !important;
         border-radius: 50%;
         overflow: hidden;
@@ -735,12 +733,11 @@ st.markdown(f"""
     .logo-img-crop {{
         width: 100%;
         height: 100%;
-        object-fit: cover;
-        object-position: center center;
-        transform: scale(1.18);
+        object-fit: contain !important;
         display: block;
         margin: 0 auto;
         border-radius: 50%;
+        transform: scale(1.0) !important;
     }}
     
     /* Tipografia Dourada Cinzel Unificada (Sidebar e Login) */
@@ -1048,7 +1045,7 @@ if not st.session_state["logado"]:
     with col_login:
         st.markdown(f"""
             <div style='text-align: center; margin-bottom: 5px;'>
-                <div class='logo-container-circular' style='width: 82px; height: 82px;'>
+                <div class='logo-container-circular' style='width: 90px; height: 90px;'>
                     <img src='{LOGO_URL}' class='logo-img-crop'>
                 </div>
                 <p class='login-brand-title'>UPDATED YESTERDAY</p>
@@ -1807,8 +1804,8 @@ else:
             st.markdown("""
                 ### 📝 Guia Rápido - Cadastro
                 1. **Uso:** Utilize para preventivas ou serviços que não vieram de uma reclamação de motorista.
-                2. **Formulário:** Preencha os campos and confirme.
-                3. **Gestão:** Na lista abaixo, você pode excluir registros marcando a coluna **Exc** and clicando em excluir.
+                2. **Formulário:** Preencha os campos e confirme.
+                3. **Gestão:** Na lista abaixo, você pode excluir registros marcando a coluna **Exc** e clicando em excluir.
             """)
         st.info("💡 **Atenção:** Use este formulário para serviços que não vieram de chamados.")
         st.warning("⚠️ **Nota:** Para reagendar ou corrigir, basta alterar diretamente na lista abaixo. O salvamento é automático.")
@@ -1879,7 +1876,7 @@ else:
                 ### 📥 Guia Rápido - Chamados
                 1. **Triagem:** Veja o que os motoristas relataram. 
                 2. **Aprovação:** Marque a caixa **Aprovar?** para o Mr. Halley dar o diagnóstico de cada veículo!
-                3. **Planejamento:** Defina o Executor and a Área com base nos pareceres.
+                3. **Planejamento:** Defina o Executor e a Área com base nos pareceres.
                 4. **Finalizar:** Clique em **Processar Agendamentos**.
             """)
             
@@ -1976,7 +1973,7 @@ else:
                     if 'df_ap_work' in st.session_state: del st.session_state.df_ap_work
                     if 'analises_halley' in st.session_state: del st.session_state.analises_halley
                         
-                    st.success("✅ Agendamentos processados and enviados à Agenda Principal!")
+                    st.success("✅ Agendamentos processados e enviados à Agenda Principal!")
                     st.rerun()
                 else:
                     st.warning("⚠️ Selecione ao menos um chamado na coluna 'Aprovar?' antes de processar.")
@@ -2017,7 +2014,7 @@ else:
             
     elif aba_ativa == "📊 Indicadores":
         st.subheader("📊 Painel de Performance Operacional")
-        st.info("💡 **Dica:** Utilize esses dados para identificar gargalos and planejar a capacidade da oficina.")
+        st.info("💡 **Dica:** Utilize esses dados para identificar gargalos e planejar a capacidade da oficina.")
         
         query_ind = text("SELECT area, realizado, data, inicio_disp, fim_disp FROM tarefas WHERE empresa_id = :eid")
         df_ind = pd.read_sql(query_ind, engine, params={"eid": str(emp_id)})
@@ -2035,7 +2032,7 @@ else:
             if not df_ind.empty:
                 df_st = df_ind['realizado'].map({True: 'Concluído', False: 'Pendente'}).value_counts()
                 st.markdown("**Status de Conclusão**")
-                st.caption("Mostra a proporção entre os serviços que já receberam baixa técnica (Concluídos) and os que ainda estão na fila (Pendentes).")
+                st.caption("Mostra a proporção entre os serviços que já receberam baixa técnica (Concluídos) e os que ainda estão na fila (Pendentes).")
                 st.bar_chart(df_st, color=COR_OURO) 
                 
         st.divider() 
@@ -2085,8 +2082,8 @@ else:
             st.error("🚫 Acesso restrito apenas ao Usuário Master.")
             st.stop()
             
-        st.subheader("👥 Gestão de Equipe and Acessos")
-        st.info("💡 **Segurança:** As senhas são criptografadas and não podem ser lidas por ninguém. Para alterar a senha de um integrante, use o formulário de redefinição abaixo.")
+        st.subheader("👥 Gestão de Equipe e Acessos")
+        st.info("💡 **Segurança:** As senhas são criptografadas e não podem ser lidas por ninguém. Para alterar a senha de um integrante, use o formulário de redefinição abaixo.")
         
         col_cad, col_reset = st.columns(2)
 
@@ -2128,7 +2125,7 @@ else:
                                 conn.commit()
                             st.success(f"Senha de **{user_alvo}** alterada com sucesso!")
                         else:
-                            st.warning("Selecione o usuário and digite a nova senha.")
+                            st.warning("Selecione o usuário e digite a nova senha.")
                     
         st.divider()
         st.subheader("Integrantes Cadastrados")
