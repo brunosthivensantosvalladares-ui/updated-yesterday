@@ -297,7 +297,7 @@ def processar_comando_os(texto_usuario, emp_id):
         ultimas_msgs = "\n".join([f"{m['role'].upper()}: {m['content']}" for m in mensagens_recentes])
 
     template_fluxo = """
-Você é o assistente Mr. Halley da plataforma Up 2 Today, specialist em agendamento de OS.
+Você é o assistente Mr. Halley da plataforma Up 2 Today, especialista em agendamento de OS.
 
 Histórico Recente da Conversa no Chat:
 {ultimas_msgs}
@@ -311,7 +311,7 @@ Referência da Data Atual do Sistema: {hoje}
 
 CAMPOS DA OS:
 - prefixo: Número/placa do veículo (capture do contexto se for "esse veículo" ou "último veículo")
-- descricao: Descrição do problem/serviço (capture do contexto se for "mesmo problema")
+- descricao: Descrição do problema/serviço (capture do contexto se for "mesmo problema")
 - executor: Mecânico ou responsável
 - data: Data no formato AAAA-MM-DD. REGRA CRÍTICA: Deixe NULO/VAZIO se o usuário NÃO tiver informado explicitamente uma data ou termos como "hoje", "amanhã", "17/08". NUNCA preencha automaticamente.
 - area: APENAS UMA DAS 5 OPÇÕES: Mecânica, Elétrica, Borracharia, Chapeamento ou Limpeza. Deixe NULO/VAZIO se o usuário não disse explicitamente.
@@ -737,7 +737,7 @@ st.markdown(f"""
         display: block;
         margin: 0 auto;
         border-radius: 50%;
-        transform: scale(1.0) !important;
+        transform: scale(1.05) !important;
     }}
     
     /* Tipografia Dourada Cinzel Unificada (Sidebar e Login) */
@@ -1210,7 +1210,7 @@ else:
     with st.sidebar:
         st.markdown(f"""
             <div style='text-align: center; padding: 10px 0 16px 0;'>
-                <div class='logo-container-circular' style='width: 82px; height: 82px;'>
+                <div class='logo-container-circular' style='width: 106px; height: 106px;'>
                     <img src='{LOGO_URL}' class='logo-img-crop'>
                 </div>
                 <p class='brand-title-gold'>UPDATED YESTERDAY</p>
