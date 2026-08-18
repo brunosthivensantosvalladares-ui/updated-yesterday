@@ -311,7 +311,7 @@ Referência da Data Atual do Sistema: {hoje}
 
 CAMPOS DA OS:
 - prefixo: Número/placa do veículo (capture do contexto se for "esse veículo" ou "último veículo")
-- descricao: Descrição do problema/serviço (capture do contexto se for "mesmo problema")
+- descricao: Descrição do problem/serviço (capture do contexto se for "mesmo problema")
 - executor: Mecânico ou responsável
 - data: Data no formato AAAA-MM-DD. REGRA CRÍTICA: Deixe NULO/VAZIO se o usuário NÃO tiver informado explicitamente uma data ou termos como "hoje", "amanhã", "17/08". NUNCA preencha automaticamente.
 - area: APENAS UMA DAS 5 OPÇÕES: Mecânica, Elétrica, Borracharia, Chapeamento ou Limpeza. Deixe NULO/VAZIO se o usuário não disse explicitamente.
@@ -721,27 +721,31 @@ st.markdown(f"""
         font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif !important;
     }}
 
-    /* Container do Brasão Circular Sem Bordas Brancas */
+    /* Container do Brasão Centralizado Perfeitamente Sem Bordas Brancas */
     .logo-container-circular {{
         width: 110px;
         height: 110px;
-        margin: 0 auto;
+        margin: 0 auto !important;
         border-radius: 50%;
         overflow: hidden;
-        display: flex;
-        align-items: center;
-        justify-content: center;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        position: relative;
     }}
     .logo-img-crop {{
         width: 100%;
         height: 100%;
         object-fit: cover;
+        object-position: center;
         transform: scale(1.28);
         clip-path: circle(40.5% at 50% 50%);
+        display: block;
+        margin: 0 auto;
     }}
     
-    /* Título com Fonte Romana Luxo Dourada */
-    .brand-title-gold {{
+    /* Tipografia Dourada Cinzel Unificada (Sidebar e Login) */
+    .brand-title-gold, .login-brand-title {{
         font-family: 'Cinzel', serif !important;
         font-weight: 800 !important;
         font-size: 0.98rem !important;
@@ -749,10 +753,12 @@ st.markdown(f"""
         background: linear-gradient(135deg, #E6C875 0%, #C5A059 50%, #9B783E 100%) !important;
         -webkit-background-clip: text !important;
         -webkit-text-fill-color: transparent !important;
-        margin: 8px 0 0 0 !important;
+        margin: 8px auto 0 auto !important;
         text-align: center !important;
         text-transform: uppercase !important;
         white-space: nowrap !important;
+        display: block !important;
+        width: 100% !important;
     }}
 
     /* Sidebar Escura Elegante */
@@ -902,20 +908,6 @@ st.markdown("""
     <style>
     .logo-u { color: #4A3C31 !important; font-weight: bold; }
     .logo-y { color: #C5A059 !important; font-weight: bold; }
-    .login-brand-title {
-        font-family: 'Cinzel', serif !important;
-        text-align: center !important;
-        background: linear-gradient(135deg, #E6C875 0%, #C5A059 50%, #9B783E 100%) !important;
-        -webkit-background-clip: text !important;
-        -webkit-text-fill-color: transparent !important;
-        font-size: 1.85rem !important;
-        font-weight: 800 !important;
-        margin-bottom: 0px !important;
-        margin-top: 8px !important;
-        line-height: 1.1 !important;
-        letter-spacing: 2px !important;
-        text-transform: uppercase !important;
-    }}
     </style>
 """, unsafe_allow_html=True)
 
@@ -1056,14 +1048,14 @@ if not st.session_state["logado"]:
     _, col_login, _ = st.columns([1.2, 1, 1.2])
     with col_login:
         st.markdown(f"""
-            <div style='display: flex; justify-content: center; margin-bottom: 5px;'>
+            <div style='text-align: center; margin-bottom: 5px;'>
                 <div class='logo-container-circular'>
                     <img src='{LOGO_URL}' class='logo-img-crop'>
                 </div>
+                <p class='login-brand-title'>UPDATED YESTERDAY</p>
+                <p style='text-align: center; font-style: italic; color: #8F847B; margin: 4px 0 20px 0; font-size: 0.78rem;'>{SLOGAN}</p>
             </div>
         """, unsafe_allow_html=True)
-        st.markdown("<p class='login-brand-title'>UPDATED YESTERDAY</p>", unsafe_allow_html=True)
-        st.markdown(f"<p style='text-align: center; font-style: italic; color: #8F847B; margin-top: 0; margin-bottom: 20px; font-size: 0.88rem;'>{SLOGAN}</p>", unsafe_allow_html=True)
         
         aba = st.radio("Selecione uma opção", ["Acessar", "Criar Conta"], horizontal=True, label_visibility="collapsed")
         
@@ -1222,13 +1214,11 @@ else:
     with st.sidebar:
         st.markdown(f"""
             <div style='text-align: center; padding: 10px 0 16px 0;'>
-                <div style='display: flex; justify-content: center;'>
-                    <div class='logo-container-circular'>
-                        <img src='{LOGO_URL}' class='logo-img-crop'>
-                    </div>
+                <div class='logo-container-circular'>
+                    <img src='{LOGO_URL}' class='logo-img-crop'>
                 </div>
                 <p class='brand-title-gold'>UPDATED YESTERDAY</p>
-                <p style='color: #A89C91; font-size: 0.76rem; margin: 4px 0 0 0;'>{SLOGAN}</p>
+                <p style='color: #A89C91; font-size: 0.76rem; margin: 4px 0 0 0; text-align: center;'>{SLOGAN}</p>
             </div>
         """, unsafe_allow_html=True)
         st.divider()
