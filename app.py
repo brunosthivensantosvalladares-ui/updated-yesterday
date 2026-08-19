@@ -722,7 +722,7 @@ st.markdown(f"""
     }}
 
     /* ========================================================= */
-    /* 1. CONTROLE E FIXAÇÃO DA SIDEBAR (SEM ROLAGEM / COMPACTA) */
+    /* 1. CONTROLE E FIXAÇÃO DA SIDEBAR (SEM ROLAGEM / TOPO PUXADO) */
     /* ========================================================= */
     section[data-testid="stSidebar"] {{ 
         background: linear-gradient(180deg, #2A211B 0%, #1D1612 100%) !important; 
@@ -731,10 +731,10 @@ st.markdown(f"""
     }}
     section[data-testid="stSidebar"] > div:first-child {{
         overflow: hidden !important;
-        padding-top: 0.5rem !important;
-        padding-bottom: 0.5rem !important;
-        padding-left: 0.6rem !important;
-        padding-right: 0.6rem !important;
+        padding-top: 0rem !important;
+        padding-bottom: 0.3rem !important;
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
     }}
     section[data-testid="stSidebar"] * {{
         color: #F0EDE6 !important;
@@ -742,14 +742,14 @@ st.markdown(f"""
 
     /* Espaçamentos verticais compactados */
     section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] {{
-        gap: 0.25rem !important;
+        gap: 0.18rem !important;
     }}
     section[data-testid="stSidebar"] hr {{
-        margin: 0.35rem 0 !important;
+        margin: 0.25rem 0 !important;
         border-color: rgba(197, 160, 89, 0.25) !important;
     }}
 
-    /* Container do Brasão Circular */
+    /* Container do Brasão Circular (90px perfeito) */
     .logo-container-circular {{
         margin: 0 auto !important;
         border-radius: 50%;
@@ -761,13 +761,13 @@ st.markdown(f"""
     .logo-img-crop {{
         width: 100%;
         height: 100%;
-        object-fit: contain !important;
+        object-fit: cover !important;
         display: block;
         margin: 0 auto;
         border-radius: 50%;
     }}
     
-    /* Tipografia Dourada Cinzel Unificada (Sidebar e Login) */
+    /* Tipografia Dourada Cinzel Unificada */
     .brand-title-gold, .login-brand-title {{
         font-family: 'Cinzel', serif !important;
         font-weight: 800 !important;
@@ -776,7 +776,7 @@ st.markdown(f"""
         background: linear-gradient(135deg, #E6C875 0%, #C5A059 50%, #9B783E 100%) !important;
         -webkit-background-clip: text !important;
         -webkit-text-fill-color: transparent !important;
-        margin: 4px auto 0 auto !important;
+        margin: 3px auto 0 auto !important;
         text-align: center !important;
         text-transform: uppercase !important;
         white-space: nowrap !important;
@@ -788,14 +788,14 @@ st.markdown(f"""
     section[data-testid="stSidebar"] [data-testid="stRadio"] > div {{
         background: transparent !important;
         border: none !important;
-        gap: 2px !important;
+        gap: 1px !important;
     }}
     section[data-testid="stSidebar"] [data-testid="stRadio"] label {{
         background-color: transparent !important;
-        padding: 4px 8px !important;
-        border-radius: 6px !important;
-        font-size: 0.84rem !important;
-        line-height: 1.15 !important;
+        padding: 3px 6px !important;
+        border-radius: 5px !important;
+        font-size: 0.82rem !important;
+        line-height: 1.1 !important;
         transition: all 0.15s ease !important;
         min-height: auto !important;
     }}
@@ -807,12 +807,12 @@ st.markdown(f"""
     section[data-testid="stSidebar"] p, 
     section[data-testid="stSidebar"] span, 
     section[data-testid="stSidebar"] div {{
-        font-size: 0.82rem !important;
+        font-size: 0.80rem !important;
     }}
     section[data-testid="stSidebar"] button {{
-        padding: 0.3rem 0.6rem !important;
-        min-height: 32px !important;
-        font-size: 0.82rem !important;
+        padding: 0.25rem 0.5rem !important;
+        min-height: 28px !important;
+        font-size: 0.80rem !important;
     }}
 
     /* Botões Padrão */
@@ -1240,15 +1240,15 @@ else:
         st.session_state.opcao_selecionada = target
         st.session_state.radio_key += 1 
 
-    # --- MONTAGEM DA SIDEBAR ELEGANTE COM FONTE DOURADA CINZEL E LOGO AMPLIADO ---
+    # --- MONTAGEM DA SIDEBAR COM TOPO PUXADO E PROPORÇÃO 90PX ---
     with st.sidebar:
         st.markdown(f"""
-            <div style='text-align: center; padding: 4px 0 10px 0;'>
-                <div class='logo-container-circular' style='width: 120px; height: 120px;'>
+            <div style='text-align: center; margin-top: -1.2rem; padding: 0 0 4px 0;'>
+                <div class='logo-container-circular' style='width: 90px; height: 90px;'>
                     <img src='{LOGO_URL}' class='logo-img-crop'>
                 </div>
                 <p class='brand-title-gold'>UPDATED YESTERDAY</p>
-                <p style='color: #A89C91; font-size: 0.74rem; margin: 2px 0 0 0; text-align: center;'>{SLOGAN}</p>
+                <p style='color: #A89C91; font-size: 0.72rem; margin: 2px 0 0 0; text-align: center;'>{SLOGAN}</p>
             </div>
         """, unsafe_allow_html=True)
         st.divider()
@@ -1268,9 +1268,9 @@ else:
         
         st.divider()
         st.markdown("""
-            <div style='background: rgba(197, 160, 89, 0.08); border: 1.2px solid #C5A059; border-radius: 10px; padding: 8px 10px; margin-bottom: 6px;'>
-                <p style='margin:0; font-weight:700; color:#C5A059; font-size:0.84rem;'>💬 Chat com Mr. Halley</p>
-                <p style='margin:2px 0 0 0; font-size:0.72rem; color:#DDD;'>Estamos online para ajudar!</p>
+            <div style='background: rgba(197, 160, 89, 0.08); border: 1px solid #C5A059; border-radius: 8px; padding: 6px 8px; margin-bottom: 4px;'>
+                <p style='margin:0; font-weight:700; color:#C5A059; font-size:0.80rem;'>💬 Chat com Mr. Halley</p>
+                <p style='margin:1px 0 0 0; font-size:0.70rem; color:#DDD;'>Estamos online para ajudar!</p>
             </div>
         """, unsafe_allow_html=True)
 
@@ -2115,8 +2115,8 @@ else:
             st.error("🚫 Acesso restrito apenas ao Usuário Master.")
             st.stop()
             
-        st.subheader("👥 Gestão de Equipe e Acessos")
-        st.info("💡 **Segurança:** As senhas são criptografadas e não podem ser lidas por ninguém. Para alterar a senha de um integrante, use o formulário de redefinição abaixo.")
+        st.subheader("👥 Gestão de Equipe and Acessos")
+        st.info("💡 **Segurança:** As senhas são criptografadas and não podem ser lidas por ninguém. Para alterar a senha de um integrante, use o formulário de redefinição abaixo.")
         
         col_cad, col_reset = st.columns(2)
 
@@ -2158,7 +2158,7 @@ else:
                                 conn.commit()
                             st.success(f"Senha de **{user_alvo}** alterada com sucesso!")
                         else:
-                            st.warning("Selecione o usuário e digite a nova senha.")
+                            st.warning("Selecione o usuário and digite a nova senha.")
                     
         st.divider()
         st.subheader("Integrantes Cadastrados")
