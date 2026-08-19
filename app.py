@@ -732,7 +732,7 @@ st.markdown(f"""
     section[data-testid="stSidebar"] > div:first-child {{
         overflow: hidden !important;
         padding-top: 0rem !important;
-        padding-bottom: 0.3rem !important;
+        padding-bottom: 0.2rem !important;
         padding-left: 0.5rem !important;
         padding-right: 0.5rem !important;
     }}
@@ -742,10 +742,10 @@ st.markdown(f"""
 
     /* Espaçamentos verticais compactados */
     section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] {{
-        gap: 0.18rem !important;
+        gap: 0.12rem !important;
     }}
     section[data-testid="stSidebar"] hr {{
-        margin: 0.25rem 0 !important;
+        margin: 0.18rem 0 !important;
         border-color: rgba(197, 160, 89, 0.25) !important;
     }}
 
@@ -788,11 +788,11 @@ st.markdown(f"""
     section[data-testid="stSidebar"] [data-testid="stRadio"] > div {{
         background: transparent !important;
         border: none !important;
-        gap: 1px !important;
+        gap: 0px !important;
     }}
     section[data-testid="stSidebar"] [data-testid="stRadio"] label {{
         background-color: transparent !important;
-        padding: 3px 6px !important;
+        padding: 2.5px 5px !important;
         border-radius: 5px !important;
         font-size: 0.82rem !important;
         line-height: 1.1 !important;
@@ -807,12 +807,12 @@ st.markdown(f"""
     section[data-testid="stSidebar"] p, 
     section[data-testid="stSidebar"] span, 
     section[data-testid="stSidebar"] div {{
-        font-size: 0.80rem !important;
+        font-size: 0.79rem !important;
     }}
     section[data-testid="stSidebar"] button {{
-        padding: 0.25rem 0.5rem !important;
-        min-height: 28px !important;
-        font-size: 0.80rem !important;
+        padding: 0.22rem 0.5rem !important;
+        min-height: 27px !important;
+        font-size: 0.79rem !important;
     }}
 
     /* Botões Padrão */
@@ -1240,15 +1240,15 @@ else:
         st.session_state.opcao_selecionada = target
         st.session_state.radio_key += 1 
 
-    # --- MONTAGEM DA SIDEBAR COM TOPO PUXADO E PROPORÇÃO 90PX ---
+    # --- MONTAGEM DA SIDEBAR COM ESPAÇAMENTOS REFINADOS ---
     with st.sidebar:
         st.markdown(f"""
-            <div style='text-align: center; margin-top: -1.2rem; padding: 0 0 4px 0;'>
+            <div style='text-align: center; margin-top: -1.2rem; padding: 0 0 2px 0;'>
                 <div class='logo-container-circular' style='width: 90px; height: 90px;'>
                     <img src='{LOGO_URL}' class='logo-img-crop'>
                 </div>
                 <p class='brand-title-gold'>UPDATED YESTERDAY</p>
-                <p style='color: #A89C91; font-size: 0.72rem; margin: 2px 0 0 0; text-align: center;'>{SLOGAN}</p>
+                <p style='color: #A89C91; font-size: 0.72rem; margin: 2px 0 10px 0; text-align: center;'>{SLOGAN}</p>
             </div>
         """, unsafe_allow_html=True)
         st.divider()
@@ -1266,11 +1266,11 @@ else:
             on_change=lambda: st.session_state.update({"opcao_selecionada": st.session_state[f"radio_nav_{st.session_state.radio_key}"]})
         )
         
-        st.divider()
+        # Bloco inferior com espaçamento equilibrado
         st.markdown("""
-            <div style='background: rgba(197, 160, 89, 0.08); border: 1px solid #C5A059; border-radius: 8px; padding: 6px 8px; margin-bottom: 4px;'>
-                <p style='margin:0; font-weight:700; color:#C5A059; font-size:0.80rem;'>💬 Chat com Mr. Halley</p>
-                <p style='margin:1px 0 0 0; font-size:0.70rem; color:#DDD;'>Estamos online para ajudar!</p>
+            <div style='margin-top: 18px; background: rgba(197, 160, 89, 0.08); border: 1px solid #C5A059; border-radius: 8px; padding: 8px 10px; margin-bottom: 6px;'>
+                <p style='margin:0; font-weight:700; color:#C5A059; font-size:0.82rem;'>💬 Chat com Mr. Halley</p>
+                <p style='margin:2px 0 0 0; font-size:0.72rem; color:#DDD;'>Estamos online para ajudar!</p>
             </div>
         """, unsafe_allow_html=True)
 
