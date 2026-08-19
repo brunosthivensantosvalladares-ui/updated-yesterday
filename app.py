@@ -710,7 +710,7 @@ COR_TEXTO = "#231F20"
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title=f"{NOME_SISTEMA} - Painel de Controle", layout="wide", page_icon="⚙️")
 
-# --- NOVO DESIGN SYSTEM LUXO / NEUMÓRFICO SUAVE & FONTE CINZEL ROMANA ---
+# --- DESIGN SYSTEM LUXO / NEUMÓRFICO SUAVE & SIDEBAR FIXA E COMPACTA ---
 st.markdown(f"""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&display=swap');
@@ -719,6 +719,34 @@ st.markdown(f"""
     html, body, [data-testid="stAppViewContainer"], .stApp {{ 
         background-color: {COR_CHAPA} !important; 
         font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif !important;
+    }}
+
+    /* ========================================================= */
+    /* 1. CONTROLE E FIXAÇÃO DA SIDEBAR (SEM ROLAGEM / COMPACTA) */
+    /* ========================================================= */
+    section[data-testid="stSidebar"] {{ 
+        background: linear-gradient(180deg, #2A211B 0%, #1D1612 100%) !important; 
+        border-right: 1px solid #3D3128 !important;
+        overflow: hidden !important;
+    }}
+    section[data-testid="stSidebar"] > div:first-child {{
+        overflow: hidden !important;
+        padding-top: 0.5rem !important;
+        padding-bottom: 0.5rem !important;
+        padding-left: 0.6rem !important;
+        padding-right: 0.6rem !important;
+    }}
+    section[data-testid="stSidebar"] * {{
+        color: #F0EDE6 !important;
+    }}
+
+    /* Espaçamentos verticais compactados */
+    section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] {{
+        gap: 0.25rem !important;
+    }}
+    section[data-testid="stSidebar"] hr {{
+        margin: 0.35rem 0 !important;
+        border-color: rgba(197, 160, 89, 0.25) !important;
     }}
 
     /* Container do Brasão Circular */
@@ -737,19 +765,18 @@ st.markdown(f"""
         display: block;
         margin: 0 auto;
         border-radius: 50%;
-        transform: scale(1.05) !important;
     }}
     
     /* Tipografia Dourada Cinzel Unificada (Sidebar e Login) */
     .brand-title-gold, .login-brand-title {{
         font-family: 'Cinzel', serif !important;
         font-weight: 800 !important;
-        font-size: 0.98rem !important;
-        letter-spacing: 1.5px !important;
+        font-size: 0.92rem !important;
+        letter-spacing: 1.2px !important;
         background: linear-gradient(135deg, #E6C875 0%, #C5A059 50%, #9B783E 100%) !important;
         -webkit-background-clip: text !important;
         -webkit-text-fill-color: transparent !important;
-        margin: 8px auto 0 auto !important;
+        margin: 4px auto 0 auto !important;
         text-align: center !important;
         text-transform: uppercase !important;
         white-space: nowrap !important;
@@ -757,28 +784,35 @@ st.markdown(f"""
         width: 100% !important;
     }}
 
-    /* Sidebar Escura Elegante */
-    [data-testid="stSidebar"] {{ 
-        background: linear-gradient(180deg, #2A211B 0%, #1D1612 100%) !important; 
-        border-right: 1px solid #3D3128 !important;
-    }}
-    [data-testid="stSidebar"] * {{
-        color: #F0EDE6 !important;
-    }}
-    [data-testid="stSidebar"] [data-testid="stRadio"] > div {{
+    /* Radio / Navegação Ultra-Compacta na Sidebar */
+    section[data-testid="stSidebar"] [data-testid="stRadio"] > div {{
         background: transparent !important;
         border: none !important;
-        gap: 4px !important;
+        gap: 2px !important;
     }}
-    [data-testid="stSidebar"] [data-testid="stRadio"] label {{
+    section[data-testid="stSidebar"] [data-testid="stRadio"] label {{
         background-color: transparent !important;
-        padding: 8px 12px !important;
-        border-radius: 8px !important;
-        font-size: 0.95rem !important;
-        transition: all 0.2s ease !important;
+        padding: 4px 8px !important;
+        border-radius: 6px !important;
+        font-size: 0.84rem !important;
+        line-height: 1.15 !important;
+        transition: all 0.15s ease !important;
+        min-height: auto !important;
     }}
-    [data-testid="stSidebar"] [data-testid="stRadio"] label:hover {{
-        background-color: rgba(197, 160, 89, 0.15) !important;
+    section[data-testid="stSidebar"] [data-testid="stRadio"] label:hover {{
+        background-color: rgba(197, 160, 89, 0.18) !important;
+    }}
+
+    /* Textos e Botões na Sidebar */
+    section[data-testid="stSidebar"] p, 
+    section[data-testid="stSidebar"] span, 
+    section[data-testid="stSidebar"] div {{
+        font-size: 0.82rem !important;
+    }}
+    section[data-testid="stSidebar"] button {{
+        padding: 0.3rem 0.6rem !important;
+        min-height: 32px !important;
+        font-size: 0.82rem !important;
     }}
 
     /* Botões Padrão */
@@ -1206,15 +1240,15 @@ else:
         st.session_state.opcao_selecionada = target
         st.session_state.radio_key += 1 
 
-    # --- MONTAGEM DA SIDEBAR ELEGANTE COM FONTE DOURADA CINZEL ---
+    # --- MONTAGEM DA SIDEBAR ELEGANTE COM FONTE DOURADA CINZEL E LOGO AMPLIADO ---
     with st.sidebar:
         st.markdown(f"""
-            <div style='text-align: center; padding: 10px 0 16px 0;'>
-                <div class='logo-container-circular' style='width: 106px; height: 106px;'>
+            <div style='text-align: center; padding: 4px 0 10px 0;'>
+                <div class='logo-container-circular' style='width: 120px; height: 120px;'>
                     <img src='{LOGO_URL}' class='logo-img-crop'>
                 </div>
                 <p class='brand-title-gold'>UPDATED YESTERDAY</p>
-                <p style='color: #A89C91; font-size: 0.76rem; margin: 4px 0 0 0; text-align: center;'>{SLOGAN}</p>
+                <p style='color: #A89C91; font-size: 0.74rem; margin: 2px 0 0 0; text-align: center;'>{SLOGAN}</p>
             </div>
         """, unsafe_allow_html=True)
         st.divider()
@@ -1234,14 +1268,13 @@ else:
         
         st.divider()
         st.markdown("""
-            <div style='background: rgba(197, 160, 89, 0.08); border: 1.5px solid #C5A059; border-radius: 12px; padding: 12px; margin-bottom: 12px;'>
-                <p style='margin:0; font-weight:700; color:#C5A059; font-size:0.9rem;'>💬 Chat com Mr. Halley</p>
-                <p style='margin:2px 0 0 0; font-size:0.75rem; color:#DDD;'>Estamos online para ajudar!</p>
+            <div style='background: rgba(197, 160, 89, 0.08); border: 1.2px solid #C5A059; border-radius: 10px; padding: 8px 10px; margin-bottom: 6px;'>
+                <p style='margin:0; font-weight:700; color:#C5A059; font-size:0.84rem;'>💬 Chat com Mr. Halley</p>
+                <p style='margin:2px 0 0 0; font-size:0.72rem; color:#DDD;'>Estamos online para ajudar!</p>
             </div>
         """, unsafe_allow_html=True)
 
-        st.write(f"🏢 **Empresa:** {emp_id}")
-        st.write(f"👤 **{st.session_state['perfil'].capitalize()}** ({usuario_ativo})")
+        st.write(f"🏢 **{emp_id}** | 👤 **{st.session_state['perfil'].capitalize()}** ({usuario_ativo})")
         if st.button("Sair da Conta", type="primary", use_container_width=True): 
             st.session_state["logado"] = False
             st.rerun()
@@ -1804,8 +1837,8 @@ else:
             st.markdown("""
                 ### 📝 Guia Rápido - Cadastro
                 1. **Uso:** Utilize para preventivas ou serviços que não vieram de uma reclamação de motorista.
-                2. **Formulário:** Preencha os campos e confirme.
-                3. **Gestão:** Na lista abaixo, você pode excluir registros marcando a coluna **Exc** e clicando em excluir.
+                2. **Formulário:** Preencha os campos and confirme.
+                3. **Gestão:** Na lista abaixo, você pode excluir registros marcando a coluna **Exc** and clicando em excluir.
             """)
         st.info("💡 **Atenção:** Use este formulário para serviços que não vieram de chamados.")
         st.warning("⚠️ **Nota:** Para reagendar ou corrigir, basta alterar diretamente na lista abaixo. O salvamento é automático.")
@@ -1876,7 +1909,7 @@ else:
                 ### 📥 Guia Rápido - Chamados
                 1. **Triagem:** Veja o que os motoristas relataram. 
                 2. **Aprovação:** Marque a caixa **Aprovar?** para o Mr. Halley dar o diagnóstico de cada veículo!
-                3. **Planejamento:** Defina o Executor e a Área com base nos pareceres.
+                3. **Planejamento:** Defina o Executor and a Área com base nos pareceres.
                 4. **Finalizar:** Clique em **Processar Agendamentos**.
             """)
             
@@ -1973,7 +2006,7 @@ else:
                     if 'df_ap_work' in st.session_state: del st.session_state.df_ap_work
                     if 'analises_halley' in st.session_state: del st.session_state.analises_halley
                         
-                    st.success("✅ Agendamentos processados e enviados à Agenda Principal!")
+                    st.success("✅ Agendamentos processados and enviados à Agenda Principal!")
                     st.rerun()
                 else:
                     st.warning("⚠️ Selecione ao menos um chamado na coluna 'Aprovar?' antes de processar.")
@@ -2032,7 +2065,7 @@ else:
             if not df_ind.empty:
                 df_st = df_ind['realizado'].map({True: 'Concluído', False: 'Pendente'}).value_counts()
                 st.markdown("**Status de Conclusão**")
-                st.caption("Mostra a proporção entre os serviços que já receberam baixa técnica (Concluídos) e os que ainda estão na fila (Pendentes).")
+                st.caption("Mostra a proporção entre os serviços que já receberam baixa técnica (Concluídos) and os que ainda estão na fila (Pendentes).")
                 st.bar_chart(df_st, color=COR_OURO) 
                 
         st.divider() 
