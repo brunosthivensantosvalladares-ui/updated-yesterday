@@ -58,7 +58,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from duckduckgo_search import DDGS
 
 def formatar_acao_infinitivo(texto_bruto):
-    """ Converte textos passados/relatórios do banco para recomendações no infinitivo. """
+    """Converte textos passados/relatórios do banco para recomendações no infinitivo."""
     txt = texto_bruto.strip()
     
     substituicoes = [
@@ -682,7 +682,7 @@ def gerar_pdf_manual_oficial_pro():
     pdf.cell(190, 10, "8. ASSISTENTE VIRTUAL E PENDÊNCIAS", ln=True)
     pdf.set_font("Arial", "", 11)
     pdf.multi_cell(190, 7, (
-        "O Assistente monitora a integridade dos prazos. O法 alarme visual no topo indica que "
+        "O Assistente monitora a integridade dos prazos. O alarme visual no topo indica que "
         "há pendências de datas passadas. O botão 'Resolver' permite ao gestor dar "
         "baixa imediata ou reagendar tarefas para o presente com um único clique."
     ))
@@ -1039,9 +1039,9 @@ def inicializar_banco():
                 )
             """))
             try: conn.execute(text("ALTER TABLE tarefas ADD COLUMN IF NOT EXISTS empresa_id TEXT DEFAULT 'U2T_MATRIZ'"))
-            except: pass
+            except Exception: pass
             try: conn.execute(text("ALTER TABLE chamados ADD COLUMN IF NOT EXISTS empresa_id TEXT DEFAULT 'U2T_MATRIZ'"))
-            except: pass
+            except Exception: pass
             conn.commit()
     except Exception:
         pass
@@ -1904,8 +1904,8 @@ else:
             st.markdown("""
                 ### 📝 Guia Rápido - Cadastro
                 1. **Uso:** Utilize para preventivas ou serviços que não vieram de uma reclamação de motorista.
-                2. **Formulário:** Preencha os campos and confirme.
-                3. **Gestão:** Na lista abaixo, você pode excluir registros marcando a coluna **Exc** and clicando em excluir.
+                2. **Formulário:** Preencha os campos e confirme.
+                3. **Gestão:** Na lista abaixo, você pode excluir registros marcando a coluna **Exc** e clicando em excluir.
             """)
         st.info("💡 **Atenção:** Use este formulário para serviços que não vieram de chamados.")
         st.warning("⚠️ **Nota:** Para reagendar ou corrigir, basta alterar diretamente na lista abaixo. O salvamento é automático.")
@@ -1976,7 +1976,7 @@ else:
                 ### 📥 Guia Rápido - Chamados
                 1. **Triagem:** Veja o que os motoristas relataram. 
                 2. **Aprovação:** Marque a caixa **Aprovar?** para o Mr. Halley dar o diagnóstico de cada veículo!
-                3. **Planejamento:** Defina o Executor and a Área com base nos pareceres.
+                3. **Planejamento:** Defina o Executor e a Área com base nos pareceres.
                 4. **Finalizar:** Clique em **Processar Agendamentos**.
             """)
             
@@ -2073,7 +2073,7 @@ else:
                     if 'df_ap_work' in st.session_state: del st.session_state.df_ap_work
                     if 'analises_halley' in st.session_state: del st.session_state.analises_halley
                         
-                    st.success("✅ Agendamentos processados and enviados à Agenda Principal!")
+                    st.success("✅ Agendamentos processados e enviados à Agenda Principal!")
                     st.rerun()
                 else:
                     st.warning("⚠️ Selecione ao menos um chamado na coluna 'Aprovar?' antes de processar.")
@@ -2132,7 +2132,7 @@ else:
             if not df_ind.empty:
                 df_st = df_ind['realizado'].map({True: 'Concluído', False: 'Pendente'}).value_counts()
                 st.markdown("**Status de Conclusão**")
-                st.caption("Mostra a proporção entre os serviços que já receberam baixa técnica (Concluídos) and os que ainda estão na fila (Pendentes).")
+                st.caption("Mostra a proporção entre os serviços que já receberam baixa técnica (Concluídos) e os que ainda estão na fila (Pendentes).")
                 st.bar_chart(df_st, color=COR_OURO) 
                 
         st.divider() 
@@ -2182,8 +2182,8 @@ else:
             st.error("🚫 Acesso restrito apenas ao Usuário Master.")
             st.stop()
             
-        st.subheader("👥 Gestão de Equipe and Acessos")
-        st.info("💡 **Segurança:** As senhas são criptografadas and não podem ser lidas por ninguém. Para alterar a senha de um integrante, use o formulário de redefinição abaixo.")
+        st.subheader("👥 Gestão de Equipe e Acessos")
+        st.info("💡 **Segurança:** As senhas são criptografadas e não podem ser lidas por ninguém. Para alterar a senha de um integrante, use o formulário de redefinição abaixo.")
         
         col_cad, col_reset = st.columns(2)
 
@@ -2225,7 +2225,7 @@ else:
                                 conn.commit()
                             st.success(f"Senha de **{user_alvo}** alterada com sucesso!")
                         else:
-                            st.warning("Selecione o usuário and digite a nova senha.")
+                            st.warning("Selecione o usuário e digite a nova senha.")
                     
         st.divider()
         st.subheader("Integrantes Cadastrados")
