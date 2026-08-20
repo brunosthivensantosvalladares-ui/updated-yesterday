@@ -747,8 +747,8 @@ st.markdown(f"""
     section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] {{
         gap: 0.12rem !important;
     }}
-    section[data-testid="stSidebar"] hr {{
-        margin: 0.18rem 0 !important;
+    section[data-testid="stSidebar"] hr {
+        margin: -8px 0 12px 0 !important;
         border-color: rgba(197, 160, 89, 0.25) !important;
     }}
 
