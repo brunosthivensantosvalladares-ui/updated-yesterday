@@ -748,7 +748,7 @@ st.markdown(f"""
         gap: 0.12rem !important;
     }}
     section[data-testid="stSidebar"] hr {{
-        margin: 4px 0 10px 0 !important;
+        margin: 4px 0 20px 0 !important;
         border-color: rgba(197, 160, 89, 0.25) !important;
     }}
 
@@ -1280,7 +1280,7 @@ else:
         # Bloco de Rodapé: Espaço aumentado antes de Usuário e Botão de Logout
         st.markdown(f"""
             <div style='margin-top: 45px; padding-top: 10px; border-top: 1px solid rgba(197, 160, 89, 0.2);'>
-                <p style='margin: 0 0 14px 0; font-size: 0.8rem; line-height: 1.2;'>
+                <p style='margin: 0 0 30px 0; font-size: 0.8rem; line-height: 1.2;'>
                     🏢 <b>{emp_id}</b> | 👤 <b>{st.session_state['perfil'].capitalize()}</b> ({usuario_ativo})
                 </p>
             </div>
