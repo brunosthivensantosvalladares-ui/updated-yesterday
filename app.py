@@ -1280,7 +1280,7 @@ else:
         # Bloco de Rodapé: Usuário e Botão de Logout empurrados para a base
         st.markdown(f"""
             <div style='margin-top: 25px; padding-top: 8px; border-top: 1px solid rgba(197, 160, 89, 0.2);'>
-                <p style='margin: 0 0 8px 0; font-size: 0.8rem; line-height: 1.2;'>
+                <p style='margin: 0 0 20px 0; font-size: 0.8rem; line-height: 1.2;'>
                     🏢 <b>{emp_id}</b> | 👤 <b>{st.session_state['perfil'].capitalize()}</b> ({usuario_ativo})
                 </p>
             </div>
