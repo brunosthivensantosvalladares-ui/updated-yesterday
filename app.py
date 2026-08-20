@@ -750,7 +750,7 @@ st.markdown(f"""
     section[data-testid="stSidebar"] hr {
         margin: -8px 0 12px 0 !important;
         border-color: rgba(197, 160, 89, 0.25) !important;
-    }}
+    }
 
     /* Container do Brasão Circular (90px perfeito) */
     .logo-container-circular {{
