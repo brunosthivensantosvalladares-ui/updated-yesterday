@@ -748,7 +748,7 @@ st.markdown(f"""
         gap: 0 !important;
     }}
     section[data-testid="stSidebar"] hr {{
-        margin: 2px 0 4px 0 !important;
+        margin: 2px 0 30px 0 !important;
         border-color: rgba(197, 160, 89, 0.25) !important;
     }}
 
@@ -1239,7 +1239,7 @@ if not st.session_state["logado"]:
                     <img src='{LOGO_URL}' class='logo-img-crop'>
                 </div>
                 <p class='login-brand-title'>UPDATED YESTERDAY</p>
-                <p style='text-align: center; font-style: italic; color: #8F847B; margin: 4px 0 20px 0; font-size: 0.78rem;'>{SLOGAN}</p>
+                <p style='text-align: center; font-style: italic; color: #8F847B; margin: 4px 0 30px 0; font-size: 0.78rem;'>{SLOGAN}</p>
             </div>
         """, unsafe_allow_html=True)
         
