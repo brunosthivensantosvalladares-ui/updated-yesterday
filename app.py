@@ -732,9 +732,12 @@ st.markdown(f"""
     section[data-testid="stSidebar"] > div:first-child {{
         overflow: hidden !important;
         padding-top: 0rem !important;
-        padding-bottom: 0.2rem !important;
+        padding-bottom: 0.8rem !important;
         padding-left: 0.5rem !important;
         padding-right: 0.5rem !important;
+        display: flex !important;
+        flex-direction: column !important;
+        height: 100vh !important;
     }}
     section[data-testid="stSidebar"] * {{
         color: #F0EDE6 !important;
@@ -1266,15 +1269,23 @@ else:
             on_change=lambda: st.session_state.update({"opcao_selecionada": st.session_state[f"radio_nav_{st.session_state.radio_key}"]})
         )
         
-        # Bloco inferior com espaçamento equilibrado
+        # Bloco do Mr. Halley
         st.markdown("""
-            <div style='margin-top: 18px; background: rgba(197, 160, 89, 0.08); border: 1px solid #C5A059; border-radius: 8px; padding: 8px 10px; margin-bottom: 6px;'>
+            <div style='margin-top: 14px; background: rgba(197, 160, 89, 0.08); border: 1px solid #C5A059; border-radius: 8px; padding: 8px 10px; margin-bottom: 6px;'>
                 <p style='margin:0; font-weight:700; color:#C5A059; font-size:0.82rem;'>💬 Chat com Mr. Halley</p>
                 <p style='margin:2px 0 0 0; font-size:0.72rem; color:#DDD;'>Estamos online para ajudar!</p>
             </div>
         """, unsafe_allow_html=True)
 
-        st.write(f"🏢 **{emp_id}** | 👤 **{st.session_state['perfil'].capitalize()}** ({usuario_ativo})")
+        # Bloco de Rodapé: Usuário e Botão de Logout empurrados para a base
+        st.markdown(f"""
+            <div style='margin-top: 25px; padding-top: 8px; border-top: 1px solid rgba(197, 160, 89, 0.2);'>
+                <p style='margin: 0 0 8px 0; font-size: 0.8rem; line-height: 1.2;'>
+                    🏢 <b>{emp_id}</b> | 👤 <b>{st.session_state['perfil'].capitalize()}</b> ({usuario_ativo})
+                </p>
+            </div>
+        """, unsafe_allow_html=True)
+        
         if st.button("Sair da Conta", type="primary", use_container_width=True): 
             st.session_state["logado"] = False
             st.rerun()
