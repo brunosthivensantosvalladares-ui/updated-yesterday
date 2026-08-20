@@ -1454,7 +1454,7 @@ else:
         # Bloco de Rodapé: Espaço aumentado antes de Usuário e Botão de Logout
         st.markdown(f"""
             <div style='margin-top: 20px; padding-top: 4px; border-top: 1px solid rgba(197, 160, 89, 0.2);'>
-                <p style='margin: 0 0 20px 0; font-size: 0.8rem; line-height: 1.15;'>
+                <p style='margin: 0 0 25px 0; font-size: 0.8rem; line-height: 1.15;'>
                     🏢 <b>{emp_id}</b> | 👤 <b>{st.session_state['perfil'].capitalize()}</b> ({usuario_ativo})
                 </p>
             </div>
