@@ -1057,6 +1057,53 @@ st.markdown(f"""
         color: #8A7E75;
         margin: 2px 0 0 0;
     }}
+
+    /* Cabeçalho fixo durante a rolagem da área principal. */
+    div[data-testid="stHorizontalBlock"]:has(input[aria-label="Buscar..."]),
+    div[data-testid="stHorizontalBlock"]:has(input[placeholder*="Buscar veículo"]),
+    div[data-testid="stHorizontalBlock"]:has(input[placeholder*="Search vehicle"]) {{
+        position: sticky !important;
+        top: 0 !important;
+        z-index: 1000 !important;
+        background: rgba(247, 245, 240, 0.97) !important;
+        padding: 10px 12px 8px 12px !important;
+        margin-top: -1rem !important;
+        border-bottom: 1px solid #E6DED1 !important;
+        box-shadow: 0 4px 12px rgba(35, 31, 32, 0.08) !important;
+        backdrop-filter: blur(8px) !important;
+    }}
+
+    .quick-carousel-heading {{
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 10px;
+    }}
+    .quick-carousel-arrow {{
+        min-height: 90px !important;
+        height: 90px !important;
+        font-size: 2rem !important;
+        line-height: 1 !important;
+        padding: 0 !important;
+        border-radius: 12px !important;
+    }}
+    .quick-carousel-arrow p,
+    .quick-carousel-arrow span,
+    .quick-carousel-arrow div {{
+        font-size: 2rem !important;
+        line-height: 1 !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }}
+    .quick-carousel-arrow:hover {{
+        background: rgba(0, 0, 0, 0.18) !important;
+        border-color: #C5A059 !important;
+        transition-delay: 0.15s !important;
+    }}
+    .quick-carousel-window {{
+        overflow: hidden !important;
+    }}
     
     /* Cartões de Métricas */
     .metric-card {{
@@ -1600,49 +1647,67 @@ else:
     # NOVA ABA: DASHBOARD EXCLUSIVA
     # ==================================================
     if "Dashboard" in aba_ativa:
-        st.markdown("<h4 style='color: #2D241E; font-weight: 700; margin-bottom: 16px;'>Acesso Rápido</h4>", unsafe_allow_html=True)
-        
-        col_q1, col_q2, col_q3 = st.columns(3)
-        with col_q1:
-            st.markdown("""
-                <div class='quick-card active'>
-                    <div class='quick-card-icon-dark'>📅</div>
-                    <div>
-                        <p class='quick-card-title'>Agenda Principal</p>
-                        <p class='quick-card-sub'>Controle de janelas de box e manutenções programadas.</p>
-                    </div>
-                </div>
-            """, unsafe_allow_html=True)
-            if st.button("Abrir Agenda", key="btn_q_agenda", use_container_width=True):
-                set_nav("Agenda Principal")
+        # --- CARROSSEL DE ACESSO RÁPIDO: TODAS AS ABAS, 3 VISÍVEIS ---
+        cards_acesso = [
+            {"alvo": "Dashboard", "icone": "🏠", "titulo": "Dashboard", "descricao": "Visão geral da operação e dos principais indicadores.", "acao": "Abrir Dashboard"},
+            {"alvo": "Agenda Principal", "icone": "📅", "titulo": "Agenda Principal", "descricao": "Controle de janelas de box e manutenções programadas.", "acao": "Abrir Agenda"},
+            {"alvo": "Cadastro Direto", "icone": "📋", "titulo": "Cadastro Direto", "descricao": "Agendamento de preventivas e revisões periódicas.", "acao": "Abrir Cadastro"},
+            {"alvo": "Chamados Oficina", "icone": "📖", "titulo": "Chamados Oficina", "descricao": "Triagem técnica e diagnósticos com o Mr. Halley.", "acao": "Ver Chamados"},
+            {"alvo": "Chat Mr. Halley", "icone": "💬", "titulo": "Chat Mr. Halley", "descricao": "Primeira triagem de dúvidas técnicas e abertura de OS.", "acao": "Abrir Chat"},
+            {"alvo": "OSs Pendentes", "icone": "⏳", "titulo": "OSs Pendentes", "descricao": "Acompanhe serviços que ainda aguardam conclusão.", "acao": "Ver Pendentes"},
+            {"alvo": "OSs Concluídas", "icone": "✅", "titulo": "OSs Concluídas", "descricao": "Consulte o histórico de serviços finalizados.", "acao": "Ver Concluídas"},
+            {"alvo": "Indicadores", "icone": "📊", "titulo": "Indicadores", "descricao": "Visualize métricas e desempenho da manutenção.", "acao": "Abrir Indicadores"},
+            {"alvo": "Manual do Sistema", "icone": "📖", "titulo": "Manual do Sistema", "descricao": "Consulte o guia operacional completo da plataforma.", "acao": "Abrir Manual"}
+        ]
+        if usuario_ativo == "bruno":
+            cards_acesso.extend([
+                {"alvo": "Minha Equipe", "icone": "👥", "titulo": "Minha Equipe", "descricao": "Gerencie usuários, perfis e acessos da empresa.", "acao": "Abrir Equipe"},
+                {"alvo": "Gestão Master", "icone": "★", "titulo": "Gestão Master", "descricao": "Acesse os recursos administrativos avançados.", "acao": "Abrir Gestão Master"}
+            ])
+        if st.session_state["perfil"] == "motorista":
+            cards_acesso = [
+                {"alvo": "Abrir Solicitação", "icone": "✍️", "titulo": "Abrir Solicitação", "descricao": "Registre uma nova necessidade para a oficina.", "acao": "Abrir Solicitação"},
+                {"alvo": "Status", "icone": "📋", "titulo": "Status", "descricao": "Acompanhe o andamento das suas solicitações.", "acao": "Ver Status"}
+            ]
+
+        if "quick_carousel_index" not in st.session_state:
+            st.session_state.quick_carousel_index = 0
+        limite_carrossel = max(0, len(cards_acesso) - 3)
+        st.session_state.quick_carousel_index = min(st.session_state.quick_carousel_index, limite_carrossel)
+
+        st.markdown("<div class='quick-carousel-heading'><h4 style='color: #2D241E; font-weight: 700; margin: 0;'>Acesso Rápido</h4><span style='color:#8A7E75; font-size:0.78rem;'>Use as setas para ver todas as abas</span></div>", unsafe_allow_html=True)
+        col_prev, col_q1, col_q2, col_q3, col_next = st.columns([0.055, 0.295, 0.295, 0.295, 0.055], gap="small")
+
+        with col_prev:
+            if st.button("‹", key="quick_prev", disabled=st.session_state.quick_carousel_index == 0, help="Mostrar abas anteriores"):
+                st.session_state.quick_carousel_index = max(0, st.session_state.quick_carousel_index - 1)
                 st.rerun()
 
-        with col_q2:
-            st.markdown("""
-                <div class='quick-card'>
-                    <div class='quick-card-icon-light'>📋</div>
-                    <div>
-                        <p class='quick-card-title'>Cadastro Direto</p>
-                        <p class='quick-card-sub'>Agendamento de preventivas e revisões periódicas.</p>
-                    </div>
-                </div>
-            """, unsafe_allow_html=True)
-            if st.button("Abrir Cadastro", key="btn_q_cadastro", use_container_width=True):
-                set_nav("Cadastro Direto")
-                st.rerun()
+        cards_visiveis = cards_acesso[st.session_state.quick_carousel_index:st.session_state.quick_carousel_index + 3]
+        colunas_cards = [col_q1, col_q2, col_q3]
+        for indice_card, coluna_card in enumerate(colunas_cards):
+            with coluna_card:
+                if indice_card < len(cards_visiveis):
+                    card = cards_visiveis[indice_card]
+                    estado_card = " active" if card["alvo"] in aba_ativa else ""
+                    st.markdown(f"""
+                        <div class='quick-card{estado_card}'>
+                            <div class='quick-card-icon-light'>{card['icone']}</div>
+                            <div>
+                                <p class='quick-card-title'>{card['titulo']}</p>
+                                <p class='quick-card-sub'>{card['descricao']}</p>
+                            </div>
+                        </div>
+                    """, unsafe_allow_html=True)
+                    if st.button(card["acao"], key=f"quick_action_{st.session_state.quick_carousel_index}_{indice_card}", use_container_width=True):
+                        set_nav(card["alvo"])
+                        st.rerun()
+                else:
+                    st.empty()
 
-        with col_q3:
-            st.markdown("""
-                <div class='quick-card'>
-                    <div class='quick-card-icon-light'>📖</div>
-                    <div>
-                        <p class='quick-card-title'>Chamados Oficina</p>
-                        <p class='quick-card-sub'>Triagem técnica e diagnósticos com o Mr. Halley.</p>
-                    </div>
-                </div>
-            """, unsafe_allow_html=True)
-            if st.button("Ver Chamados", key="btn_q_chamados", use_container_width=True):
-                set_nav("Chamados Oficina")
+        with col_next:
+            if st.button("›", key="quick_next", disabled=st.session_state.quick_carousel_index >= limite_carrossel, help="Mostrar próximas abas"):
+                st.session_state.quick_carousel_index = min(limite_carrossel, st.session_state.quick_carousel_index + 1)
                 st.rerun()
 
         st.markdown("<br>", unsafe_allow_html=True)
