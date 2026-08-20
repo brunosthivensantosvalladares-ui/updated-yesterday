@@ -886,10 +886,10 @@ st.markdown(f"""
     }}
 
     .sidebar-nav-title {{
-        margin: 0 0 6px 0 !important;
+        margin: 10px 0 6px 0 !important;
         padding: 0 !important;
         font-size: 0.82rem !important;
-        line-height: 1.05 !important;
+        line-height: 1.15 !important;
         color: #F0EDE6 !important;
     }}
 
@@ -1445,7 +1445,7 @@ else:
         
         # Bloco do Mr. Halley
         st.markdown("""
-            <div style='margin-top: 2px; background: rgba(197, 160, 89, 0.08); border: 1px solid #C5A059; border-radius: 8px; padding: 8px 10px; margin-bottom: 4px;'>
+            <div style='margin-top: 8px; background: rgba(197, 160, 89, 0.08); border: 1px solid #C5A059; border-radius: 8px; padding: 8px 10px; margin-bottom: 4px;'>
                 <p style='margin:0; font-weight:700; color:#C5A059; font-size:0.82rem;'>💬 Chat com Mr. Halley</p>
                 <p style='margin:2px 0 0 0; font-size:0.72rem; color:#DDD;'>Estamos online para ajudar!</p>
             </div>
@@ -1453,7 +1453,7 @@ else:
 
         # Bloco de Rodapé: Espaço aumentado antes de Usuário e Botão de Logout
         st.markdown(f"""
-            <div style='margin-top: 6px; padding-top: 4px; border-top: 1px solid rgba(197, 160, 89, 0.2);'>
+            <div style='margin-top: 4px; padding-top: 4px; border-top: 1px solid rgba(197, 160, 89, 0.2);'>
                 <p style='margin: 0 0 8px 0; font-size: 0.8rem; line-height: 1.15;'>
                     🏢 <b>{emp_id}</b> | 👤 <b>{st.session_state['perfil'].capitalize()}</b> ({usuario_ativo})
                 </p>
