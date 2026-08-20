@@ -682,7 +682,7 @@ def gerar_pdf_manual_oficial_pro():
     pdf.cell(190, 10, "8. ASSISTENTE VIRTUAL E PENDÊNCIAS", ln=True)
     pdf.set_font("Arial", "", 11)
     pdf.multi_cell(190, 7, (
-        "O Assistente monitora a integridade dos prazos. O alerta visual no topo indica que "
+        "O Assistente monitora a integridade dos prazos. O法 alarme visual no topo indica que "
         "há pendências de datas passadas. O botão 'Resolver' permite ao gestor dar "
         "baixa imediata ou reagendar tarefas para o presente com um único clique."
     ))
@@ -710,7 +710,7 @@ COR_TEXTO = "#231F20"
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title=f"{NOME_SISTEMA} - Painel de Controle", layout="wide", page_icon="⚙️")
 
-# --- DESIGN SYSTEM LUXO & SIDEBAR MODERNA COM ÍCONES BRANCOS ---
+# --- DESIGN SYSTEM LUXO & SIDEBAR MODERNA COM ÍCONES BRANCOS SEM BOLINHAS ---
 st.markdown(f"""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&display=swap');
@@ -733,8 +733,8 @@ st.markdown(f"""
         overflow: hidden !important;
         padding-top: 0rem !important;
         padding-bottom: 0.8rem !important;
-        padding-left: 0.5rem !important;
-        padding-right: 0.5rem !important;
+        padding-left: 0.6rem !important;
+        padding-right: 0.6rem !important;
         display: flex !important;
         flex-direction: column !important;
         height: 100vh !important;
@@ -787,51 +787,75 @@ st.markdown(f"""
         width: 100% !important;
     }}
 
-    /* Radio / Navegação Estilo Botão Elegante com Ícones Brancos (Sem bolinha) */
+    /* ========================================================================= */
+    /* REMOVE DEFINITIVAMENTE TODAS AS BOLINHAS DE SELEÇÃO E AUMENTA OS BOTÕES   */
+    /* ========================================================================= */
     section[data-testid="stSidebar"] [data-testid="stRadio"] > div {{
         background: transparent !important;
         border: none !important;
         gap: 3px !important;
     }}
     
-    /* Oculta as bolinhas azuis nativas do radio */
-    section[data-testid="stSidebar"] [data-testid="stRadio"] div[role="radiogroup"] > label > div:first-child {{
+    /* Oculta os círculos/bolinhas azuis e brancas nativas */
+    section[data-testid="stSidebar"] [data-testid="stRadio"] div[role="radiogroup"] label div[data-testid="stRadioButtonCustom"],
+    section[data-testid="stSidebar"] [data-testid="stRadio"] div[role="radiogroup"] label > div:first-child,
+    section[data-testid="stSidebar"] [data-testid="stRadio"] div[role="radiogroup"] label input[type="radio"] {{
         display: none !important;
+        visibility: hidden !important;
+        width: 0 !important;
+        height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
     }}
     
+    /* Estilização dos Itens em Formato de Botão Expandido e Letras Maiores */
     section[data-testid="stSidebar"] [data-testid="stRadio"] label {{
         background-color: transparent !important;
-        padding: 5px 10px !important;
+        padding: 7px 12px !important;
         border-radius: 8px !important;
-        font-size: 0.83rem !important;
-        line-height: 1.15 !important;
+        font-size: 0.92rem !important;
+        font-weight: 500 !important;
+        line-height: 1.25 !important;
         transition: all 0.15s ease !important;
         min-height: auto !important;
         cursor: pointer !important;
         width: 100% !important;
         display: flex !important;
         align-items: center !important;
+        box-sizing: border-box !important;
+        border: 1px solid transparent !important;
     }}
+    
     section[data-testid="stSidebar"] [data-testid="stRadio"] label:hover {{
-        background-color: rgba(197, 160, 89, 0.15) !important;
+        background-color: rgba(197, 160, 89, 0.16) !important;
+        border: 1px solid rgba(197, 160, 89, 0.3) !important;
     }}
-    /* Item ativo com destaque sutil marrom/dourado */
+    
+    /* Item Selecionado / Ativo */
     section[data-testid="stSidebar"] [data-testid="stRadio"] label[data-checked="true"],
     section[data-testid="stSidebar"] [data-testid="stRadio"] label:has(input:checked) {{
-        background-color: rgba(197, 160, 89, 0.28) !important;
-        border: 1px solid rgba(197, 160, 89, 0.5) !important;
+        background-color: rgba(197, 160, 89, 0.32) !important;
+        border: 1px solid rgba(197, 160, 89, 0.6) !important;
+        font-weight: 700 !important;
+    }}
+    
+    section[data-testid="stSidebar"] [data-testid="stRadio"] label p {{
+        font-size: 0.92rem !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        color: #FFFFFF !important;
     }}
 
     /* Textos e Botões na Sidebar */
     section[data-testid="stSidebar"] p, 
     section[data-testid="stSidebar"] span, 
     section[data-testid="stSidebar"] div {{
-        font-size: 0.79rem !important;
+        font-size: 0.82rem !important;
     }}
     section[data-testid="stSidebar"] button {{
-        padding: 0.22rem 0.5rem !important;
-        min-height: 27px !important;
-        font-size: 0.79rem !important;
+        padding: 0.30rem 0.6rem !important;
+        min-height: 30px !important;
+        font-size: 0.84rem !important;
     }}
 
     /* Botões Padrão */
@@ -1267,7 +1291,6 @@ else:
         st.session_state.radio_key = 0
 
     def set_nav(target):
-        # Mapeia target caso venha com ícone antigo
         for op in opcoes:
             if target.split()[-1] in op:
                 st.session_state.opcao_selecionada = op
