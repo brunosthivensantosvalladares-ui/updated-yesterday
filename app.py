@@ -799,20 +799,34 @@ st.markdown(f"""
         padding: 0 !important;
     }}
 
-    /* Oculta o controle de rádio nativo em todas as estruturas do Streamlit. */
-    section[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] > label > div:first-child,
-    section[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] > label > div:first-child > div,
-    section[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] label [data-testid="stRadioButtonCustom"],
-    section[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] label input[type="radio"] {{
+    /* Oculta o controle nativo em todas as estruturas do Streamlit. */
+    section[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] > label > *:first-child,
+    section[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] > label > *:first-child *,
+    section[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] label [data-testid*="RadioButton"],
+    section[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] label [data-testid*="radio"],
+    section[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] label input[type="radio"],
+    section[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] label::before,
+    section[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] label::after {{
         display: none !important;
         visibility: hidden !important;
+        opacity: 0 !important;
+        content: none !important;
         flex: 0 0 0 !important;
         width: 0 !important;
         height: 0 !important;
         min-width: 0 !important;
         min-height: 0 !important;
+        max-width: 0 !important;
+        max-height: 0 !important;
         margin: 0 !important;
         padding: 0 !important;
+        border: 0 !important;
+        box-shadow: none !important;
+    }}
+
+    /* Evita que a primeira coluna reservada ao indicador ocupe espaço. */
+    section[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] > label {{
+        grid-template-columns: 1fr !important;
     }}
 
     /* Título da seção com margem reduzida. */
