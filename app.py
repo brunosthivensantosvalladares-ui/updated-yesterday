@@ -927,9 +927,12 @@ st.markdown(f"""
     }}
 
     section[data-testid="stSidebar"] button[kind="secondary"]:hover,
-    section[data-testid="stSidebar"] button[data-testid="stBaseButton-secondary"]:hover {{
-        background: rgba(197, 160, 89, 0.16) !important;
-        border-color: rgba(197, 160, 89, 0.3) !important;
+    section[data-testid="stSidebar"] button[data-testid="stBaseButton-secondary"]:hover,
+    section[data-testid="stSidebar"] button[kind="primary"]:hover,
+    section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"]:hover {{
+        background: rgba(0, 0, 0, 0.38) !important;
+        border-color: rgba(197, 160, 89, 0.55) !important;
+        box-shadow: inset 0 0 0 1px rgba(197, 160, 89, 0.18), 0 2px 8px rgba(0, 0, 0, 0.22) !important;
     }}
 
     section[data-testid="stSidebar"] button[kind="primary"],
