@@ -745,10 +745,10 @@ st.markdown(f"""
 
     /* Espaçamentos verticais compactados */
     section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] {{
-        gap: 0.12rem !important;
+        gap: 0 !important;
     }}
     section[data-testid="stSidebar"] hr {{
-        margin: 4px 0 10px 0 !important;
+        margin: 2px 0 4px 0 !important;
         border-color: rgba(197, 160, 89, 0.25) !important;
     }}
 
@@ -788,36 +788,53 @@ st.markdown(f"""
     }}
 
     /* ========================================================================= */
-    /* REMOVE DEFINITIVAMENTE TODAS AS BOLINHAS DE SELEÇÃO E AUMENTA OS BOTÕES   */
+    /* NAVEGAÇÃO COMPACTA: SEM BOLINHAS E COM ÍCONES LEVEMENTE MAIORES          */
     /* ========================================================================= */
-    section[data-testid="stSidebar"] [data-testid="stRadio"] > div {{
+    section[data-testid="stSidebar"] [data-testid="stRadio"] > div,
+    section[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] {{
         background: transparent !important;
         border: none !important;
-        gap: 3px !important;
-    }}
-    
-    /* Oculta os círculos/bolinhas azuis e brancas nativas */
-    section[data-testid="stSidebar"] [data-testid="stRadio"] div[role="radiogroup"] label div[data-testid="stRadioButtonCustom"],
-    section[data-testid="stSidebar"] [data-testid="stRadio"] div[role="radiogroup"] label > div:first-child,
-    section[data-testid="stSidebar"] [data-testid="stRadio"] div[role="radiogroup"] label input[type="radio"] {{
-        display: none !important;
-        visibility: hidden !important;
-        width: 0 !important;
-        height: 0 !important;
+        gap: 0 !important;
         margin: 0 !important;
         padding: 0 !important;
     }}
-    
-    /* Estilização dos Itens em Formato de Botão Expandido e Letras Maiores */
-    section[data-testid="stSidebar"] [data-testid="stRadio"] label {{
+
+    /* Oculta o controle de rádio nativo em todas as estruturas do Streamlit. */
+    section[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] > label > div:first-child,
+    section[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] > label > div:first-child > div,
+    section[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] label [data-testid="stRadioButtonCustom"],
+    section[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] label input[type="radio"] {{
+        display: none !important;
+        visibility: hidden !important;
+        flex: 0 0 0 !important;
+        width: 0 !important;
+        height: 0 !important;
+        min-width: 0 !important;
+        min-height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }}
+
+    /* Título da seção com margem reduzida. */
+    section[data-testid="stSidebar"] [data-testid="stRadio"] > label {{
+        margin: 0 0 2px 0 !important;
+        padding: 0 !important;
+        font-size: 0.82rem !important;
+        line-height: 1.05 !important;
+    }}
+
+    /* Itens compactos: menor altura, menor intervalo e texto/ícones um pouco maiores. */
+    section[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] > label {{
         background-color: transparent !important;
-        padding: 7px 12px !important;
+        gap: 0 !important;
+        margin: 0 !important;
+        padding: 3px 8px !important;
         border-radius: 8px !important;
-        font-size: 0.92rem !important;
+        font-size: 0.96rem !important;
         font-weight: 500 !important;
-        line-height: 1.25 !important;
-        transition: all 0.15s ease !important;
-        min-height: auto !important;
+        line-height: 1.05 !important;
+        min-height: 30px !important;
+        height: 30px !important;
         cursor: pointer !important;
         width: 100% !important;
         display: flex !important;
@@ -825,22 +842,23 @@ st.markdown(f"""
         box-sizing: border-box !important;
         border: 1px solid transparent !important;
     }}
-    
-    section[data-testid="stSidebar"] [data-testid="stRadio"] label:hover {{
+
+    section[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] > label:hover {{
         background-color: rgba(197, 160, 89, 0.16) !important;
         border: 1px solid rgba(197, 160, 89, 0.3) !important;
     }}
-    
-    /* Item Selecionado / Ativo */
-    section[data-testid="stSidebar"] [data-testid="stRadio"] label[data-checked="true"],
-    section[data-testid="stSidebar"] [data-testid="stRadio"] label:has(input:checked) {{
+
+    /* Item selecionado/ativo. */
+    section[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] > label[data-checked="true"],
+    section[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] > label:has(input:checked) {{
         background-color: rgba(197, 160, 89, 0.32) !important;
         border: 1px solid rgba(197, 160, 89, 0.6) !important;
         font-weight: 700 !important;
     }}
-    
-    section[data-testid="stSidebar"] [data-testid="stRadio"] label p {{
-        font-size: 0.92rem !important;
+
+    section[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] > label p {{
+        font-size: 0.96rem !important;
+        line-height: 1.05 !important;
         margin: 0 !important;
         padding: 0 !important;
         color: #FFFFFF !important;
@@ -1327,7 +1345,7 @@ else:
         
         # Bloco do Mr. Halley
         st.markdown("""
-            <div style='margin-top: 10px; background: rgba(197, 160, 89, 0.08); border: 1px solid #C5A059; border-radius: 8px; padding: 8px 10px; margin-bottom: 4px;'>
+            <div style='margin-top: 4px; background: rgba(197, 160, 89, 0.08); border: 1px solid #C5A059; border-radius: 8px; padding: 8px 10px; margin-bottom: 4px;'>
                 <p style='margin:0; font-weight:700; color:#C5A059; font-size:0.82rem;'>💬 Chat com Mr. Halley</p>
                 <p style='margin:2px 0 0 0; font-size:0.72rem; color:#DDD;'>Estamos online para ajudar!</p>
             </div>
@@ -1335,7 +1353,7 @@ else:
 
         # Bloco de Rodapé: Espaço aumentado antes de Usuário e Botão de Logout
         st.markdown(f"""
-            <div style='margin-top: 45px; padding-top: 10px; border-top: 1px solid rgba(197, 160, 89, 0.2);'>
+            <div style='margin-top: 10px; padding-top: 6px; border-top: 1px solid rgba(197, 160, 89, 0.2);'>
                 <p style='margin: 0 0 14px 0; font-size: 0.8rem; line-height: 1.2;'>
                     🏢 <b>{emp_id}</b> | 👤 <b>{st.session_state['perfil'].capitalize()}</b> ({usuario_ativo})
                 </p>
