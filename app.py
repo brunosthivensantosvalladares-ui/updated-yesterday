@@ -710,7 +710,7 @@ COR_TEXTO = "#231F20"
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title=f"{NOME_SISTEMA} - Painel de Controle", layout="wide", page_icon="⚙️")
 
-# --- DESIGN SYSTEM LUXO / NEUMÓRFICO SUAVE & SIDEBAR FIXA E COMPACTA ---
+# --- DESIGN SYSTEM LUXO & SIDEBAR MODERNA COM ÍCONES BRANCOS ---
 st.markdown(f"""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&display=swap');
@@ -722,7 +722,7 @@ st.markdown(f"""
     }}
 
     /* ========================================================= */
-    /* 1. CONTROLE E FIXAÇÃO DA SIDEBAR (SEM ROLAGEM / TOPO PUXADO) */
+    /* 1. CONTROLE E FIXAÇÃO DA SIDEBAR (SEM ROLAGEM)            */
     /* ========================================================= */
     section[data-testid="stSidebar"] {{ 
         background: linear-gradient(180deg, #2A211B 0%, #1D1612 100%) !important; 
@@ -748,11 +748,11 @@ st.markdown(f"""
         gap: 0.12rem !important;
     }}
     section[data-testid="stSidebar"] hr {{
-        margin: 4px 0 20px 0 !important;
+        margin: 4px 0 10px 0 !important;
         border-color: rgba(197, 160, 89, 0.25) !important;
     }}
 
-    /* Container do Brasão Circular (90px perfeito) */
+    /* Container do Brasão Circular (90px) */
     .logo-container-circular {{
         margin: 0 auto !important;
         border-radius: 50%;
@@ -787,23 +787,39 @@ st.markdown(f"""
         width: 100% !important;
     }}
 
-    /* Radio / Navegação Ultra-Compacta na Sidebar */
+    /* Radio / Navegação Estilo Botão Elegante com Ícones Brancos (Sem bolinha) */
     section[data-testid="stSidebar"] [data-testid="stRadio"] > div {{
         background: transparent !important;
         border: none !important;
-        gap: 0px !important;
+        gap: 3px !important;
     }}
+    
+    /* Oculta as bolinhas azuis nativas do radio */
+    section[data-testid="stSidebar"] [data-testid="stRadio"] div[role="radiogroup"] > label > div:first-child {{
+        display: none !important;
+    }}
+    
     section[data-testid="stSidebar"] [data-testid="stRadio"] label {{
         background-color: transparent !important;
-        padding: 2.5px 5px !important;
-        border-radius: 5px !important;
-        font-size: 0.82rem !important;
-        line-height: 1.1 !important;
+        padding: 5px 10px !important;
+        border-radius: 8px !important;
+        font-size: 0.83rem !important;
+        line-height: 1.15 !important;
         transition: all 0.15s ease !important;
         min-height: auto !important;
+        cursor: pointer !important;
+        width: 100% !important;
+        display: flex !important;
+        align-items: center !important;
     }}
     section[data-testid="stSidebar"] [data-testid="stRadio"] label:hover {{
-        background-color: rgba(197, 160, 89, 0.18) !important;
+        background-color: rgba(197, 160, 89, 0.15) !important;
+    }}
+    /* Item ativo com destaque sutil marrom/dourado */
+    section[data-testid="stSidebar"] [data-testid="stRadio"] label[data-checked="true"],
+    section[data-testid="stSidebar"] [data-testid="stRadio"] label:has(input:checked) {{
+        background-color: rgba(197, 160, 89, 0.28) !important;
+        border: 1px solid rgba(197, 160, 89, 0.5) !important;
     }}
 
     /* Textos e Botões na Sidebar */
@@ -1224,14 +1240,25 @@ else:
                     if st.session_state.get("show_pay_banner"):
                         exibir_painel_pagamento_pro("banner")
     
+    # --- ÍCONES BRANCOS LINEARES / MINIMALISTAS ---
     if st.session_state["perfil"] == "motorista":
-        opcoes = ["✍️ Abrir Solicitação", "📜 Status"]
+        opcoes = ["✍  Abrir Solicitação", "📋  Status"]
     else:
-        opcoes = ["🏠 Dashboard", "📅 Agenda Principal", "📋 Cadastro Direto", "📥 Chamados Oficina", "🤖 Chat Mr. Halley", "⏳ OSs Pendentes", "✅ OSs Concluídas", "📊 Indicadores", "📖 Manual do Sistema"]
+        opcoes = [
+            "⌂  Dashboard",
+            "◰  Agenda Principal",
+            "🗎  Cadastro Direto",
+            "🗀  Chamados Oficina",
+            "🗩  Chat Mr. Halley",
+            "⧖  OSs Pendentes",
+            "✓  OSs Concluídas",
+            "🗠  Indicadores",
+            "🕮  Manual do Sistema"
+        ]
         
         if usuario_ativo == "bruno":
-            opcoes.insert(7, "👥 Minha Equipe")
-            opcoes.append("👑 Gestão Master")
+            opcoes.insert(7, "👥  Minha Equipe")
+            opcoes.append("★  Gestão Master")
 
     if "opcao_selecionada" not in st.session_state or st.session_state.opcao_selecionada not in opcoes:
         st.session_state.opcao_selecionada = opcoes[0]
@@ -1240,7 +1267,13 @@ else:
         st.session_state.radio_key = 0
 
     def set_nav(target):
-        st.session_state.opcao_selecionada = target
+        # Mapeia target caso venha com ícone antigo
+        for op in opcoes:
+            if target.split()[-1] in op:
+                st.session_state.opcao_selecionada = op
+                break
+        else:
+            st.session_state.opcao_selecionada = target
         st.session_state.radio_key += 1 
 
     # --- MONTAGEM DA SIDEBAR COM ESPAÇAMENTOS REFINADOS ---
@@ -1280,7 +1313,7 @@ else:
         # Bloco de Rodapé: Espaço aumentado antes de Usuário e Botão de Logout
         st.markdown(f"""
             <div style='margin-top: 45px; padding-top: 10px; border-top: 1px solid rgba(197, 160, 89, 0.2);'>
-                <p style='margin: 0 0 30px 0; font-size: 0.8rem; line-height: 1.2;'>
+                <p style='margin: 0 0 14px 0; font-size: 0.8rem; line-height: 1.2;'>
                     🏢 <b>{emp_id}</b> | 👤 <b>{st.session_state['perfil'].capitalize()}</b> ({usuario_ativo})
                 </p>
             </div>
@@ -1311,9 +1344,9 @@ else:
     aba_ativa = st.session_state.opcao_selecionada
 
     # ==================================================
-    # NOVA ABA: 🏠 DASHBOARD EXCLUSIVA
+    # NOVA ABA: DASHBOARD EXCLUSIVA
     # ==================================================
-    if aba_ativa == "🏠 Dashboard":
+    if "Dashboard" in aba_ativa:
         st.markdown("<h4 style='color: #2D241E; font-weight: 700; margin-bottom: 16px;'>Acesso Rápido</h4>", unsafe_allow_html=True)
         
         col_q1, col_q2, col_q3 = st.columns(3)
@@ -1328,7 +1361,7 @@ else:
                 </div>
             """, unsafe_allow_html=True)
             if st.button("Abrir Agenda", key="btn_q_agenda", use_container_width=True):
-                set_nav("📅 Agenda Principal")
+                set_nav("Agenda Principal")
                 st.rerun()
 
         with col_q2:
@@ -1342,7 +1375,7 @@ else:
                 </div>
             """, unsafe_allow_html=True)
             if st.button("Abrir Cadastro", key="btn_q_cadastro", use_container_width=True):
-                set_nav("📋 Cadastro Direto")
+                set_nav("Cadastro Direto")
                 st.rerun()
 
         with col_q3:
@@ -1356,7 +1389,7 @@ else:
                 </div>
             """, unsafe_allow_html=True)
             if st.button("Ver Chamados", key="btn_q_chamados", use_container_width=True):
-                set_nav("📥 Chamados Oficina")
+                set_nav("Chamados Oficina")
                 st.rerun()
 
         st.markdown("<br>", unsafe_allow_html=True)
@@ -1433,7 +1466,7 @@ else:
                 """)
 
     # --- DEMAIS ABAS DO SISTEMA ---
-    elif aba_ativa == "👑 Gestão Master" and usuario_ativo == "bruno":
+    elif "Gestão Master" in aba_ativa and usuario_ativo == "bruno":
         st.subheader("👑 Painel de Controle Master")
         
         llm = obter_llm()
@@ -1469,7 +1502,7 @@ else:
                                 conn.commit()
                             st.rerun()
 
-    elif aba_ativa == "✍️ Abrir Solicitação":
+    elif "Abrir Solicitação" in aba_ativa:
         st.subheader("✍️ Nova Solicitação de Manutenção")
         st.info("💡 **Dica:** Informe o prefixo e detalhe o problema para que a oficina possa se programar.")
         
@@ -1494,13 +1527,13 @@ else:
                         conn.commit()
                     st.success("✅ Solicitação enviada com sucesso!")
 
-    elif aba_ativa == "📜 Status":
+    elif "Status" in aba_ativa:
         st.subheader("📜 Status dos Meus Veículos")
         st.info("Aqui você pode ver se o seu veículo já foi agendado ou concluído pela oficina.")
         df_status = pd.read_sql(text("SELECT prefixo, data_solicitacao as data, status, descricao FROM chamados WHERE empresa_id = :eid ORDER BY id DESC"), engine, params={"eid": str(emp_id)})
         st.dataframe(df_status, use_container_width=True, hide_index=True)
     
-    elif aba_ativa == "📖 Manual do Sistema":
+    elif "Manual do Sistema" in aba_ativa:
         st.subheader("📖 Manual Oficial e Treinamento")
         with st.container(border=True):
             st.markdown(f"### 📥 Documentação Oficial {NOME_SISTEMA}")
@@ -1527,7 +1560,7 @@ else:
                 st.write("- Interface para celular.\n- Abertura de chamados.\n- Acompanhamento de status.")
         st.info("💡 Este manual explica a diferença entre os níveis de acesso e como maximizar os lucros da oficina.")
 
-    elif aba_ativa == "⏳ OSs Pendentes":
+    elif "OSs Pendentes" in aba_ativa:
         if 'os_em_baixa' not in st.session_state:
             st.session_state.os_em_baixa = None
 
@@ -1598,7 +1631,7 @@ else:
             except Exception as e:
                 st.error("Erro ao carregar lista."); st.code(str(e))
     
-    elif aba_ativa == "✅ OSs Concluídas":
+    elif "OSs Concluídas" in aba_ativa:
         st.subheader("✅ Histórico de OSs Concluídas")
         if st.button("🔄 Atualizar Relatório"):
             st.cache_data.clear()
@@ -1634,7 +1667,7 @@ else:
         except Exception as e:
             st.error("Erro ao carregar histórico."); st.code(str(e))
             
-    elif aba_ativa == "📅 Agenda Principal":
+    elif "Agenda Principal" in aba_ativa:
         st.subheader("📅 Cronograma Geral de Manutenções")
         
         try:
@@ -1750,7 +1783,7 @@ else:
                                     st.warning(f"OS Selecionada: **{os_label}**")
                                     if st.button(f"🚀 Abrir Baixa Técnica da OS {os_label}", type="primary", use_container_width=True, key="btn_baixa_topo"):
                                         st.session_state.os_em_baixa = os_data_atraso
-                                        set_nav("⏳ OSs Pendentes")
+                                        set_nav("OSs Pendentes")
                                         st.rerun()
                                     st.divider()
 
@@ -1842,7 +1875,7 @@ else:
                             st.toast("Alteração salva com isolamento de segurança!", icon="✅")
                             time_module.sleep(0.5); st.rerun()
 
-    elif aba_ativa == "📋 Cadastro Direto":
+    elif "Cadastro Direto" in aba_ativa:
         st.subheader("📝 Agendamento Direto")
         with st.popover("💡 Como usar o Cadastro Direto?"):
             st.markdown("""
@@ -1902,7 +1935,7 @@ else:
                     conn.commit()
                 st.rerun()
 
-    elif aba_ativa == "📥 Chamados Oficina":
+    elif "Chamados Oficina" in aba_ativa:
         c_tit, c_refresh = st.columns([0.8, 0.2])
         with c_tit: 
             st.subheader("📥 Aprovação de Chamados")
@@ -2024,7 +2057,7 @@ else:
         else: 
             st.info("Nenhum chamado pendente no momento.")
 
-    elif aba_ativa == "🤖 Chat Mr. Halley":
+    elif "Chat Mr. Halley" in aba_ativa:
         st.subheader("🤖 Conversar com Mr. Halley - Telemetria & IA")
         st.caption("Tire dúvidas técnicas sobre falhas, consulte históricos ou solicite a abertura de OS diretamente pelo chat.")
 
@@ -2056,7 +2089,7 @@ else:
             st.session_state.mensagens_chat_halley.append({"role": "assistant", "content": resposta})
             st.rerun()
             
-    elif aba_ativa == "📊 Indicadores":
+    elif "Indicadores" in aba_ativa:
         st.subheader("📊 Painel de Performance Operacional")
         st.info("💡 **Dica:** Utilize esses dados para identificar gargalos e planejar a capacidade da oficina.")
         
@@ -2121,7 +2154,7 @@ else:
         else:
             st.warning("Sem dados de tarefas disponíveis para calcular indicadores de evolução.")
 
-    elif aba_ativa == "👥 Minha Equipe":
+    elif "Minha Equipe" in aba_ativa:
         if usuario_ativo != "bruno":
             st.error("🚫 Acesso restrito apenas ao Usuário Master.")
             st.stop()
@@ -2217,5 +2250,5 @@ else:
 
 # --- ATIVAÇÃO GLOBAL DO CHAT FLUTUANTE (EXCETO NA ABA DO CHAT PRINCIPAL) ---
 if st.session_state.get("logado") and "empresa" in st.session_state:
-    if st.session_state.get("opcao_selecionada") != "🤖 Chat Mr. Halley":
+    if "Chat Mr. Halley" not in st.session_state.get("opcao_selecionada", ""):
         renderizar_chat_flutuante(st.session_state["empresa"])
