@@ -872,7 +872,7 @@ st.markdown(f"""
 
     section[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] > label p {{
         font-size: 0.90rem !important;
-        line-height: 1.10 !important;
+        line-height: 1 !important;
         margin: 0 !important;
         padding: 0 !important;
         color: #FFFFFF !important;
@@ -898,13 +898,13 @@ st.markdown(f"""
     section[data-testid="stSidebar"] button[data-testid="stBaseButton-secondary"],
     section[data-testid="stSidebar"] div[data-testid="stButton"] button[kind="secondary"] {{
         width: 100% !important;
-        min-height: 34px !important;
-        height: 34px !important;
-        margin: 0 0 2px 0 !important;
-        padding: 4px 8px !important;
+        min-height: 30px !important;
+        height: 30px !important;
+        margin: 0 !important;
+        padding: 2px 8px !important;
         border-radius: 8px !important;
         font-size: 0.90rem !important;
-        line-height: 1.10 !important;
+        line-height: 1 !important;
         justify-content: flex-start !important;
         text-align: left !important;
         box-sizing: border-box !important;
@@ -919,7 +919,7 @@ st.markdown(f"""
     section[data-testid="stSidebar"] button[data-testid="stBaseButton-secondary"] span,
     section[data-testid="stSidebar"] button[data-testid="stBaseButton-secondary"] div {{
         font-size: 0.90rem !important;
-        line-height: 1.10 !important;
+        line-height: 1 !important;
         margin: 0 !important;
         padding: 0 !important;
         color: #FFFFFF !important;
@@ -936,13 +936,13 @@ st.markdown(f"""
     section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"],
     section[data-testid="stSidebar"] div[data-testid="stButton"] button[kind="primary"] {{
         width: 100% !important;
-        min-height: 34px !important;
-        height: 34px !important;
-        margin: 0 0 2px 0 !important;
-        padding: 4px 8px !important;
+        min-height: 30px !important;
+        height: 30px !important;
+        margin: 0 !important;
+        padding: 2px 8px !important;
         border-radius: 8px !important;
         font-size: 0.90rem !important;
-        line-height: 1.10 !important;
+        line-height: 1 !important;
         justify-content: flex-start !important;
         text-align: left !important;
         box-sizing: border-box !important;
@@ -958,7 +958,7 @@ st.markdown(f"""
     section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"] span,
     section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"] div {{
         font-size: 0.90rem !important;
-        line-height: 1.10 !important;
+        line-height: 1 !important;
         margin: 0 !important;
         padding: 0 !important;
         color: #FFFFFF !important;
