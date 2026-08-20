@@ -884,7 +884,88 @@ st.markdown(f"""
     section[data-testid="stSidebar"] div {{
         font-size: 0.82rem !important;
     }}
-    section[data-testid="stSidebar"] button {{
+
+    .sidebar-nav-title {{
+        margin: 0 0 2px 0 !important;
+        padding: 0 !important;
+        font-size: 0.82rem !important;
+        line-height: 1.05 !important;
+        color: #F0EDE6 !important;
+    }}
+
+    /* Navegação feita com botões; o item ativo é indicado pelo fundo dourado. */
+    section[data-testid="stSidebar"] button[kind="secondary"],
+    section[data-testid="stSidebar"] button[data-testid="stBaseButton-secondary"],
+    section[data-testid="stSidebar"] div[data-testid="stButton"] button[kind="secondary"] {{
+        width: 100% !important;
+        min-height: 30px !important;
+        height: 30px !important;
+        margin: 0 !important;
+        padding: 3px 8px !important;
+        border-radius: 8px !important;
+        font-size: 0.96rem !important;
+        line-height: 1.05 !important;
+        justify-content: flex-start !important;
+        text-align: left !important;
+        box-sizing: border-box !important;
+        background: transparent !important;
+        border-color: transparent !important;
+    }}
+
+    section[data-testid="stSidebar"] button[kind="secondary"] p,
+    section[data-testid="stSidebar"] button[kind="secondary"] span,
+    section[data-testid="stSidebar"] button[kind="secondary"] div,
+    section[data-testid="stSidebar"] button[data-testid="stBaseButton-secondary"] p,
+    section[data-testid="stSidebar"] button[data-testid="stBaseButton-secondary"] span,
+    section[data-testid="stSidebar"] button[data-testid="stBaseButton-secondary"] div {{
+        font-size: 0.96rem !important;
+        line-height: 1.05 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        color: #FFFFFF !important;
+        -webkit-text-fill-color: #FFFFFF !important;
+    }}
+
+    section[data-testid="stSidebar"] button[kind="secondary"]:hover,
+    section[data-testid="stSidebar"] button[data-testid="stBaseButton-secondary"]:hover {{
+        background: rgba(197, 160, 89, 0.16) !important;
+        border-color: rgba(197, 160, 89, 0.3) !important;
+    }}
+
+    section[data-testid="stSidebar"] button[kind="primary"],
+    section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"],
+    section[data-testid="stSidebar"] div[data-testid="stButton"] button[kind="primary"] {{
+        width: 100% !important;
+        min-height: 30px !important;
+        height: 30px !important;
+        margin: 0 !important;
+        padding: 3px 8px !important;
+        border-radius: 8px !important;
+        font-size: 0.96rem !important;
+        line-height: 1.05 !important;
+        justify-content: flex-start !important;
+        text-align: left !important;
+        box-sizing: border-box !important;
+        background: rgba(197, 160, 89, 0.32) !important;
+        border-color: rgba(197, 160, 89, 0.6) !important;
+        font-weight: 700 !important;
+    }}
+
+    section[data-testid="stSidebar"] button[kind="primary"] p,
+    section[data-testid="stSidebar"] button[kind="primary"] span,
+    section[data-testid="stSidebar"] button[kind="primary"] div,
+    section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"] p,
+    section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"] span,
+    section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"] div {{
+        font-size: 0.96rem !important;
+        line-height: 1.05 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        color: #FFFFFF !important;
+        -webkit-text-fill-color: #FFFFFF !important;
+    }}
+
+    section[data-testid="stSidebar"] button:not([key^="nav_btn_"]) {{
         padding: 0.30rem 0.6rem !important;
         min-height: 30px !important;
         font-size: 0.84rem !important;
@@ -1349,13 +1430,18 @@ else:
         except ValueError:
             idx_seguro = 0; st.session_state.opcao_selecionada = opcoes[0]
 
-        escolha_sidebar = st.radio(
-            "NAVEGAÇÃO", 
-            opcoes, 
-            index=idx_seguro,
-            key=f"radio_nav_{st.session_state.radio_key}",
-            on_change=lambda: st.session_state.update({"opcao_selecionada": st.session_state[f"radio_nav_{st.session_state.radio_key}"]})
-        )
+        st.markdown("<div class='sidebar-nav-title'>NAVEGAÇÃO</div>", unsafe_allow_html=True)
+
+        # Botões individuais: não usam input/radio e, portanto, não exibem bolinhas.
+        for indice, opcao in enumerate(opcoes):
+            st.button(
+                opcao,
+                key=f"nav_btn_{indice}_{st.session_state.radio_key}",
+                type="primary" if opcao == st.session_state.opcao_selecionada else "secondary",
+                use_container_width=True,
+                on_click=set_nav,
+                args=(opcao,)
+            )
         
         # Bloco do Mr. Halley
         st.markdown("""
