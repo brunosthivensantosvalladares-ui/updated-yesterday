@@ -1251,7 +1251,7 @@ else:
                     <img src='{LOGO_URL}' class='logo-img-crop'>
                 </div>
                 <p class='brand-title-gold'>UPDATED YESTERDAY</p>
-                <p style='color: #A89C91; font-size: 0.72rem; margin: 2px 0 10px 0; text-align: center;'>{SLOGAN}</p>
+                <p style='color: #A89C91; font-size: 0.72rem; margin: 2px 0 30px 0; text-align: center;'>{SLOGAN}</p>
             </div>
         """, unsafe_allow_html=True)
         st.divider()
