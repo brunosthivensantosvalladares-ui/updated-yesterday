@@ -732,7 +732,7 @@ st.markdown(f"""
     section[data-testid="stSidebar"] > div:first-child {{
         overflow: hidden !important;
         padding-top: 0rem !important;
-        padding-bottom: 0.8rem !important;
+        padding-bottom: 0.4rem !important;
         padding-left: 0.6rem !important;
         padding-right: 0.6rem !important;
         display: flex !important;
@@ -872,7 +872,7 @@ st.markdown(f"""
 
     section[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] > label p {{
         font-size: 0.96rem !important;
-        line-height: 1.05 !important;
+        line-height: 1.15 !important;
         margin: 0 !important;
         padding: 0 !important;
         color: #FFFFFF !important;
@@ -886,7 +886,7 @@ st.markdown(f"""
     }}
 
     .sidebar-nav-title {{
-        margin: 0 0 2px 0 !important;
+        margin: 0 0 6px 0 !important;
         padding: 0 !important;
         font-size: 0.82rem !important;
         line-height: 1.05 !important;
@@ -898,13 +898,13 @@ st.markdown(f"""
     section[data-testid="stSidebar"] button[data-testid="stBaseButton-secondary"],
     section[data-testid="stSidebar"] div[data-testid="stButton"] button[kind="secondary"] {{
         width: 100% !important;
-        min-height: 30px !important;
-        height: 30px !important;
-        margin: 0 !important;
-        padding: 3px 8px !important;
+        min-height: 34px !important;
+        height: 34px !important;
+        margin: 0 0 2px 0 !important;
+        padding: 4px 8px !important;
         border-radius: 8px !important;
         font-size: 0.96rem !important;
-        line-height: 1.05 !important;
+        line-height: 1.15 !important;
         justify-content: flex-start !important;
         text-align: left !important;
         box-sizing: border-box !important;
@@ -919,7 +919,7 @@ st.markdown(f"""
     section[data-testid="stSidebar"] button[data-testid="stBaseButton-secondary"] span,
     section[data-testid="stSidebar"] button[data-testid="stBaseButton-secondary"] div {{
         font-size: 0.96rem !important;
-        line-height: 1.05 !important;
+        line-height: 1.15 !important;
         margin: 0 !important;
         padding: 0 !important;
         color: #FFFFFF !important;
@@ -936,13 +936,13 @@ st.markdown(f"""
     section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"],
     section[data-testid="stSidebar"] div[data-testid="stButton"] button[kind="primary"] {{
         width: 100% !important;
-        min-height: 30px !important;
-        height: 30px !important;
-        margin: 0 !important;
-        padding: 3px 8px !important;
+        min-height: 34px !important;
+        height: 34px !important;
+        margin: 0 0 2px 0 !important;
+        padding: 4px 8px !important;
         border-radius: 8px !important;
         font-size: 0.96rem !important;
-        line-height: 1.05 !important;
+        line-height: 1.15 !important;
         justify-content: flex-start !important;
         text-align: left !important;
         box-sizing: border-box !important;
@@ -958,7 +958,7 @@ st.markdown(f"""
     section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"] span,
     section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"] div {{
         font-size: 0.96rem !important;
-        line-height: 1.05 !important;
+        line-height: 1.15 !important;
         margin: 0 !important;
         padding: 0 !important;
         color: #FFFFFF !important;
@@ -1420,7 +1420,7 @@ else:
                     <img src='{LOGO_URL}' class='logo-img-crop'>
                 </div>
                 <p class='brand-title-gold'>UPDATED YESTERDAY</p>
-                <p style='color: #A89C91; font-size: 0.72rem; margin: 2px 0 10px 0; text-align: center;'>{SLOGAN}</p>
+                <p style='color: #A89C91; font-size: 0.72rem; margin: 2px 0 7px 0; text-align: center;'>{SLOGAN}</p>
             </div>
         """, unsafe_allow_html=True)
         st.divider()
@@ -1445,7 +1445,7 @@ else:
         
         # Bloco do Mr. Halley
         st.markdown("""
-            <div style='margin-top: 4px; background: rgba(197, 160, 89, 0.08); border: 1px solid #C5A059; border-radius: 8px; padding: 8px 10px; margin-bottom: 4px;'>
+            <div style='margin-top: 2px; background: rgba(197, 160, 89, 0.08); border: 1px solid #C5A059; border-radius: 8px; padding: 8px 10px; margin-bottom: 4px;'>
                 <p style='margin:0; font-weight:700; color:#C5A059; font-size:0.82rem;'>💬 Chat com Mr. Halley</p>
                 <p style='margin:2px 0 0 0; font-size:0.72rem; color:#DDD;'>Estamos online para ajudar!</p>
             </div>
@@ -1453,8 +1453,8 @@ else:
 
         # Bloco de Rodapé: Espaço aumentado antes de Usuário e Botão de Logout
         st.markdown(f"""
-            <div style='margin-top: 10px; padding-top: 6px; border-top: 1px solid rgba(197, 160, 89, 0.2);'>
-                <p style='margin: 0 0 14px 0; font-size: 0.8rem; line-height: 1.2;'>
+            <div style='margin-top: 6px; padding-top: 4px; border-top: 1px solid rgba(197, 160, 89, 0.2);'>
+                <p style='margin: 0 0 8px 0; font-size: 0.8rem; line-height: 1.15;'>
                     🏢 <b>{emp_id}</b> | 👤 <b>{st.session_state['perfil'].capitalize()}</b> ({usuario_ativo})
                 </p>
             </div>
