@@ -747,10 +747,10 @@ st.markdown(f"""
     section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] {{
         gap: 0.12rem !important;
     }}
-    section[data-testid="stSidebar"] hr {
-        margin: -8px 0 12px 0 !important;
+    section[data-testid="stSidebar"] hr {{
+        margin: 4px 0 10px 0 !important;
         border-color: rgba(197, 160, 89, 0.25) !important;
-    }
+    }}
 
     /* Container do Brasão Circular (90px perfeito) */
     .logo-container-circular {{
@@ -1251,7 +1251,7 @@ else:
                     <img src='{LOGO_URL}' class='logo-img-crop'>
                 </div>
                 <p class='brand-title-gold'>UPDATED YESTERDAY</p>
-                <p style='color: #A89C91; font-size: 0.72rem; margin: 2px 0 30px 0; text-align: center;'>{SLOGAN}</p>
+                <p style='color: #A89C91; font-size: 0.72rem; margin: 2px 0 10px 0; text-align: center;'>{SLOGAN}</p>
             </div>
         """, unsafe_allow_html=True)
         st.divider()
@@ -1271,16 +1271,16 @@ else:
         
         # Bloco do Mr. Halley
         st.markdown("""
-            <div style='margin-top: 14px; background: rgba(197, 160, 89, 0.08); border: 1px solid #C5A059; border-radius: 8px; padding: 8px 10px; margin-bottom: 6px;'>
+            <div style='margin-top: 10px; background: rgba(197, 160, 89, 0.08); border: 1px solid #C5A059; border-radius: 8px; padding: 8px 10px; margin-bottom: 4px;'>
                 <p style='margin:0; font-weight:700; color:#C5A059; font-size:0.82rem;'>💬 Chat com Mr. Halley</p>
                 <p style='margin:2px 0 0 0; font-size:0.72rem; color:#DDD;'>Estamos online para ajudar!</p>
             </div>
         """, unsafe_allow_html=True)
 
-        # Bloco de Rodapé: Usuário e Botão de Logout empurrados para a base
+        # Bloco de Rodapé: Espaço aumentado antes de Usuário e Botão de Logout
         st.markdown(f"""
-            <div style='margin-top: 25px; padding-top: 8px; border-top: 1px solid rgba(197, 160, 89, 0.2);'>
-                <p style='margin: 0 0 30px 0; font-size: 0.8rem; line-height: 1.2;'>
+            <div style='margin-top: 45px; padding-top: 10px; border-top: 1px solid rgba(197, 160, 89, 0.2);'>
+                <p style='margin: 0 0 14px 0; font-size: 0.8rem; line-height: 1.2;'>
                     🏢 <b>{emp_id}</b> | 👤 <b>{st.session_state['perfil'].capitalize()}</b> ({usuario_ativo})
                 </p>
             </div>
