@@ -871,8 +871,8 @@ st.markdown(f"""
     }}
 
     section[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] > label p {{
-        font-size: 0.96rem !important;
-        line-height: 1.15 !important;
+        font-size: 0.90rem !important;
+        line-height: 1.10 !important;
         margin: 0 !important;
         padding: 0 !important;
         color: #FFFFFF !important;
@@ -924,16 +924,6 @@ st.markdown(f"""
         padding: 0 !important;
         color: #FFFFFF !important;
         -webkit-text-fill-color: #FFFFFF !important;
-    }}
-
-    /* Mantém os ícones independentes ligeiramente maiores que os textos. */
-    section[data-testid="stSidebar"] button[data-testid="stBaseButton-secondary"] > div:first-child,
-    section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"] > div:first-child,
-    section[data-testid="stSidebar"] button[kind="secondary"] > div:first-child,
-    section[data-testid="stSidebar"] button[kind="primary"] > div:first-child {{
-        font-size: 1rem !important;
-        line-height: 1 !important;
-        flex: 0 0 auto !important;
     }}
 
     section[data-testid="stSidebar"] button[kind="secondary"]:hover,
@@ -1389,40 +1379,23 @@ else:
     
     # --- ÍCONES BRANCOS LINEARES / MINIMALISTAS ---
     if st.session_state["perfil"] == "motorista":
-        opcoes = ["Abrir Solicitação", "Status"]
-        icones_nav = {
-            "Abrir Solicitação": "✍",
-            "Status": "📋"
-        }
+        opcoes = ["✍  Abrir Solicitação", "📋  Status"]
     else:
         opcoes = [
-            "Dashboard",
-            "Agenda Principal",
-            "Cadastro Direto",
-            "Chamados Oficina",
-            "Chat Mr. Halley",
-            "OSs Pendentes",
-            "OSs Concluídas",
-            "Indicadores",
-            "Manual do Sistema"
+            "⌂  Dashboard",
+            "◰  Agenda Principal",
+            "🗎  Cadastro Direto",
+            "🗀  Chamados Oficina",
+            "🗩  Chat Mr. Halley",
+            "⧖  OSs Pendentes",
+            "✓  OSs Concluídas",
+            "🗠  Indicadores",
+            "🕮  Manual do Sistema"
         ]
-        icones_nav = {
-            "Dashboard": "⌂",
-            "Agenda Principal": "◰",
-            "Cadastro Direto": "🗎",
-            "Chamados Oficina": "🗀",
-            "Chat Mr. Halley": "🗩",
-            "OSs Pendentes": "⧖",
-            "OSs Concluídas": "✓",
-            "Indicadores": "🗠",
-            "Manual do Sistema": "🕮",
-            "Minha Equipe": "👥",
-            "Gestão Master": "★"
-        }
         
         if usuario_ativo == "bruno":
-            opcoes.insert(7, "Minha Equipe")
-            opcoes.append("Gestão Master")
+            opcoes.insert(7, "👥  Minha Equipe")
+            opcoes.append("★  Gestão Master")
 
     if "opcao_selecionada" not in st.session_state or st.session_state.opcao_selecionada not in opcoes:
         st.session_state.opcao_selecionada = opcoes[0]
@@ -1464,7 +1437,6 @@ else:
             st.button(
                 opcao,
                 key=f"nav_btn_{indice}_{st.session_state.radio_key}",
-                icon=icones_nav.get(opcao),
                 type="primary" if opcao == st.session_state.opcao_selecionada else "secondary",
                 use_container_width=True,
                 on_click=set_nav,
