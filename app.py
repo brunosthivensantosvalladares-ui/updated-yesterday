@@ -1445,7 +1445,7 @@ else:
         
         # Bloco do Mr. Halley
         st.markdown("""
-            <div style='margin-top: 8px; background: rgba(197, 160, 89, 0.08); border: 1px solid #C5A059; border-radius: 8px; padding: 8px 10px; margin-bottom: 4px;'>
+            <div style='margin-top: 3px; background: rgba(197, 160, 89, 0.08); border: 1px solid #C5A059; border-radius: 8px; padding: 8px 10px; margin-bottom: 4px;'>
                 <p style='margin:0; font-weight:700; color:#C5A059; font-size:0.82rem;'>💬 Chat com Mr. Halley</p>
                 <p style='margin:2px 0 0 0; font-size:0.72rem; color:#DDD;'>Estamos online para ajudar!</p>
             </div>
