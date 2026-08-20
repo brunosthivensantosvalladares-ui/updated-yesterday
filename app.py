@@ -1413,7 +1413,78 @@ else:
                 break
         else:
             st.session_state.opcao_selecionada = target
-        st.session_state.radio_key += 1 
+        st.session_state.radio_key += 1
+
+    # --- TRADUÇÃO BÁSICA DA INTERFACE E CONTADORES DO CABEÇALHO ---
+    IDIOMAS_DISPONIVEIS = ["Português", "English", "Español"]
+    TRADUCOES_INTERFACE = {
+        "Português": {
+            "Ajuda": "Ajuda", "Idioma": "Idioma", "Notificações": "Notificações",
+            "NAVEGAÇÃO": "NAVEGAÇÃO", "Buscar veículo, OS, motorista ou serviço...": "Buscar veículo, OS, motorista ou serviço...",
+            "Abrir manual": "Abrir Manual do Sistema", "Abrir chat": "Abrir Chat Mr. Halley",
+            "Aplicar idioma": "Aplicar idioma", "OSs atrasadas": "OSs atrasadas",
+            "chamados pendentes": "chamados pendentes", "Ver OSs atrasadas": "Ver OSs atrasadas",
+            "Avaliar chamados": "Avaliar chamados", "Nenhuma notificação nova.": "Nenhuma notificação nova."
+        },
+        "English": {
+            "Ajuda": "Help", "Idioma": "Language", "Notificações": "Notifications",
+            "NAVEGAÇÃO": "NAVIGATION", "Buscar veículo, OS, motorista ou serviço...": "Search vehicle, WO, driver or service...",
+            "Abrir manual": "Open System Manual", "Abrir chat": "Open Mr. Halley Chat",
+            "Aplicar idioma": "Apply language", "OSs atrasadas": "Overdue work orders",
+            "chamados pendentes": "pending driver requests", "Ver OSs atrasadas": "View overdue WOs",
+            "Avaliar chamados": "Review requests", "Nenhuma notificação nova.": "No new notifications."
+        },
+        "Español": {
+            "Ajuda": "Ayuda", "Idioma": "Idioma", "Notificações": "Notificaciones",
+            "NAVEGAÇÃO": "NAVEGACIÓN", "Buscar veículo, OS, motorista ou serviço...": "Buscar vehículo, OT, conductor o servicio...",
+            "Abrir manual": "Abrir manual del sistema", "Abrir chat": "Abrir chat del Sr. Halley",
+            "Aplicar idioma": "Aplicar idioma", "OSs atrasadas": "OT atrasadas",
+            "chamados pendentes": "solicitudes pendientes", "Ver OSs atrasadas": "Ver OT atrasadas",
+            "Avaliar chamados": "Evaluar solicitudes", "Nenhuma notificação nova.": "No hay notificaciones nuevas."
+        }
+    }
+    TRADUCOES_NAVEGACAO = {
+        "⌂  Dashboard": {"English": "⌂  Dashboard", "Español": "⌂  Panel"},
+        "◰  Agenda Principal": {"English": "◰  Main Schedule", "Español": "◰  Agenda Principal"},
+        "🗎  Cadastro Direto": {"English": "🗎  Direct Registration", "Español": "🗎  Registro Directo"},
+        "🗀  Chamados Oficina": {"English": "🗀  Workshop Requests", "Español": "🗀  Solicitudes de Taller"},
+        "🗩  Chat Mr. Halley": {"English": "🗩  Mr. Halley Chat", "Español": "🗩  Chat del Sr. Halley"},
+        "⧖  OSs Pendentes": {"English": "⧖  Pending WOs", "Español": "⧖  OT Pendientes"},
+        "✓  OSs Concluídas": {"English": "✓  Completed WOs", "Español": "✓  OT Concluidas"},
+        "🗠  Indicadores": {"English": "🗠  Indicators", "Español": "🗠  Indicadores"},
+        "🕮  Manual do Sistema": {"English": "🕮  System Manual", "Español": "🕮  Manual del Sistema"},
+        "👥  Minha Equipe": {"English": "👥  My Team", "Español": "👥  Mi Equipo"},
+        "★  Gestão Master": {"English": "★  Master Management", "Español": "★  Gestión Master"},
+        "✍  Abrir Solicitação": {"English": "✍  Open Request", "Español": "✍  Abrir Solicitud"},
+        "📋  Status": {"English": "📋  Status", "Español": "📋  Estado"}
+    }
+    if "idioma_atual" not in st.session_state:
+        st.session_state.idioma_atual = "Português"
+
+    def tr(chave):
+        return TRADUCOES_INTERFACE.get(st.session_state.idioma_atual, {}).get(chave, chave)
+
+    def traduzir_nav(opcao):
+        return TRADUCOES_NAVEGACAO.get(opcao, {}).get(st.session_state.idioma_atual, opcao)
+
+    def obter_notificacoes_header():
+        qtd_atrasadas = 0
+        qtd_chamados = 0
+        try:
+            hoje_header = str(datetime.now().date())
+            with engine.connect() as conn:
+                qtd_atrasadas = conn.execute(
+                    text("SELECT COUNT(*) FROM tarefas WHERE data < :hoje AND realizado = FALSE AND empresa_id = :eid"),
+                    {"hoje": hoje_header, "eid": str(emp_id)}
+                ).scalar() or 0
+                if st.session_state.get("perfil") == "admin":
+                    qtd_chamados = conn.execute(
+                        text("SELECT COUNT(*) FROM chamados WHERE status = 'Pendente' AND empresa_id = :eid"),
+                        {"eid": str(emp_id)}
+                    ).scalar() or 0
+        except Exception:
+            pass
+        return int(qtd_atrasadas), int(qtd_chamados)
 
     # --- MONTAGEM DA SIDEBAR COM ESPAÇAMENTOS REFINADOS ---
     with st.sidebar:
@@ -1433,12 +1504,12 @@ else:
         except ValueError:
             idx_seguro = 0; st.session_state.opcao_selecionada = opcoes[0]
 
-        st.markdown("<div class='sidebar-nav-title'>NAVEGAÇÃO</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='sidebar-nav-title'>{tr('NAVEGAÇÃO')}</div>", unsafe_allow_html=True)
 
         # Botões individuais: não usam input/radio e, portanto, não exibem bolinhas.
         for indice, opcao in enumerate(opcoes):
             st.button(
-                opcao,
+                traduzir_nav(opcao),
                 key=f"nav_btn_{indice}_{st.session_state.radio_key}",
                 type="primary" if opcao == st.session_state.opcao_selecionada else "secondary",
                 use_container_width=True,
@@ -1468,20 +1539,58 @@ else:
             st.rerun()
 
     # --- BARRA DE TOPO (HEADER) ---
-    c_srch, c_tools = st.columns([0.6, 0.4])
+    qtd_atrasadas_header, qtd_chamados_header = obter_notificacoes_header()
+    total_notificacoes_header = qtd_atrasadas_header + qtd_chamados_header
+    c_srch, c_help, c_lang, c_notify = st.columns([0.54, 0.16, 0.14, 0.16])
+
     with c_srch:
-        st.text_input("Buscar...", placeholder="🔍 Buscar veículo, OS, motorista ou serviço...", label_visibility="collapsed")
-    with c_tools:
-        st.markdown(f"""
-            <div style='display: flex; justify-content: flex-end; align-items: center; gap: 20px; padding-top: 5px;'>
-                <span style='color: #3B2E25; font-weight: 600; cursor: pointer; border-bottom: 2px solid #3B2E25;'>Ajuda</span>
-                <span style='color: #6E6259; cursor: pointer;'>Idioma ▾</span>
-                <span style='color: #6E6259; cursor: pointer;'>Ferramentas de tela</span>
-                <span style='position: relative; font-size: 1.3rem; cursor: pointer;'>🔔<span style='position: absolute; top: -5px; right: -8px; background: #E53935; color: white; border-radius: 50%; font-size: 0.65rem; padding: 2px 6px; font-weight: bold;'>2</span></span>
-                <span style='font-size: 1.3rem; cursor: pointer;'>☀️</span>
-                <span style='font-size: 1.4rem; background: #3B2E25; border-radius: 50%; padding: 4px 8px; color: white;'>👤</span>
-            </div>
-        """, unsafe_allow_html=True)
+        st.text_input(
+            "Buscar...",
+            placeholder=f"🔍 {tr('Buscar veículo, OS, motorista ou serviço...')}",
+            label_visibility="collapsed"
+        )
+
+    with c_help:
+        with st.popover(f"❔ {tr('Ajuda')}", use_container_width=True):
+            st.markdown(f"### ❔ {tr('Ajuda')}")
+            st.caption("Acesse o manual da plataforma ou converse com o Mr. Halley para uma primeira triagem.")
+            if st.button(f"📖 {tr('Abrir manual')}", key="header_help_manual", use_container_width=True):
+                set_nav("Manual do Sistema")
+                st.rerun()
+            if st.button(f"💬 {tr('Abrir chat')}", key="header_help_chat", use_container_width=True):
+                st.session_state.chat_aberto_usuario = True
+                set_nav("Chat Mr. Halley")
+                st.rerun()
+
+    with c_lang:
+        with st.popover(f"🌐 {tr('Idioma')}", use_container_width=True):
+            idioma_selecionado = st.selectbox(
+                tr("Idioma"),
+                IDIOMAS_DISPONIVEIS,
+                index=IDIOMAS_DISPONIVEIS.index(st.session_state.idioma_atual),
+                key="header_idioma_selecao"
+            )
+            if idioma_selecionado != st.session_state.idioma_atual:
+                st.session_state.idioma_atual = idioma_selecionado
+                st.rerun()
+            st.caption(tr("Aplicar idioma"))
+
+    with c_notify:
+        rotulo_notificacao = f"🔔 {total_notificacoes_header}" if total_notificacoes_header else "🔔"
+        with st.popover(rotulo_notificacao, use_container_width=True):
+            st.markdown(f"### 🔔 {tr('Notificações')}")
+            if qtd_atrasadas_header:
+                st.warning(f"⚠️ {qtd_atrasadas_header} {tr('OSs atrasadas')}.")
+                if st.button(f"📅 {tr('Ver OSs atrasadas')}", key="header_overdue", use_container_width=True):
+                    set_nav("OSs Pendentes")
+                    st.rerun()
+            if qtd_chamados_header:
+                st.info(f"📥 {qtd_chamados_header} {tr('chamados pendentes')}.")
+                if st.button(f"📥 {tr('Avaliar chamados')}", key="header_calls", use_container_width=True):
+                    set_nav("Chamados Oficina")
+                    st.rerun()
+            if not total_notificacoes_header:
+                st.success(tr("Nenhuma notificação nova."))
 
     st.markdown("<hr style='margin: 10px 0 20px 0; border: none; border-top: 1px solid #ECE7DE;'>", unsafe_allow_html=True)
 
