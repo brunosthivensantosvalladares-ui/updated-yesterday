@@ -58,7 +58,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from duckduckgo_search import DDGS
 
 def formatar_acao_infinitivo(texto_bruto):
-    """Converte textos passados/relatórios do banco para recomendações no infinitivo."""
+    """ Converte textos passados/relatórios do banco para recomendações no infinitivo. """
     txt = texto_bruto.strip()
     
     substituicoes = [
@@ -787,104 +787,6 @@ st.markdown(f"""
         width: 100% !important;
     }}
 
-    /* ========================================================================= */
-    /* NAVEGAÇÃO COMPACTA: SEM BOLINHAS E COM ÍCONES LEVEMENTE MAIORES          */
-    /* ========================================================================= */
-    section[data-testid="stSidebar"] [data-testid="stRadio"] > div,
-    section[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] {{
-        background: transparent !important;
-        border: none !important;
-        gap: 0 !important;
-        margin: 0 !important;
-        padding: 0 !important;
-    }}
-
-    /* Oculta o controle nativo em todas as estruturas do Streamlit. */
-    section[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] > label > *:first-child,
-    section[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] > label > *:first-child *,
-    section[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] label [data-testid*="RadioButton"],
-    section[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] label [data-testid*="radio"],
-    section[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] label input[type="radio"],
-    section[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] label::before,
-    section[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] label::after {{
-        display: none !important;
-        visibility: hidden !important;
-        opacity: 0 !important;
-        content: none !important;
-        flex: 0 0 0 !important;
-        width: 0 !important;
-        height: 0 !important;
-        min-width: 0 !important;
-        min-height: 0 !important;
-        max-width: 0 !important;
-        max-height: 0 !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        border: 0 !important;
-        box-shadow: none !important;
-    }}
-
-    /* Evita que a primeira coluna reservada ao indicador ocupe espaço. */
-    section[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] > label {{
-        grid-template-columns: 1fr !important;
-    }}
-
-    /* Título da seção com margem reduzida. */
-    section[data-testid="stSidebar"] [data-testid="stRadio"] > label {{
-        margin: 0 0 2px 0 !important;
-        padding: 0 !important;
-        font-size: 0.82rem !important;
-        line-height: 1.05 !important;
-    }}
-
-    /* Itens compactos: menor altura, menor intervalo e texto/ícones um pouco maiores. */
-    section[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] > label {{
-        background-color: transparent !important;
-        gap: 0 !important;
-        margin: 0 !important;
-        padding: 3px 8px !important;
-        border-radius: 8px !important;
-        font-size: 0.96rem !important;
-        font-weight: 500 !important;
-        line-height: 1.05 !important;
-        min-height: 30px !important;
-        height: 30px !important;
-        cursor: pointer !important;
-        width: 100% !important;
-        display: flex !important;
-        align-items: center !important;
-        box-sizing: border-box !important;
-        border: 1px solid transparent !important;
-    }}
-
-    section[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] > label:hover {{
-        background-color: rgba(197, 160, 89, 0.16) !important;
-        border: 1px solid rgba(197, 160, 89, 0.3) !important;
-    }}
-
-    /* Item selecionado/ativo. */
-    section[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] > label[data-checked="true"],
-    section[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] > label:has(input:checked) {{
-        background-color: rgba(197, 160, 89, 0.32) !important;
-        border: 1px solid rgba(197, 160, 89, 0.6) !important;
-        font-weight: 700 !important;
-    }}
-
-    section[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] > label p {{
-        font-size: 0.90rem !important;
-        line-height: 1 !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        color: #FFFFFF !important;
-    }}
-
-    /* Textos e Botões na Sidebar */
-    section[data-testid="stSidebar"] p, 
-    section[data-testid="stSidebar"] span, 
-    section[data-testid="stSidebar"] div {{
-        font-size: 0.82rem !important;
-    }}
-
     .sidebar-nav-title {{
         margin: 10px 0 20px 0 !important;
         padding: 0 !important;
@@ -966,12 +868,6 @@ st.markdown(f"""
         padding: 0 !important;
         color: #FFFFFF !important;
         -webkit-text-fill-color: #FFFFFF !important;
-    }}
-
-    section[data-testid="stSidebar"] button:not([key^="nav_btn_"]) {{
-        padding: 0.30rem 0.6rem !important;
-        min-height: 30px !important;
-        font-size: 0.84rem !important;
     }}
 
     /* Botões Padrão */
@@ -1071,38 +967,6 @@ st.markdown(f"""
         border-bottom: 1px solid #E6DED1 !important;
         box-shadow: 0 4px 12px rgba(35, 31, 32, 0.08) !important;
         backdrop-filter: blur(8px) !important;
-    }}
-
-    .quick-carousel-heading {{
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 10px;
-        margin-bottom: 10px;
-    }}
-    .quick-carousel-arrow {{
-        min-height: 90px !important;
-        height: 90px !important;
-        font-size: 2rem !important;
-        line-height: 1 !important;
-        padding: 0 !important;
-        border-radius: 12px !important;
-    }}
-    .quick-carousel-arrow p,
-    .quick-carousel-arrow span,
-    .quick-carousel-arrow div {{
-        font-size: 2rem !important;
-        line-height: 1 !important;
-        padding: 0 !important;
-        margin: 0 !important;
-    }}
-    .quick-carousel-arrow:hover {{
-        background: rgba(0, 0, 0, 0.18) !important;
-        border-color: #C5A059 !important;
-        transition-delay: 0.15s !important;
-    }}
-    .quick-carousel-window {{
-        overflow: hidden !important;
     }}
     
     /* Cartões de Métricas */
@@ -1483,7 +1347,7 @@ else:
         },
         "Español": {
             "Ajuda": "Ayuda", "Idioma": "Idioma", "Notificações": "Notificaciones",
-            "NAVEGAÇÃO": "NAVEGACIÓN", "Buscar veículo, OS, motorista ou serviço...": "Buscar vehículo, OT, conductor o servicio...",
+            "NAVEGACIÓN": "NAVEGACIÓN", "Buscar veículo, OS, motorista ou serviço...": "Buscar vehículo, OT, conductor o servicio...",
             "Abrir manual": "Abrir manual del sistema", "Abrir chat": "Abrir chat del Sr. Halley",
             "Aplicar idioma": "Aplicar idioma", "OSs atrasadas": "OT atrasadas",
             "chamados pendentes": "solicitudes pendientes", "Ver OSs atrasadas": "Ver OT atrasadas",
@@ -1546,14 +1410,8 @@ else:
         """, unsafe_allow_html=True)
         st.divider()
         
-        try:
-            idx_seguro = opcoes.index(st.session_state.opcao_selecionada)
-        except ValueError:
-            idx_seguro = 0; st.session_state.opcao_selecionada = opcoes[0]
-
         st.markdown(f"<div class='sidebar-nav-title'>{tr('NAVEGAÇÃO')}</div>", unsafe_allow_html=True)
 
-        # Botões individuais: não usam input/radio e, portanto, não exibem bolinhas.
         for indice, opcao in enumerate(opcoes):
             st.button(
                 traduzir_nav(opcao),
@@ -1647,250 +1505,296 @@ else:
     # NOVA ABA: DASHBOARD EXCLUSIVA
     # ==================================================
     if "Dashboard" in aba_ativa:
+        # --- CARROSSEL FLUIDO COM ROLAGEM CONTÍNUA NO HOVER (2S) E RESTAURAÇÃO TOTAL ---
+        cards_acesso = [
+            {"alvo": "Dashboard", "icone": "⌂", "titulo": "Dashboard", "descricao": "Visão geral da operação e dos principais indicadores.", "acao": "Abrir Dashboard"},
+            {"alvo": "Agenda Principal", "icone": "◰", "titulo": "Agenda Principal", "descricao": "Controle de janelas de box e manutenções programadas.", "acao": "Abrir Agenda"},
+            {"alvo": "Cadastro Direto", "icone": "🗎", "titulo": "Cadastro Direto", "descricao": "Agendamento de preventivas e revisões periódicas.", "acao": "Abrir Cadastro"},
+            {"alvo": "Chamados Oficina", "icone": "🗀", "titulo": "Chamados Oficina", "descricao": "Triagem técnica e diagnósticos com o Mr. Halley.", "acao": "Ver Chamados"},
+            {"alvo": "Chat Mr. Halley", "icone": "🗩", "titulo": "Chat Mr. Halley", "descricao": "Primeira triagem de dúvidas técnicas e abertura de OS.", "acao": "Abrir Chat"},
+            {"alvo": "OSs Pendentes", "icone": "⧖", "titulo": "OSs Pendentes", "descricao": "Acompanhe serviços que ainda aguardam conclusão.", "acao": "Ver Pendentes"},
+            {"alvo": "OSs Concluídas", "icone": "✓", "titulo": "OSs Concluídas", "descricao": "Consulte o histórico de serviços finalizados.", "acao": "Ver Concluídas"},
+            {"alvo": "Indicadores", "icone": "🗠", "titulo": "Indicadores", "descricao": "Visualize métricas e desempenho da manutenção.", "acao": "Abrir Indicadores"},
+            {"alvo": "Manual do Sistema", "icone": "🕮", "titulo": "Manual do Sistema", "descricao": "Consulte o guia operacional completo da plataforma.", "acao": "Abrir Manual"}
+        ]
+        if usuario_ativo == "bruno":
+            cards_acesso.extend([
+                {"alvo": "Minha Equipe", "icone": "👥", "titulo": "Minha Equipe", "descricao": "Gerencie usuários, perfis e acessos da empresa.", "acao": "Abrir Equipe"},
+                {"alvo": "Gestão Master", "icone": "★", "titulo": "Gestão Master", "descricao": "Acesse os recursos administrativos avançados.", "acao": "Abrir Gestão Master"}
+            ])
+        if st.session_state["perfil"] == "motorista":
+            cards_acesso = [
+                {"alvo": "Abrir Solicitação", "icone": "✍", "titulo": "Abrir Solicitação", "descricao": "Registre uma nova necessidade para a oficina.", "acao": "Abrir Solicitação"},
+                {"alvo": "Status", "icone": "📋", "titulo": "Status", "descricao": "Acompanhe o andamento das suas solicitações.", "acao": "Ver Status"}
+            ]
+
         st.markdown(
             """
-            <div class='quick-carousel-heading'>
+            <div style='display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;'>
                 <h4 style='color: #2D241E; font-weight: 700; margin: 0;'>Acesso Rápido</h4>
-                <span style='color:#8A7E75; font-size:0.8rem;'>Passe o mouse por 2s sobre as setas ou clique para rolar</span>
+                <span style='color: #8A7E75; font-size: 0.78rem;'>Mantenha o mouse sobre as setas para rolar continuamente</span>
             </div>
             """,
             unsafe_allow_html=True
         )
 
-        # Componente Frontend do Carrossel fluido com rolagem contínua e timer de 2s no hover
+        cards_json = json.dumps(cards_acesso, ensure_ascii=False)
+
         st.components.v1.html(
-            """
+            f"""
             <style>
-                * { box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
-                body { margin: 0; padding: 0; background: transparent; }
-                .carousel-container {
+                * {{ box-sizing: border-box; font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif; }}
+                body {{ margin: 0; padding: 0; background: transparent; overflow: hidden; }}
+                .carousel-wrapper {{
                     display: flex;
                     align-items: center;
-                    gap: 12px;
+                    gap: 10px;
                     width: 100%;
-                    overflow: hidden;
-                    padding: 8px 0;
-                }
-                .carousel-btn {
+                    padding: 4px 0;
+                }}
+                .arrow-btn {{
                     background-color: #3B2E25;
                     border: 1.5px solid #C5A059;
                     color: #FFFFFF;
-                    width: 42px;
-                    height: 96px;
+                    width: 38px;
+                    height: 100px;
                     border-radius: 10px;
                     cursor: pointer;
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    font-size: 1.8rem;
+                    font-size: 1.6rem;
                     flex-shrink: 0;
                     transition: all 0.2s ease;
-                }
-                .carousel-btn:hover {
+                    user-select: none;
+                }}
+                .arrow-btn:hover {{
                     background-color: #C5A059;
                     color: #231F20;
-                }
-                .carousel-track-wrapper {
+                }}
+                .track-window {{
                     overflow: hidden;
                     flex-grow: 1;
                     width: 100%;
-                }
-                .carousel-track {
+                }}
+                .track {{
                     display: flex;
-                    gap: 16px;
+                    gap: 14px;
                     transition: transform 0.45s cubic-bezier(0.25, 1, 0.5, 1);
                     will-change: transform;
-                }
-                .card-item {
-                    flex: 0 0 calc((100% - 32px) / 3);
+                }}
+                .card {{
+                    flex: 0 0 calc((100% - 28px) / 3);
                     min-width: 0;
                     background: #FFFFFF;
                     border: 1.5px solid #EDE8DF;
                     border-radius: 16px;
-                    padding: 16px;
-                    display: flex;
-                    flex-direction: column;
-                    justify-content: space-between;
-                    min-height: 120px;
-                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
-                }
-                .card-header-flex {
+                    padding: 14px;
                     display: flex;
                     align-items: center;
                     gap: 12px;
-                }
-                .card-icon {
-                    width: 46px;
-                    height: 46px;
+                    min-height: 100px;
+                    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.03);
+                    box-sizing: border-box;
+                }}
+                .card.active {{
+                    border: 2px solid #C5A059;
+                    box-shadow: 0 6px 20px rgba(197, 160, 89, 0.18);
+                }}
+                .icon-box {{
+                    width: 48px;
+                    height: 48px;
                     background: #FBF8F3;
                     border: 1px solid #EAE3D5;
                     border-radius: 12px;
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    font-size: 1.5rem;
+                    font-size: 1.6rem;
+                    color: #8C7355;
                     flex-shrink: 0;
-                }
-                .card-title {
+                }}
+                .card-texts {{
+                    display: flex;
+                    flex-direction: column;
+                    min-width: 0;
+                }}
+                .card-title {{
                     margin: 0;
-                    font-size: 1rem;
+                    font-size: 0.98rem;
                     font-weight: 700;
                     color: #2D241E;
-                }
-                .card-sub {
-                    margin: 4px 0 0 0;
-                    font-size: 0.78rem;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                }}
+                .card-sub {{
+                    margin: 3px 0 0 0;
+                    font-size: 0.76rem;
                     color: #8A7E75;
                     line-height: 1.25;
-                }
+                    display: -webkit-box;
+                    -webkit-line-clamp: 2;
+                    -webkit-box-orient: vertical;
+                    overflow: hidden;
+                }}
             </style>
 
-            <div class="carousel-container">
-                <button class="carousel-btn" id="btnPrev">‹</button>
-                <div class="carousel-track-wrapper">
-                    <div class="carousel-track" id="track">
-                        <div class="card-item">
-                            <div class="card-header-flex">
-                                <div class="card-icon">⌂</div>
-                                <div>
-                                    <p class="card-title">Dashboard</p>
-                                    <p class="card-sub">Visão geral da operação e indicadores.</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="card-item">
-                            <div class="card-header-flex">
-                                <div class="card-icon">◰</div>
-                                <div>
-                                    <p class="card-title">Agenda Principal</p>
-                                    <p class="card-sub">Controle de janelas de box e manutenções.</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="card-item">
-                            <div class="card-header-flex">
-                                <div class="card-icon">🗎</div>
-                                <div>
-                                    <p class="card-title">Cadastro Direto</p>
-                                    <p class="card-sub">Agendamento de preventivas e revisões.</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="card-item">
-                            <div class="card-header-flex">
-                                <div class="card-icon">🗀</div>
-                                <div>
-                                    <p class="card-title">Chamados Oficina</p>
-                                    <p class="card-sub">Triagem e diagnósticos com o Mr. Halley.</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="card-item">
-                            <div class="card-header-flex">
-                                <div class="card-icon">🗩</div>
-                                <div>
-                                    <p class="card-title">Chat Mr. Halley</p>
-                                    <p class="card-sub">Tire dúvidas e abra ordens de serviço.</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="card-item">
-                            <div class="card-header-flex">
-                                <div class="card-icon">⧖</div>
-                                <div>
-                                    <p class="card-title">OSs Pendentes</p>
-                                    <p class="card-sub">Acompanhe tarefas em andamento.</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="card-item">
-                            <div class="card-header-flex">
-                                <div class="card-icon">✓</div>
-                                <div>
-                                    <p class="card-title">OSs Concluídas</p>
-                                    <p class="card-sub">Histórico técnico e serviços realizados.</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="card-item">
-                            <div class="card-header-flex">
-                                <div class="card-icon">🗠</div>
-                                <div>
-                                    <p class="card-title">Indicadores</p>
-                                    <p class="card-sub">Lead time e estatísticas por setor.</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="card-item">
-                            <div class="card-header-flex">
-                                <div class="card-icon">🕮</div>
-                                <div>
-                                    <p class="card-title">Manual do Sistema</p>
-                                    <p class="card-sub">Documentação oficial e fluxos operacionais.</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+            <div class="carousel-wrapper">
+                <button class="arrow-btn" id="btnPrev">‹</button>
+                <div class="track-window">
+                    <div class="track" id="track"></div>
                 </div>
-                <button class="carousel-btn" id="btnNext">›</button>
+                <button class="arrow-btn" id="btnNext">›</button>
             </div>
 
             <script>
+                const cardsData = {cards_json};
                 const track = document.getElementById('track');
                 const btnPrev = document.getElementById('btnPrev');
                 const btnNext = document.getElementById('btnNext');
-                const totalCards = 9;
-                const visibleCards = 3;
-                const maxIndex = totalCards - visibleCards;
+                const visibleCount = 3;
                 let currentIndex = 0;
-                let hoverTimer = null;
+                let intervalTimer = null;
 
-                function updateTrack() {
-                    const cardWidthPercent = (100 / visibleCards);
-                    const gapCompensation = (currentIndex * 16) / visibleCards;
-                    track.style.transform = `translateX(calc(-${currentIndex * cardWidthPercent}% - ${gapCompensation}px))`;
-                }
+                // Renderiza os cards dinamicamente
+                cardsData.forEach((c) => {{
+                    const el = document.createElement('div');
+                    el.className = 'card';
+                    el.innerHTML = `
+                        <div class="icon-box">${{c.icone}}</div>
+                        <div class="card-texts">
+                            <p class="card-title">${{c.titulo}}</p>
+                            <p class="card-sub">${{c.descricao}}</p>
+                        </div>
+                    `;
+                    track.appendChild(el);
+                }});
 
-                function slideNext() {
-                    if (currentIndex < maxIndex) {
+                const maxIndex = Math.max(0, cardsData.length - visibleCount);
+
+                function updateTrack() {{
+                    const cardPercent = 100 / visibleCount;
+                    const gapPx = (currentIndex * 14) / visibleCount;
+                    track.style.transform = `translateX(calc(-${{currentIndex * cardPercent}}% - ${{gapPx}}px))`;
+                }}
+
+                function stepNext() {{
+                    if (currentIndex < maxIndex) {{
                         currentIndex++;
-                    } else {
-                        currentIndex = 0; // Volta ao início suavemente
-                    }
+                    }} else {{
+                        currentIndex = 0;
+                    }}
                     updateTrack();
-                }
+                }}
 
-                function slidePrev() {
-                    if (currentIndex > 0) {
+                function stepPrev() {{
+                    if (currentIndex > 0) {{
                         currentIndex--;
-                    } else {
+                    }} else {{
                         currentIndex = maxIndex;
-                    }
+                    }}
                     updateTrack();
-                }
+                }}
 
-                // Ação por clique
-                btnNext.addEventListener('click', slideNext);
-                btnPrev.addEventListener('click', slidePrev);
+                // Clique individual
+                btnNext.addEventListener('click', stepNext);
+                btnPrev.addEventListener('click', stepPrev);
 
-                // Ação por hover prolongado (2 segundos contínuos)
-                btnNext.addEventListener('mouseenter', () => {
-                    hoverTimer = setTimeout(() => {
-                        slideNext();
-                    }, 2000);
-                });
-                btnNext.addEventListener('mouseleave', () => clearTimeout(hoverTimer));
+                // Hover contínuo: rola a cada 2 segundos ininterruptamente
+                btnNext.addEventListener('mouseenter', () => {{
+                    clearInterval(intervalTimer);
+                    intervalTimer = setInterval(stepNext, 2000);
+                }});
+                btnNext.addEventListener('mouseleave', () => {{
+                    clearInterval(intervalTimer);
+                }});
 
-                btnPrev.addEventListener('mouseenter', () => {
-                    hoverTimer = setTimeout(() => {
-                        slidePrev();
-                    }, 2000);
-                });
-                btnPrev.addEventListener('mouseleave', () => clearTimeout(hoverTimer));
+                btnPrev.addEventListener('mouseenter', () => {{
+                    clearInterval(intervalTimer);
+                    intervalTimer = setInterval(stepPrev, 2000);
+                }});
+                btnPrev.addEventListener('mouseleave', () => {{
+                    clearInterval(intervalTimer);
+                }});
             </script>
             """,
-            height=145
+            height=125
         )
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("<h4 style='color: #2D241E; font-weight: 700; margin-bottom: 16px;'>Cronograma Geral de Manutenção</h4>", unsafe_allow_html=True)
+        
+        df_dash_stats = pd.read_sql(text("SELECT data, realizado FROM tarefas WHERE empresa_id = :eid"), engine, params={"eid": str(emp_id)})
+        agendados_hoje, concluidos_total, pendentes_total = 0, 0, 0
+        
+        if not df_dash_stats.empty:
+            df_dash_stats['data_dt'] = pd.to_datetime(df_dash_stats['data'], errors='coerce').dt.date
+            hoje_dt = datetime.now().date()
+            agendados_hoje = len(df_dash_stats[df_dash_stats['data_dt'] == hoje_dt])
+            concluidos_total = len(df_dash_stats[df_dash_stats['realizado'] == True])
+            pendentes_total = len(df_dash_stats[df_dash_stats['realizado'] == False])
+
+        col_m1, col_m2, col_m3 = st.columns(3)
+        with col_m1:
+            st.markdown(f"""
+                <div class='metric-card'>
+                    <div class='metric-icon-box' style='background: #F4E8D1; color: #C5A059;'>📅</div>
+                    <div style='text-align: right;'>
+                        <span class='metric-label'>Agendados hoje</span>
+                        <div class='metric-value'>{agendados_hoje}</div>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+
+        with col_m2:
+            st.markdown(f"""
+                <div class='metric-card'>
+                    <div class='metric-icon-box' style='background: #3B2E25; color: #FFFFFF;'>✓</div>
+                    <div style='text-align: right;'>
+                        <span class='metric-label'>Concluídos</span>
+                        <div class='metric-value'>{concluidos_total}</div>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+
+        with col_m3:
+            st.markdown(f"""
+                <div class='metric-card'>
+                    <div class='metric-icon-box' style='background: #FAECE4; color: #E65100;'>🕒</div>
+                    <div style='text-align: right;'>
+                        <span class='metric-label'>Pendentes</span>
+                        <div class='metric-value'>{pendentes_total}</div>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        col_filtro, col_exp = st.columns([0.55, 0.45])
+        
+        with col_filtro:
+            with st.container(border=True):
+                st.markdown("<h5 style='color: #2D241E;'>🔍 Filtro Operacional</h5>", unsafe_allow_html=True)
+                p_sel_dash = st.date_input("Período", [datetime.now().date(), datetime.now().date() + timedelta(days=1)], key="dash_dt_filter")
+                f_area_dash = st.selectbox("Área", ["Todas"] + ORDEM_AREAS, key="dash_f_area")
+                f_turno_dash = st.selectbox("Turno", ["Todos"] + LISTA_TURNOS, key="dash_f_turno")
+
+        with col_exp:
+            with st.container(border=True):
+                st.markdown("<h5 style='color: #2D241E;'>📤 Exportações Rápidas</h5>", unsafe_allow_html=True)
+                c_btn_pdf, c_btn_xls = st.columns(2)
+                with c_btn_pdf:
+                    st.download_button("📄 PDF", gerar_pdf_periodo(pd.DataFrame(), datetime.now().date(), datetime.now().date()), "Relatorio.pdf", use_container_width=True, key="dash_pdf_btn")
+                with c_btn_xls:
+                    st.download_button("📊 EXCEL", to_excel_native(pd.DataFrame()), "Relatorio.xlsx", use_container_width=True, key="dash_xls_btn")
+
+            with st.expander("💡 Como usar a Agenda?", expanded=False):
+                st.write("""
+                1. Selecione a Ordem de Serviço desejada na lista.
+                2. Preencha os horários de início e fim da janela logística.
+                3. Finalize a execução na aba de baixa técnica para atualizar os relatórios em tempo real.
+                """)
+
     # --- DEMAIS ABAS DO SISTEMA ---
     elif "Gestão Master" in aba_ativa and usuario_ativo == "bruno":
         st.subheader("👑 Painel de Controle Master")
