@@ -1647,142 +1647,250 @@ else:
     # NOVA ABA: DASHBOARD EXCLUSIVA
     # ==================================================
     if "Dashboard" in aba_ativa:
-        # --- CARROSSEL DE ACESSO RÁPIDO: TODAS AS ABAS, 3 VISÍVEIS ---
-        cards_acesso = [
-            {"alvo": "Dashboard", "icone": "🏠", "titulo": "Dashboard", "descricao": "Visão geral da operação e dos principais indicadores.", "acao": "Abrir Dashboard"},
-            {"alvo": "Agenda Principal", "icone": "📅", "titulo": "Agenda Principal", "descricao": "Controle de janelas de box e manutenções programadas.", "acao": "Abrir Agenda"},
-            {"alvo": "Cadastro Direto", "icone": "📋", "titulo": "Cadastro Direto", "descricao": "Agendamento de preventivas e revisões periódicas.", "acao": "Abrir Cadastro"},
-            {"alvo": "Chamados Oficina", "icone": "📖", "titulo": "Chamados Oficina", "descricao": "Triagem técnica e diagnósticos com o Mr. Halley.", "acao": "Ver Chamados"},
-            {"alvo": "Chat Mr. Halley", "icone": "💬", "titulo": "Chat Mr. Halley", "descricao": "Primeira triagem de dúvidas técnicas e abertura de OS.", "acao": "Abrir Chat"},
-            {"alvo": "OSs Pendentes", "icone": "⏳", "titulo": "OSs Pendentes", "descricao": "Acompanhe serviços que ainda aguardam conclusão.", "acao": "Ver Pendentes"},
-            {"alvo": "OSs Concluídas", "icone": "✅", "titulo": "OSs Concluídas", "descricao": "Consulte o histórico de serviços finalizados.", "acao": "Ver Concluídas"},
-            {"alvo": "Indicadores", "icone": "📊", "titulo": "Indicadores", "descricao": "Visualize métricas e desempenho da manutenção.", "acao": "Abrir Indicadores"},
-            {"alvo": "Manual do Sistema", "icone": "📖", "titulo": "Manual do Sistema", "descricao": "Consulte o guia operacional completo da plataforma.", "acao": "Abrir Manual"}
-        ]
-        if usuario_ativo == "bruno":
-            cards_acesso.extend([
-                {"alvo": "Minha Equipe", "icone": "👥", "titulo": "Minha Equipe", "descricao": "Gerencie usuários, perfis e acessos da empresa.", "acao": "Abrir Equipe"},
-                {"alvo": "Gestão Master", "icone": "★", "titulo": "Gestão Master", "descricao": "Acesse os recursos administrativos avançados.", "acao": "Abrir Gestão Master"}
-            ])
-        if st.session_state["perfil"] == "motorista":
-            cards_acesso = [
-                {"alvo": "Abrir Solicitação", "icone": "✍️", "titulo": "Abrir Solicitação", "descricao": "Registre uma nova necessidade para a oficina.", "acao": "Abrir Solicitação"},
-                {"alvo": "Status", "icone": "📋", "titulo": "Status", "descricao": "Acompanhe o andamento das suas solicitações.", "acao": "Ver Status"}
-            ]
+        st.markdown(
+            """
+            <div class='quick-carousel-heading'>
+                <h4 style='color: #2D241E; font-weight: 700; margin: 0;'>Acesso Rápido</h4>
+                <span style='color:#8A7E75; font-size:0.8rem;'>Passe o mouse por 2s sobre as setas ou clique para rolar</span>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
 
-        if "quick_carousel_index" not in st.session_state:
-            st.session_state.quick_carousel_index = 0
-        limite_carrossel = max(0, len(cards_acesso) - 3)
-        st.session_state.quick_carousel_index = min(st.session_state.quick_carousel_index, limite_carrossel)
+        # Componente Frontend do Carrossel fluido com rolagem contínua e timer de 2s no hover
+        st.components.v1.html(
+            """
+            <style>
+                * { box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
+                body { margin: 0; padding: 0; background: transparent; }
+                .carousel-container {
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                    width: 100%;
+                    overflow: hidden;
+                    padding: 8px 0;
+                }
+                .carousel-btn {
+                    background-color: #3B2E25;
+                    border: 1.5px solid #C5A059;
+                    color: #FFFFFF;
+                    width: 42px;
+                    height: 96px;
+                    border-radius: 10px;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 1.8rem;
+                    flex-shrink: 0;
+                    transition: all 0.2s ease;
+                }
+                .carousel-btn:hover {
+                    background-color: #C5A059;
+                    color: #231F20;
+                }
+                .carousel-track-wrapper {
+                    overflow: hidden;
+                    flex-grow: 1;
+                    width: 100%;
+                }
+                .carousel-track {
+                    display: flex;
+                    gap: 16px;
+                    transition: transform 0.45s cubic-bezier(0.25, 1, 0.5, 1);
+                    will-change: transform;
+                }
+                .card-item {
+                    flex: 0 0 calc((100% - 32px) / 3);
+                    min-width: 0;
+                    background: #FFFFFF;
+                    border: 1.5px solid #EDE8DF;
+                    border-radius: 16px;
+                    padding: 16px;
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: space-between;
+                    min-height: 120px;
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+                }
+                .card-header-flex {
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                }
+                .card-icon {
+                    width: 46px;
+                    height: 46px;
+                    background: #FBF8F3;
+                    border: 1px solid #EAE3D5;
+                    border-radius: 12px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 1.5rem;
+                    flex-shrink: 0;
+                }
+                .card-title {
+                    margin: 0;
+                    font-size: 1rem;
+                    font-weight: 700;
+                    color: #2D241E;
+                }
+                .card-sub {
+                    margin: 4px 0 0 0;
+                    font-size: 0.78rem;
+                    color: #8A7E75;
+                    line-height: 1.25;
+                }
+            </style>
 
-        st.markdown("<div class='quick-carousel-heading'><h4 style='color: #2D241E; font-weight: 700; margin: 0;'>Acesso Rápido</h4><span style='color:#8A7E75; font-size:0.78rem;'>Use as setas para ver todas as abas</span></div>", unsafe_allow_html=True)
-        col_prev, col_q1, col_q2, col_q3, col_next = st.columns([0.055, 0.295, 0.295, 0.295, 0.055], gap="small")
-
-        with col_prev:
-            if st.button("‹", key="quick_prev", disabled=st.session_state.quick_carousel_index == 0, help="Mostrar abas anteriores"):
-                st.session_state.quick_carousel_index = max(0, st.session_state.quick_carousel_index - 1)
-                st.rerun()
-
-        cards_visiveis = cards_acesso[st.session_state.quick_carousel_index:st.session_state.quick_carousel_index + 3]
-        colunas_cards = [col_q1, col_q2, col_q3]
-        for indice_card, coluna_card in enumerate(colunas_cards):
-            with coluna_card:
-                if indice_card < len(cards_visiveis):
-                    card = cards_visiveis[indice_card]
-                    estado_card = " active" if card["alvo"] in aba_ativa else ""
-                    st.markdown(f"""
-                        <div class='quick-card{estado_card}'>
-                            <div class='quick-card-icon-light'>{card['icone']}</div>
-                            <div>
-                                <p class='quick-card-title'>{card['titulo']}</p>
-                                <p class='quick-card-sub'>{card['descricao']}</p>
+            <div class="carousel-container">
+                <button class="carousel-btn" id="btnPrev">‹</button>
+                <div class="carousel-track-wrapper">
+                    <div class="carousel-track" id="track">
+                        <div class="card-item">
+                            <div class="card-header-flex">
+                                <div class="card-icon">⌂</div>
+                                <div>
+                                    <p class="card-title">Dashboard</p>
+                                    <p class="card-sub">Visão geral da operação e indicadores.</p>
+                                </div>
                             </div>
                         </div>
-                    """, unsafe_allow_html=True)
-                    if st.button(card["acao"], key=f"quick_action_{st.session_state.quick_carousel_index}_{indice_card}", use_container_width=True):
-                        set_nav(card["alvo"])
-                        st.rerun()
-                else:
-                    st.empty()
-
-        with col_next:
-            if st.button("›", key="quick_next", disabled=st.session_state.quick_carousel_index >= limite_carrossel, help="Mostrar próximas abas"):
-                st.session_state.quick_carousel_index = min(limite_carrossel, st.session_state.quick_carousel_index + 1)
-                st.rerun()
-
-        st.markdown("<br>", unsafe_allow_html=True)
-        st.markdown("<h4 style='color: #2D241E; font-weight: 700; margin-bottom: 16px;'>Cronograma Geral de Manutenção</h4>", unsafe_allow_html=True)
-        
-        df_dash_stats = pd.read_sql(text("SELECT data, realizado FROM tarefas WHERE empresa_id = :eid"), engine, params={"eid": str(emp_id)})
-        agendados_hoje, concluidos_total, pendentes_total = 0, 0, 0
-        
-        if not df_dash_stats.empty:
-            df_dash_stats['data_dt'] = pd.to_datetime(df_dash_stats['data'], errors='coerce').dt.date
-            hoje_dt = datetime.now().date()
-            agendados_hoje = len(df_dash_stats[df_dash_stats['data_dt'] == hoje_dt])
-            concluidos_total = len(df_dash_stats[df_dash_stats['realizado'] == True])
-            pendentes_total = len(df_dash_stats[df_dash_stats['realizado'] == False])
-
-        col_m1, col_m2, col_m3 = st.columns(3)
-        with col_m1:
-            st.markdown(f"""
-                <div class='metric-card'>
-                    <div class='metric-icon-box' style='background: #F4E8D1; color: #C5A059;'>📅</div>
-                    <div style='text-align: right;'>
-                        <span class='metric-label'>Agendados hoje</span>
-                        <div class='metric-value'>{agendados_hoje}</div>
+                        <div class="card-item">
+                            <div class="card-header-flex">
+                                <div class="card-icon">◰</div>
+                                <div>
+                                    <p class="card-title">Agenda Principal</p>
+                                    <p class="card-sub">Controle de janelas de box e manutenções.</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-item">
+                            <div class="card-header-flex">
+                                <div class="card-icon">🗎</div>
+                                <div>
+                                    <p class="card-title">Cadastro Direto</p>
+                                    <p class="card-sub">Agendamento de preventivas e revisões.</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-item">
+                            <div class="card-header-flex">
+                                <div class="card-icon">🗀</div>
+                                <div>
+                                    <p class="card-title">Chamados Oficina</p>
+                                    <p class="card-sub">Triagem e diagnósticos com o Mr. Halley.</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-item">
+                            <div class="card-header-flex">
+                                <div class="card-icon">🗩</div>
+                                <div>
+                                    <p class="card-title">Chat Mr. Halley</p>
+                                    <p class="card-sub">Tire dúvidas e abra ordens de serviço.</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-item">
+                            <div class="card-header-flex">
+                                <div class="card-icon">⧖</div>
+                                <div>
+                                    <p class="card-title">OSs Pendentes</p>
+                                    <p class="card-sub">Acompanhe tarefas em andamento.</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-item">
+                            <div class="card-header-flex">
+                                <div class="card-icon">✓</div>
+                                <div>
+                                    <p class="card-title">OSs Concluídas</p>
+                                    <p class="card-sub">Histórico técnico e serviços realizados.</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-item">
+                            <div class="card-header-flex">
+                                <div class="card-icon">🗠</div>
+                                <div>
+                                    <p class="card-title">Indicadores</p>
+                                    <p class="card-sub">Lead time e estatísticas por setor.</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-item">
+                            <div class="card-header-flex">
+                                <div class="card-icon">🕮</div>
+                                <div>
+                                    <p class="card-title">Manual do Sistema</p>
+                                    <p class="card-sub">Documentação oficial e fluxos operacionais.</p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            """, unsafe_allow_html=True)
+                <button class="carousel-btn" id="btnNext">›</button>
+            </div>
 
-        with col_m2:
-            st.markdown(f"""
-                <div class='metric-card'>
-                    <div class='metric-icon-box' style='background: #3B2E25; color: #FFFFFF;'>✓</div>
-                    <div style='text-align: right;'>
-                        <span class='metric-label'>Concluídos</span>
-                        <div class='metric-value'>{concluidos_total}</div>
-                    </div>
-                </div>
-            """, unsafe_allow_html=True)
+            <script>
+                const track = document.getElementById('track');
+                const btnPrev = document.getElementById('btnPrev');
+                const btnNext = document.getElementById('btnNext');
+                const totalCards = 9;
+                const visibleCards = 3;
+                const maxIndex = totalCards - visibleCards;
+                let currentIndex = 0;
+                let hoverTimer = null;
 
-        with col_m3:
-            st.markdown(f"""
-                <div class='metric-card'>
-                    <div class='metric-icon-box' style='background: #FAECE4; color: #E65100;'>🕒</div>
-                    <div style='text-align: right;'>
-                        <span class='metric-label'>Pendentes</span>
-                        <div class='metric-value'>{pendentes_total}</div>
-                    </div>
-                </div>
-            """, unsafe_allow_html=True)
+                function updateTrack() {
+                    const cardWidthPercent = (100 / visibleCards);
+                    const gapCompensation = (currentIndex * 16) / visibleCards;
+                    track.style.transform = `translateX(calc(-${currentIndex * cardWidthPercent}% - ${gapCompensation}px))`;
+                }
 
-        st.markdown("<br>", unsafe_allow_html=True)
-        col_filtro, col_exp = st.columns([0.55, 0.45])
-        
-        with col_filtro:
-            with st.container(border=True):
-                st.markdown("<h5 style='color: #2D241E;'>🔍 Filtro Operacional</h5>", unsafe_allow_html=True)
-                p_sel_dash = st.date_input("Período", [datetime.now().date(), datetime.now().date() + timedelta(days=1)], key="dash_dt_filter")
-                f_area_dash = st.selectbox("Área", ["Todas"] + ORDEM_AREAS, key="dash_f_area")
-                f_turno_dash = st.selectbox("Turno", ["Todos"] + LISTA_TURNOS, key="dash_f_turno")
+                function slideNext() {
+                    if (currentIndex < maxIndex) {
+                        currentIndex++;
+                    } else {
+                        currentIndex = 0; // Volta ao início suavemente
+                    }
+                    updateTrack();
+                }
 
-        with col_exp:
-            with st.container(border=True):
-                st.markdown("<h5 style='color: #2D241E;'>📤 Exportações Rápidas</h5>", unsafe_allow_html=True)
-                c_btn_pdf, c_btn_xls = st.columns(2)
-                with c_btn_pdf:
-                    st.download_button("📄 PDF", gerar_pdf_periodo(pd.DataFrame(), datetime.now().date(), datetime.now().date()), "Relatorio.pdf", use_container_width=True, key="dash_pdf_btn")
-                with c_btn_xls:
-                    st.download_button("📊 EXCEL", to_excel_native(pd.DataFrame()), "Relatorio.xlsx", use_container_width=True, key="dash_xls_btn")
+                function slidePrev() {
+                    if (currentIndex > 0) {
+                        currentIndex--;
+                    } else {
+                        currentIndex = maxIndex;
+                    }
+                    updateTrack();
+                }
 
-            with st.expander("💡 Como usar a Agenda?", expanded=False):
-                st.write("""
-                1. Selecione a Ordem de Serviço desejada na lista.
-                2. Preencha os horários de início e fim da janela logística.
-                3. Finalize a execução na aba de baixa técnica para atualizar os relatórios em tempo real.
-                """)
+                // Ação por clique
+                btnNext.addEventListener('click', slideNext);
+                btnPrev.addEventListener('click', slidePrev);
 
+                // Ação por hover prolongado (2 segundos contínuos)
+                btnNext.addEventListener('mouseenter', () => {
+                    hoverTimer = setTimeout(() => {
+                        slideNext();
+                    }, 2000);
+                });
+                btnNext.addEventListener('mouseleave', () => clearTimeout(hoverTimer));
+
+                btnPrev.addEventListener('mouseenter', () => {
+                    hoverTimer = setTimeout(() => {
+                        slidePrev();
+                    }, 2000);
+                });
+                btnPrev.addEventListener('mouseleave', () => clearTimeout(hoverTimer));
+            </script>
+            """,
+            height=145
+        )
     # --- DEMAIS ABAS DO SISTEMA ---
     elif "Gestão Master" in aba_ativa and usuario_ativo == "bruno":
         st.subheader("👑 Painel de Controle Master")
