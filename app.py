@@ -750,12 +750,12 @@ st.markdown(f"""
         display: none !important;
     }}
     
+    /* ZERA O ESPAÇAMENTO NATIVO DO STREAMLIT NO TOPO */
     .main .block-container {{
         padding-top: 0rem !important;
         padding-bottom: 2rem !important;
         padding-left: 1.5rem !important;
         padding-right: 1.5rem !important;
-        margin-top: -6.5rem !important; /* Puxa todo o conteúdo para o topo absoluto */
     }}
     
     /* ========================================================= */
@@ -944,14 +944,14 @@ st.markdown(f"""
         -webkit-text-fill-color: {COR_TEXTO} !important;
     }}
 
-   /* ANCORAGEM PERFEITA LOGO ABAIXO DA BARRA DO COMPARTILHAR */
+   /* PUXA APENAS O SEU CABEÇALHO PARA CIMA VISUALMENTE */
     .top-fixed-section {{
         position: -webkit-sticky !important;
         position: sticky !important;
         top: 0px !important;
         z-index: 99999 !important;
-        background-color: {COR_CHAPA} !important;
-        padding-top: 0px !important;  /* <--- Zera o espaço acima da linha da flecha */
+        background-color: #F7F5F0 !important;
+        padding-top: 4px !important;
         padding-bottom: 2px !important;
         border-bottom: 1.5px solid #E2D9CB !important;
         box-shadow: 0 4px 16px rgba(35, 31, 32, 0.06) !important;
@@ -959,8 +959,8 @@ st.markdown(f"""
         margin-right: -1.5rem !important;
         padding-left: 1.5rem !important;
         padding-right: 1.5rem !important;
-        margin-top: -1rem !important;   /* <--- Puxa a linha apontada pela flecha para cima */
         margin-bottom: 10px !important;
+        transform: translateY(-55px) !important; /* <--- Move exatamente a barra para cima, eliminando o vão */
     }}
     
     /* Compactação dos Inputs e Botões do Header */
