@@ -58,7 +58,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from duckduckgo_search import DDGS
 
 def formatar_acao_infinitivo(texto_bruto):
-    """ Converte textos passados/relatórios do banco para recomendações no infinitivo. """
+    """Converte textos passados/relatórios do banco para recomendações no infinitivo."""
     txt = texto_bruto.strip()
     
     substituicoes = [
@@ -870,6 +870,12 @@ st.markdown(f"""
         -webkit-text-fill-color: #FFFFFF !important;
     }}
 
+    section[data-testid="stSidebar"] button:not([key^="nav_btn_"]) {{
+        padding: 0.30rem 0.6rem !important;
+        min-height: 30px !important;
+        font-size: 0.84rem !important;
+    }}
+
     /* Botões Padrão */
     button, 
     button[kind="primary"], 
@@ -1326,6 +1332,14 @@ else:
             st.session_state.opcao_selecionada = target
         st.session_state.radio_key += 1
 
+    # --- PROCESSA NAVEGAÇÃO DISPARADA PELO CARROSSEL VIA QUERY PARAMS ---
+    if "nav" in st.query_params:
+        nav_req = st.query_params.get("nav")
+        if nav_req:
+            set_nav(nav_req)
+            del st.query_params["nav"]
+            st.rerun()
+
     # --- TRADUÇÃO BÁSICA DA INTERFACE E CONTADORES DO CABEÇALHO ---
     IDIOMAS_DISPONIVEIS = ["Português", "English", "Español"]
     TRADUCOES_INTERFACE = {
@@ -1505,34 +1519,33 @@ else:
     # NOVA ABA: DASHBOARD EXCLUSIVA
     # ==================================================
     if "Dashboard" in aba_ativa:
-        # --- CARROSSEL FLUIDO COM ROLAGEM CONTÍNUA NO HOVER (2S) E RESTAURAÇÃO TOTAL ---
         cards_acesso = [
-            {"alvo": "Dashboard", "icone": "⌂", "titulo": "Dashboard", "descricao": "Visão geral da operação e dos principais indicadores.", "acao": "Abrir Dashboard"},
-            {"alvo": "Agenda Principal", "icone": "◰", "titulo": "Agenda Principal", "descricao": "Controle de janelas de box e manutenções programadas.", "acao": "Abrir Agenda"},
-            {"alvo": "Cadastro Direto", "icone": "🗎", "titulo": "Cadastro Direto", "descricao": "Agendamento de preventivas e revisões periódicas.", "acao": "Abrir Cadastro"},
-            {"alvo": "Chamados Oficina", "icone": "🗀", "titulo": "Chamados Oficina", "descricao": "Triagem técnica e diagnósticos com o Mr. Halley.", "acao": "Ver Chamados"},
-            {"alvo": "Chat Mr. Halley", "icone": "🗩", "titulo": "Chat Mr. Halley", "descricao": "Primeira triagem de dúvidas técnicas e abertura de OS.", "acao": "Abrir Chat"},
-            {"alvo": "OSs Pendentes", "icone": "⧖", "titulo": "OSs Pendentes", "descricao": "Acompanhe serviços que ainda aguardam conclusão.", "acao": "Ver Pendentes"},
-            {"alvo": "OSs Concluídas", "icone": "✓", "titulo": "OSs Concluídas", "descricao": "Consulte o histórico de serviços finalizados.", "acao": "Ver Concluídas"},
-            {"alvo": "Indicadores", "icone": "🗠", "titulo": "Indicadores", "descricao": "Visualize métricas e desempenho da manutenção.", "acao": "Abrir Indicadores"},
-            {"alvo": "Manual do Sistema", "icone": "🕮", "titulo": "Manual do Sistema", "descricao": "Consulte o guia operacional completo da plataforma.", "acao": "Abrir Manual"}
+            {"alvo": "Dashboard", "icone": "⌂", "titulo": "Dashboard", "descricao": "Visão geral da operação e dos principais indicadores."},
+            {"alvo": "Agenda Principal", "icone": "◰", "titulo": "Agenda Principal", "descricao": "Controle de janelas de box e manutenções programadas."},
+            {"alvo": "Cadastro Direto", "icone": "🗎", "titulo": "Cadastro Direto", "descricao": "Agendamento de preventivas e revisões periódicas."},
+            {"alvo": "Chamados Oficina", "icone": "🗀", "titulo": "Chamados Oficina", "descricao": "Triagem técnica e diagnósticos com o Mr. Halley."},
+            {"alvo": "Chat Mr. Halley", "icone": "🗩", "titulo": "Chat Mr. Halley", "descricao": "Primeira triagem de dúvidas técnicas e abertura de OS."},
+            {"alvo": "OSs Pendentes", "icone": "⧖", "titulo": "OSs Pendentes", "descricao": "Acompanhe serviços que ainda aguardam conclusão."},
+            {"alvo": "OSs Concluídas", "icone": "✓", "titulo": "OSs Concluídas", "descricao": "Consulte o histórico de serviços finalizados."},
+            {"alvo": "Indicadores", "icone": "🗠", "titulo": "Indicadores", "descricao": "Visualize métricas e desempenho da manutenção."},
+            {"alvo": "Manual do Sistema", "icone": "🕮", "titulo": "Manual do Sistema", "descricao": "Consulte o guia operacional completo da plataforma."}
         ]
         if usuario_ativo == "bruno":
             cards_acesso.extend([
-                {"alvo": "Minha Equipe", "icone": "👥", "titulo": "Minha Equipe", "descricao": "Gerencie usuários, perfis e acessos da empresa.", "acao": "Abrir Equipe"},
-                {"alvo": "Gestão Master", "icone": "★", "titulo": "Gestão Master", "descricao": "Acesse os recursos administrativos avançados.", "acao": "Abrir Gestão Master"}
+                {"alvo": "Minha Equipe", "icone": "👥", "titulo": "Minha Equipe", "descricao": "Gerencie usuários, perfis e acessos da empresa."},
+                {"alvo": "Gestão Master", "icone": "★", "titulo": "Gestão Master", "descricao": "Acesse os recursos administrativos avançados."}
             ])
         if st.session_state["perfil"] == "motorista":
             cards_acesso = [
-                {"alvo": "Abrir Solicitação", "icone": "✍", "titulo": "Abrir Solicitação", "descricao": "Registre uma nova necessidade para a oficina.", "acao": "Abrir Solicitação"},
-                {"alvo": "Status", "icone": "📋", "titulo": "Status", "descricao": "Acompanhe o andamento das suas solicitações.", "acao": "Ver Status"}
+                {"alvo": "Abrir Solicitação", "icone": "✍", "titulo": "Abrir Solicitação", "descricao": "Registre uma nova necessidade para a oficina."},
+                {"alvo": "Status", "icone": "📋", "titulo": "Status", "descricao": "Acompanhe o andamento das suas solicitações."}
             ]
 
         st.markdown(
             """
             <div style='display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;'>
                 <h4 style='color: #2D241E; font-weight: 700; margin: 0;'>Acesso Rápido</h4>
-                <span style='color: #8A7E75; font-size: 0.78rem;'>Mantenha o mouse sobre as setas para rolar continuamente</span>
+                <span style='color: #8A7E75; font-size: 0.78rem;'>Mantenha o mouse sobre as setas para rolar ou clique no card para navegar</span>
             </div>
             """,
             unsafe_allow_html=True
@@ -1596,6 +1609,13 @@ else:
                     min-height: 100px;
                     box-shadow: 0 4px 14px rgba(0, 0, 0, 0.03);
                     box-sizing: border-box;
+                    cursor: pointer;
+                    transition: all 0.2s ease;
+                }}
+                .card:hover {{
+                    border: 1.5px solid #C5A059;
+                    transform: translateY(-2px);
+                    box-shadow: 0 6px 18px rgba(197, 160, 89, 0.2);
                 }}
                 .card.active {{
                     border: 2px solid #C5A059;
@@ -1657,7 +1677,6 @@ else:
                 let currentIndex = 0;
                 let intervalTimer = null;
 
-                // Renderiza os cards dinamicamente
                 cardsData.forEach((c) => {{
                     const el = document.createElement('div');
                     el.className = 'card';
@@ -1668,6 +1687,15 @@ else:
                             <p class="card-sub">${{c.descricao}}</p>
                         </div>
                     `;
+                    el.addEventListener('click', () => {{
+                        try {{
+                            const url = new URL(window.parent.location.href);
+                            url.searchParams.set('nav', c.alvo);
+                            window.parent.location.href = url.href;
+                        }} catch (e) {{
+                            window.parent.location.search = '?nav=' + encodeURIComponent(c.alvo);
+                        }}
+                    }});
                     track.appendChild(el);
                 }});
 
@@ -1697,11 +1725,9 @@ else:
                     updateTrack();
                 }}
 
-                // Clique individual
                 btnNext.addEventListener('click', stepNext);
                 btnPrev.addEventListener('click', stepPrev);
 
-                // Hover contínuo: rola a cada 2 segundos ininterruptamente
                 btnNext.addEventListener('mouseenter', () => {{
                     clearInterval(intervalTimer);
                     intervalTimer = setInterval(stepNext, 2000);
