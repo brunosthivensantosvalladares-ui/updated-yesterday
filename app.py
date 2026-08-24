@@ -907,19 +907,21 @@ st.markdown(f"""
         -webkit-text-fill-color: {COR_TEXTO} !important;
     }}
 
-    /* ========================================================= */
-    /* CABEÇALHO GLOBAL FIXO NO TOPO (STICKY HEADER ROBUSTO)     */
-    /* ========================================================= */
-    div.header-sticky-container {{
+    /* ========================================================================= */
+    /* SEÇÃO SUPERIOR COMPLETA E COMPACTA FIXADA NO TOPO (STICKY INTEGRADO)      */
+    /* ========================================================================= */
+    .top-fixed-section {{
         position: -webkit-sticky !important;
         position: sticky !important;
         top: 0 !important;
         z-index: 99999 !important;
         background-color: {COR_CHAPA} !important;
-        padding-top: 6px !important;
+        padding-top: 4px !important;
         padding-bottom: 6px !important;
-        border-bottom: 1px solid #ECE7DE !important;
+        border-bottom: 1px solid #E6DED1 !important;
+        box-shadow: 0 4px 14px rgba(35, 31, 32, 0.05) !important;
         margin-top: -1.2rem !important;
+        margin-bottom: 12px !important;
     }}
 
     /* Cartões Modernos de Dashboard */
@@ -1457,11 +1459,15 @@ else:
             st.session_state["logado"] = False
             st.rerun()
 
-    # --- BARRA DE TOPO (HEADER FIXO STICKY NO TOPO) ---
+    # =========================================================================
+    # SEÇÃO SUPERIOR COMPLETA E COMPACTA FIXADA NO TOPO (STICKY INTEGRADO)
+    # =========================================================================
+    st.markdown("<div class='top-fixed-section'>", unsafe_allow_html=True)
+    
+    # 1. Cabeçalho de Busca, Ajuda, Idioma e Notificações
     qtd_atrasadas_header, qtd_chamados_header = obter_notificacoes_header()
     total_notificacoes_header = qtd_atrasadas_header + qtd_chamados_header
     
-    st.markdown("<div class='header-sticky-container'>", unsafe_allow_html=True)
     c_srch, c_help, c_lang, c_notify = st.columns([0.54, 0.16, 0.14, 0.16])
 
     with c_srch:
@@ -1512,253 +1518,243 @@ else:
                     st.rerun()
             if not total_notificacoes_header:
                 st.success(tr("Nenhuma notificação nova."))
+
+    # 2. Carrossel Compacto de Acesso Rápido
+    cards_acesso = [
+        {"alvo": "Dashboard", "icone": "⌂", "titulo": "Dashboard", "descricao": "Visão geral e indicadores."},
+        {"alvo": "Agenda Principal", "icone": "◰", "titulo": "Agenda Principal", "descricao": "Janelas de box e manutenções."},
+        {"alvo": "Cadastro Direto", "icone": "🗎", "titulo": "Cadastro Direto", "descricao": "Preventivas e revisões."},
+        {"alvo": "Chamados Oficina", "icone": "🗀", "titulo": "Chamados Oficina", "descricao": "Triagem e diagnósticos."},
+        {"alvo": "Chat Mr. Halley", "icone": "🗩", "titulo": "Chat Mr. Halley", "descricao": "Dúvidas técnicas e OS."},
+        {"alvo": "OSs Pendentes", "icone": "⧖", "titulo": "OSs Pendentes", "descricao": "Serviços em aberto."},
+        {"alvo": "OSs Concluídas", "icone": "✓", "titulo": "OSs Concluídas", "descricao": "Histórico de serviços."},
+        {"alvo": "Indicadores", "icone": "🗠", "titulo": "Indicadores", "descricao": "Métricas operacionais."},
+        {"alvo": "Manual do Sistema", "icone": "🕮", "titulo": "Manual do Sistema", "descricao": "Guia operacional completo."}
+    ]
+    if usuario_ativo == "bruno":
+        cards_acesso.extend([
+            {"alvo": "Minha Equipe", "icone": "👥", "titulo": "Minha Equipe", "descricao": "Gestão de acessos."},
+            {"alvo": "Gestão Master", "icone": "★", "titulo": "Gestão Master", "descricao": "Recursos avançados."}
+        ])
+    if st.session_state["perfil"] == "motorista":
+        cards_acesso = [
+            {"alvo": "Abrir Solicitação", "icone": "✍", "titulo": "Abrir Solicitação", "descricao": "Solicitar manutenção."},
+            {"alvo": "Status", "icone": "📋", "titulo": "Status", "descricao": "Acompanhar veículos."}
+        ]
+
+    st.markdown(
+        """
+        <div style='display: flex; align-items: center; justify-content: space-between; margin: 4px 0 2px 0;'>
+            <span style='color: #2D241E; font-weight: 700; font-size: 0.88rem;'>Acesso Rápido</span>
+            <span style='color: #8A7E75; font-size: 0.72rem;'>Hover de 2s para rolar continuamente ou clique no card</span>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    cards_json = json.dumps(cards_acesso, ensure_ascii=False)
+
+    st.components.v1.html(
+        f"""
+        <style>
+            * {{ box-sizing: border-box; font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif; }}
+            body {{ margin: 0; padding: 0; background: transparent; overflow: hidden; }}
+            .carousel-wrapper {{
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                width: 100%;
+                padding: 1px 0;
+            }}
+            .arrow-btn {{
+                background-color: #3B2E25;
+                border: 1.2px solid #C5A059;
+                color: #FFFFFF;
+                width: 32px;
+                height: 56px;
+                border-radius: 8px;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 1.4rem;
+                flex-shrink: 0;
+                transition: all 0.2s ease;
+                user-select: none;
+            }}
+            .arrow-btn:hover {{
+                background-color: #C5A059;
+                color: #231F20;
+            }}
+            .track-window {{
+                overflow: hidden;
+                flex-grow: 1;
+                width: 100%;
+            }}
+            .track {{
+                display: flex;
+                gap: 10px;
+                transition: transform 0.45s cubic-bezier(0.25, 1, 0.5, 1);
+                will-change: transform;
+            }}
+            .card {{
+                flex: 0 0 calc((100% - 20px) / 3);
+                min-width: 0;
+                background: #FFFFFF;
+                border: 1.2px solid #EDE8DF;
+                border-radius: 12px;
+                padding: 6px 10px;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                height: 56px;
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+                box-sizing: border-box;
+                cursor: pointer;
+                transition: all 0.2s ease;
+            }}
+            .card:hover {{
+                border: 1.2px solid #C5A059;
+                transform: translateY(-1px);
+                box-shadow: 0 4px 12px rgba(197, 160, 89, 0.18);
+            }}
+            .icon-box {{
+                width: 32px;
+                height: 32px;
+                background: #FBF8F3;
+                border: 1px solid #EAE3D5;
+                border-radius: 8px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 1.15rem;
+                color: #8C7355;
+                flex-shrink: 0;
+            }}
+            .card-texts {{
+                display: flex;
+                flex-direction: column;
+                min-width: 0;
+                justify-content: center;
+            }}
+            .card-title {{
+                margin: 0;
+                font-size: 0.82rem;
+                font-weight: 700;
+                color: #2D241E;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                line-height: 1.1;
+            }}
+            .card-sub {{
+                margin: 1px 0 0 0;
+                font-size: 0.68rem;
+                color: #8A7E75;
+                line-height: 1.1;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }}
+        </style>
+
+        <div class="carousel-wrapper">
+            <button class="arrow-btn" id="btnPrev">‹</button>
+            <div class="track-window">
+                <div class="track" id="track"></div>
+            </div>
+            <button class="arrow-btn" id="btnNext">›</button>
+        </div>
+
+        <script>
+            const cardsData = {cards_json};
+            const track = document.getElementById('track');
+            const btnPrev = document.getElementById('btnPrev');
+            const btnNext = document.getElementById('btnNext');
+            const visibleCount = 3;
+            let currentIndex = 0;
+            let intervalTimer = null;
+
+            cardsData.forEach((c) => {{
+                const el = document.createElement('div');
+                el.className = 'card';
+                el.innerHTML = `
+                    <div class="icon-box">${{c.icone}}</div>
+                    <div class="card-texts">
+                        <p class="card-title">${{c.titulo}}</p>
+                        <p class="card-sub">${{c.descricao}}</p>
+                    </div>
+                `;
+                el.addEventListener('click', () => {{
+                    try {{
+                        const parentWindow = window.parent;
+                        const sidebarBtns = Array.from(parentWindow.document.querySelectorAll('section[data-testid="stSidebar"] button'));
+                        const targetBtn = sidebarBtns.find(b => b.innerText && b.innerText.includes(c.alvo));
+                        if (targetBtn) {{
+                            targetBtn.click();
+                        }} else {{
+                            const url = new URL(parentWindow.location.href);
+                            url.searchParams.set('nav', c.alvo);
+                            parentWindow.location.href = url.href;
+                        }}
+                    }} catch (e) {{
+                        window.parent.location.search = '?nav=' + encodeURIComponent(c.alvo);
+                    }}
+                }});
+                track.appendChild(el);
+            }});
+
+            const maxIndex = Math.max(0, cardsData.length - visibleCount);
+
+            function updateTrack() {{
+                const cardPercent = 100 / visibleCount;
+                const gapPx = (currentIndex * 10) / visibleCount;
+                track.style.transform = `translateX(calc(-${{currentIndex * cardPercent}}% - ${{gapPx}}px))`;
+            }}
+
+            function stepNext() {{
+                if (currentIndex < maxIndex) {{
+                    currentIndex++;
+                }} else {{
+                    currentIndex = 0;
+                }}
+                updateTrack();
+            }}
+
+            function stepPrev() {{
+                if (currentIndex > 0) {{
+                    currentIndex--;
+                }} else {{
+                    currentIndex = maxIndex;
+                }}
+                updateTrack();
+            }}
+
+            btnNext.addEventListener('click', stepNext);
+            btnPrev.addEventListener('click', stepPrev);
+
+            btnNext.addEventListener('mouseenter', () => {{
+                clearInterval(intervalTimer);
+                intervalTimer = setInterval(stepNext, 2000);
+            }});
+            btnNext.addEventListener('mouseleave', () => {{
+                clearInterval(intervalTimer);
+            }});
+
+            btnPrev.addEventListener('mouseenter', () => {{
+                clearInterval(intervalTimer);
+                intervalTimer = setInterval(stepPrev, 2000);
+            }});
+            btnPrev.addEventListener('mouseleave', () => {{
+                clearInterval(intervalTimer);
+            }});
+        </script>
+        """,
+        height=62
+    )
     st.markdown("</div>", unsafe_allow_html=True)
 
     aba_ativa = st.session_state.opcao_selecionada
-
-    # =========================================================================
-    # CARROSSEL GLOBAL DE ACESSO RÁPIDO (EXIBIDO NO TOPO DE TODAS AS ABAS)
-    # =========================================================================
-    def renderizar_carrossel_acesso_rapido():
-        cards_acesso = [
-            {"alvo": "Dashboard", "icone": "⌂", "titulo": "Dashboard", "descricao": "Visão geral da operação e dos principais indicadores."},
-            {"alvo": "Agenda Principal", "icone": "◰", "titulo": "Agenda Principal", "descricao": "Controle de janelas de box e manutenções programadas."},
-            {"alvo": "Cadastro Direto", "icone": "🗎", "titulo": "Cadastro Direto", "descricao": "Agendamento de preventivas e revisões periódicas."},
-            {"alvo": "Chamados Oficina", "icone": "🗀", "titulo": "Chamados Oficina", "descricao": "Triagem técnica e diagnósticos com o Mr. Halley."},
-            {"alvo": "Chat Mr. Halley", "icone": "🗩", "titulo": "Chat Mr. Halley", "descricao": "Primeira triagem de dúvidas técnicas e abertura de OS."},
-            {"alvo": "OSs Pendentes", "icone": "⧖", "titulo": "OSs Pendentes", "descricao": "Acompanhe serviços que ainda aguardam conclusão."},
-            {"alvo": "OSs Concluídas", "icone": "✓", "titulo": "OSs Concluídas", "descricao": "Consulte o histórico de serviços finalizados."},
-            {"alvo": "Indicadores", "icone": "🗠", "titulo": "Indicadores", "descricao": "Visualize métricas e desempenho da manutenção."},
-            {"alvo": "Manual do Sistema", "icone": "🕮", "titulo": "Manual do Sistema", "descricao": "Consulte o guia operacional completo da plataforma."}
-        ]
-        if usuario_ativo == "bruno":
-            cards_acesso.extend([
-                {"alvo": "Minha Equipe", "icone": "👥", "titulo": "Minha Equipe", "descricao": "Gerencie usuários, perfis e acessos da empresa."},
-                {"alvo": "Gestão Master", "icone": "★", "titulo": "Gestão Master", "descricao": "Acesse os recursos administrativos avançados."}
-            ])
-        if st.session_state["perfil"] == "motorista":
-            cards_acesso = [
-                {"alvo": "Abrir Solicitação", "icone": "✍", "titulo": "Abrir Solicitação", "descricao": "Registre uma nova necessidade para a oficina."},
-                {"alvo": "Status", "icone": "📋", "titulo": "Status", "descricao": "Acompanhe o andamento das suas solicitações."}
-            ]
-
-        st.markdown(
-            """
-            <div style='display: flex; align-items: center; justify-content: space-between; margin: 10px 0 6px 0;'>
-                <h4 style='color: #2D241E; font-weight: 700; margin: 0;'>Acesso Rápido</h4>
-                <span style='color: #8A7E75; font-size: 0.78rem;'>Mantenha o mouse sobre as setas para rolar ou clique no card para navegar</span>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-        cards_json = json.dumps(cards_acesso, ensure_ascii=False)
-
-        st.components.v1.html(
-            f"""
-            <style>
-                * {{ box-sizing: border-box; font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif; }}
-                body {{ margin: 0; padding: 0; background: transparent; overflow: hidden; }}
-                .carousel-wrapper {{
-                    display: flex;
-                    align-items: center;
-                    gap: 10px;
-                    width: 100%;
-                    padding: 4px 0;
-                }}
-                .arrow-btn {{
-                    background-color: #3B2E25;
-                    border: 1.5px solid #C5A059;
-                    color: #FFFFFF;
-                    width: 38px;
-                    height: 100px;
-                    border-radius: 10px;
-                    cursor: pointer;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    font-size: 1.6rem;
-                    flex-shrink: 0;
-                    transition: all 0.2s ease;
-                    user-select: none;
-                }}
-                .arrow-btn:hover {{
-                    background-color: #C5A059;
-                    color: #231F20;
-                }}
-                .track-window {{
-                    overflow: hidden;
-                    flex-grow: 1;
-                    width: 100%;
-                }}
-                .track {{
-                    display: flex;
-                    gap: 14px;
-                    transition: transform 0.45s cubic-bezier(0.25, 1, 0.5, 1);
-                    will-change: transform;
-                }}
-                .card {{
-                    flex: 0 0 calc((100% - 28px) / 3);
-                    min-width: 0;
-                    background: #FFFFFF;
-                    border: 1.5px solid #EDE8DF;
-                    border-radius: 16px;
-                    padding: 14px;
-                    display: flex;
-                    align-items: center;
-                    gap: 12px;
-                    min-height: 100px;
-                    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.03);
-                    box-sizing: border-box;
-                    cursor: pointer;
-                    transition: all 0.2s ease;
-                }}
-                .card:hover {{
-                    border: 1.5px solid #C5A059;
-                    transform: translateY(-2px);
-                    box-shadow: 0 6px 18px rgba(197, 160, 89, 0.2);
-                }}
-                .card.active {{
-                    border: 2px solid #C5A059;
-                    box-shadow: 0 6px 20px rgba(197, 160, 89, 0.18);
-                }}
-                .icon-box {{
-                    width: 48px;
-                    height: 48px;
-                    background: #FBF8F3;
-                    border: 1px solid #EAE3D5;
-                    border-radius: 12px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    font-size: 1.6rem;
-                    color: #8C7355;
-                    flex-shrink: 0;
-                }}
-                .card-texts {{
-                    display: flex;
-                    flex-direction: column;
-                    min-width: 0;
-                }}
-                .card-title {{
-                    margin: 0;
-                    font-size: 0.98rem;
-                    font-weight: 700;
-                    color: #2D241E;
-                    white-space: nowrap;
-                    overflow: hidden;
-                    text-overflow: ellipsis;
-                }}
-                .card-sub {{
-                    margin: 3px 0 0 0;
-                    font-size: 0.76rem;
-                    color: #8A7E75;
-                    line-height: 1.25;
-                    display: -webkit-box;
-                    -webkit-line-clamp: 2;
-                    -webkit-box-orient: vertical;
-                    overflow: hidden;
-                }}
-            </style>
-
-            <div class="carousel-wrapper">
-                <button class="arrow-btn" id="btnPrev">‹</button>
-                <div class="track-window">
-                    <div class="track" id="track"></div>
-                </div>
-                <button class="arrow-btn" id="btnNext">›</button>
-            </div>
-
-            <script>
-                const cardsData = {cards_json};
-                const track = document.getElementById('track');
-                const btnPrev = document.getElementById('btnPrev');
-                const btnNext = document.getElementById('btnNext');
-                const visibleCount = 3;
-                let currentIndex = 0;
-                let intervalTimer = null;
-
-                cardsData.forEach((c) => {{
-                    const el = document.createElement('div');
-                    el.className = 'card';
-                    el.innerHTML = `
-                        <div class="icon-box">${{c.icone}}</div>
-                        <div class="card-texts">
-                            <p class="card-title">${{c.titulo}}</p>
-                            <p class="card-sub">${{c.descricao}}</p>
-                        </div>
-                    `;
-                    el.addEventListener('click', () => {{
-                        try {{
-                            const parentWindow = window.parent;
-                            const sidebarBtns = Array.from(parentWindow.document.querySelectorAll('section[data-testid="stSidebar"] button'));
-                            const targetBtn = sidebarBtns.find(b => b.innerText && b.innerText.includes(c.alvo));
-                            if (targetBtn) {{
-                                targetBtn.click();
-                            }} else {{
-                                const url = new URL(parentWindow.location.href);
-                                url.searchParams.set('nav', c.alvo);
-                                parentWindow.location.href = url.href;
-                            }}
-                        }} catch (e) {{
-                            window.parent.location.search = '?nav=' + encodeURIComponent(c.alvo);
-                        }}
-                    }});
-                    track.appendChild(el);
-                }});
-
-                const maxIndex = Math.max(0, cardsData.length - visibleCount);
-
-                function updateTrack() {{
-                    const cardPercent = 100 / visibleCount;
-                    const gapPx = (currentIndex * 14) / visibleCount;
-                    track.style.transform = `translateX(calc(-${{currentIndex * cardPercent}}% - ${{gapPx}}px))`;
-                }}
-
-                function stepNext() {{
-                    if (currentIndex < maxIndex) {{
-                        currentIndex++;
-                    }} else {{
-                        currentIndex = 0;
-                    }}
-                    updateTrack();
-                }}
-
-                function stepPrev() {{
-                    if (currentIndex > 0) {{
-                        currentIndex--;
-                    }} else {{
-                        currentIndex = maxIndex;
-                    }}
-                    updateTrack();
-                }}
-
-                btnNext.addEventListener('click', stepNext);
-                btnPrev.addEventListener('click', stepPrev);
-
-                btnNext.addEventListener('mouseenter', () => {{
-                    clearInterval(intervalTimer);
-                    intervalTimer = setInterval(stepNext, 2000);
-                }});
-                btnNext.addEventListener('mouseleave', () => {{
-                    clearInterval(intervalTimer);
-                }});
-
-                btnPrev.addEventListener('mouseenter', () => {{
-                    clearInterval(intervalTimer);
-                    intervalTimer = setInterval(stepPrev, 2000);
-                }});
-                btnPrev.addEventListener('mouseleave', () => {{
-                    clearInterval(intervalTimer);
-                }});
-            </script>
-            """,
-            height=125
-        )
-        st.markdown("<hr style='margin: 15px 0 20px 0; border: none; border-top: 1px solid #ECE7DE;'>", unsafe_allow_html=True)
-
-    # Renderiza o carrossel no topo de todas as páginas
-    renderizar_carrossel_acesso_rapido()
 
     # ==================================================
     # CONTEÚDO DAS ABAS DO SISTEMA
@@ -2086,9 +2082,9 @@ else:
                     box-shadow: 0 0 0 0 rgba(255, 75, 75, 1); animation: pulse 1.5s infinite;
                 }
                 @keyframes pulse {
-                    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 75, 75, 0.8); }
+                    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 75, 75, 0.7); }
                     70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(255, 75, 75, 0); }
-                    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 75, 75, 0); }
+                    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 75, 75, 0.8); }
                 }
             </style>
         """, unsafe_allow_html=True)
