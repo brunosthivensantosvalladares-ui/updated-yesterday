@@ -307,7 +307,7 @@ Rascunho Existente: {rascunho_json}
 Em Fluxo de OS Ativo? {em_fluxo}
 Veículo em Análise Recente na Tela: {veiculo_contexto}
 Relato da Análise Recente: "{relato_contexto}"
-Referência da Data Atual o Sistema: {hoje}
+Referência da Data Atual do Sistema: {hoje}
 
 CAMPOS DA OS:
 - prefixo: Número/placa do veículo (capture do contexto se for "esse veículo" ou "último veículo")
@@ -710,7 +710,7 @@ COR_TEXTO = "#231F20"
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title=f"{NOME_SISTEMA} - Painel de Controle", layout="wide", page_icon="⚙️")
 
-# --- DESIGN SYSTEM LUXO & CORREÇÃO DEFINITIVA DO ESPAÇO SUPERIOR ---
+# --- DESIGN SYSTEM LUXO & SIDEBAR MODERNA COM CABEÇALHO 100% FIXO E SEM EXcesso ---
 st.markdown(f"""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&display=swap');
@@ -721,23 +721,18 @@ st.markdown(f"""
         font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif !important;
     }}
 
-    /* ELIMINAÇÃO TOTAL DA FAIXA SUPERIOR BRANCA DO STREAMLIT */
-    header[data-testid="stHeader"],
-    div[data-testid="stDecoration"],
-    div[data-testid="stStatusWidget"] {{
-        display: none !important;
-        height: 0px !important;
-        visibility: hidden !important;
+    /* AJUSTE FINO DO ESPAÇO SUPERIOR (MANTÉM O LOGO E O BOTÃO COMPARTILHAR VISÍVEIS) */
+    header[data-testid="stHeader"] {{
+        background: transparent !important;
+        height: 1.5rem !important;
+        z-index: 1 !important;
     }}
-
-    .main .block-container,
-    [data-testid="stAppViewBlockContainer"],
-    div[data-testid="stMainBlockContainer"] {{
+    .main .block-container {{
         padding-top: 0rem !important;
         padding-bottom: 2rem !important;
-        padding-left: 1.2rem !important;
-        padding-right: 1.2rem !important;
-        margin-top: -3.8rem !important;
+        padding-left: 1.5rem !important;
+        padding-right: 1.5rem !important;
+        margin-top: -0.5rem !important;
     }}
 
     /* ========================================================= */
@@ -927,7 +922,7 @@ st.markdown(f"""
     }}
 
     /* ========================================================================= */
-    /* SEÇÃO SUPERIOR 100% FIXA NO TOPO (STICKY INTEGRADO TOTAL)                */
+    /* SEÇÃO SUPERIOR 100% FIXA NO TOPO (STICKY INTEGRADO SEM ESPAÇOS VAZIOS)   */
     /* ========================================================================= */
     .top-fixed-section {{
         position: -webkit-sticky !important;
@@ -935,20 +930,20 @@ st.markdown(f"""
         top: 0px !important;
         z-index: 99999 !important;
         background-color: {COR_CHAPA} !important;
-        padding-top: 6px !important;
+        padding-top: 8px !important;
         padding-bottom: 2px !important;
         border-bottom: 1.5px solid #E2D9CB !important;
         box-shadow: 0 4px 16px rgba(35, 31, 32, 0.06) !important;
-        margin-left: -1.2rem !important;
-        margin-right: -1.2rem !important;
-        padding-left: 1.2rem !important;
-        padding-right: 1.2rem !important;
-        margin-bottom: 10px !important;
+        margin-left: -1.5rem !important;
+        margin-right: -1.5rem !important;
+        padding-left: 1.5rem !important;
+        padding-right: 1.5rem !important;
+        margin-bottom: 12px !important;
     }}
 
     /* Compactação dos Inputs e Botões do Header */
     .top-fixed-section div[data-testid="stTextInput"] {{
-        margin-top: 0px !important;
+        margin-top: -2px !important;
     }}
     .top-fixed-section div[data-testid="stPopover"] button {{
         padding: 4px 10px !important;
@@ -2115,7 +2110,7 @@ else:
                     box-shadow: 0 0 0 0 rgba(255, 75, 75, 1); animation: pulse 1.5s infinite;
                 }
                 @keyframes pulse {
-                    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 75, 75, 0.7); }
+                    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 75, 75, 0.8); }
                     70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(255, 75, 75, 0); }
                     100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 75, 75, 0); }
                 }
@@ -2645,7 +2640,7 @@ else:
                             elif col_real == "login":
                                 conn.execute(text("UPDATE usuarios SET login = :v WHERE id = :i AND empresa_id = :eid"), {"v": str(val).lower().strip(), "i": uid, "eid": str(emp_id)})
                     conn.commit()
-                st.rer0n() if hasattr(st, "rerun") else st.experimental_rerun()
+                st.rerun()
 
 # --- ATIVAÇÃO GLOBAL DO CHAT FLUTUANTE (EXCETO NA ABA DO CHAT PRINCIPAL) ---
 if st.session_state.get("logado") and "empresa" in st.session_state:
