@@ -912,14 +912,14 @@ st.markdown(f"""
         background: #FFFFFF;
         border: 1.5px solid #EDE8DF;
         border-radius: 18px;
-        padding: 16px;
+        padding: 20px;
         box-shadow: 0 4px 14px rgba(0, 0, 0, 0.03);
         display: flex;
         align-items: center;
-        gap: 14px;
+        gap: 16px;
         transition: all 0.25s ease;
-        min-height: 105px;
-        box-sizing: border-box;
+        cursor: pointer;
+        min-height: 110px;
     }}
     .quick-card.active {{
         border: 2px solid #C5A059;
@@ -929,52 +929,35 @@ st.markdown(f"""
         background: #3B2E25;
         color: #C5A059;
         border-radius: 14px;
-        width: 52px;
-        height: 52px;
+        width: 56px;
+        height: 56px;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 1.7rem;
-        flex-shrink: 0;
+        font-size: 1.8rem;
     }}
     .quick-card-icon-light {{
         background: #FBF8F3;
         color: #8C7355;
         border: 1px solid #EAE3D5;
         border-radius: 14px;
-        width: 52px;
-        height: 52px;
+        width: 56px;
+        height: 56px;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 1.7rem;
-        flex-shrink: 0;
+        font-size: 1.8rem;
     }}
     .quick-card-title {{
-        font-size: 1.05rem;
+        font-size: 1.1rem;
         font-weight: 700;
         color: #2D241E;
         margin: 0;
     }}
     .quick-card-sub {{
-        font-size: 0.80rem;
+        font-size: 0.82rem;
         color: #8A7E75;
-        margin: 3px 0 0 0;
-        line-height: 1.25;
-    }}
-
-    /* Botão das Setas do Carrossel */
-    .arrow-card-btn button {{
-        min-height: 105px !important;
-        height: 105px !important;
-        font-size: 2.2rem !important;
-        padding: 0 !important;
-        border-radius: 14px !important;
-    }}
-    .arrow-card-btn button p {{
-        font-size: 2.2rem !important;
-        line-height: 1 !important;
-        margin: 0 !important;
+        margin: 2px 0 0 0;
     }}
 
     /* Cabeçalho fixo durante a rolagem da área principal. */
@@ -1349,6 +1332,14 @@ else:
             st.session_state.opcao_selecionada = target
         st.session_state.radio_key += 1
 
+    # --- PROCESSA NAVEGAÇÃO DISPARADA PELO CARROSSEL VIA QUERY PARAMS ---
+    if "nav" in st.query_params:
+        nav_req = st.query_params.get("nav")
+        if nav_req:
+            set_nav(nav_req)
+            del st.query_params["nav"]
+            st.rerun()
+
     # --- TRADUÇÃO BÁSICA DA INTERFACE E CONTADORES DO CABEÇALHO ---
     IDIOMAS_DISPONIVEIS = ["Português", "English", "Español"]
     TRADUCOES_INTERFACE = {
@@ -1550,58 +1541,220 @@ else:
                 {"alvo": "Status", "icone": "📋", "titulo": "Status", "descricao": "Acompanhe o andamento das suas solicitações."}
             ]
 
-        if "quick_carousel_index" not in st.session_state:
-            st.session_state.quick_carousel_index = 0
-
-        limite_carrossel = max(0, len(cards_acesso) - 3)
-        st.session_state.quick_carousel_index = min(st.session_state.quick_carousel_index, limite_carrossel)
-
         st.markdown(
             """
-            <div style='display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;'>
+            <div style='display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;'>
                 <h4 style='color: #2D241E; font-weight: 700; margin: 0;'>Acesso Rápido</h4>
-                <span style='color: #8A7E75; font-size: 0.78rem;'>Clique no card para abrir a aba correspondente</span>
+                <span style='color: #8A7E75; font-size: 0.78rem;'>Mantenha o mouse sobre as setas para rolar ou clique no card para navegar</span>
             </div>
             """,
             unsafe_allow_html=True
         )
 
-        col_prev, col_q1, col_q2, col_q3, col_next = st.columns([0.05, 0.30, 0.30, 0.30, 0.05], gap="small")
+        cards_json = json.dumps(cards_acesso, ensure_ascii=False)
 
-        with col_prev:
-            st.markdown("<div class='arrow-card-btn'>", unsafe_allow_html=True)
-            if st.button("‹", key="btn_c_prev", disabled=st.session_state.quick_carousel_index == 0, use_container_width=True):
-                st.session_state.quick_carousel_index = max(0, st.session_state.quick_carousel_index - 1)
-                st.rerun()
-            st.markdown("</div>", unsafe_allow_html=True)
+        st.components.v1.html(
+            f"""
+            <style>
+                * {{ box-sizing: border-box; font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif; }}
+                body {{ margin: 0; padding: 0; background: transparent; overflow: hidden; }}
+                .carousel-wrapper {{
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    width: 100%;
+                    padding: 4px 0;
+                }}
+                .arrow-btn {{
+                    background-color: #3B2E25;
+                    border: 1.5px solid #C5A059;
+                    color: #FFFFFF;
+                    width: 38px;
+                    height: 100px;
+                    border-radius: 10px;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 1.6rem;
+                    flex-shrink: 0;
+                    transition: all 0.2s ease;
+                    user-select: none;
+                }}
+                .arrow-btn:hover {{
+                    background-color: #C5A059;
+                    color: #231F20;
+                }}
+                .track-window {{
+                    overflow: hidden;
+                    flex-grow: 1;
+                    width: 100%;
+                }}
+                .track {{
+                    display: flex;
+                    gap: 14px;
+                    transition: transform 0.45s cubic-bezier(0.25, 1, 0.5, 1);
+                    will-change: transform;
+                }}
+                .card {{
+                    flex: 0 0 calc((100% - 28px) / 3);
+                    min-width: 0;
+                    background: #FFFFFF;
+                    border: 1.5px solid #EDE8DF;
+                    border-radius: 16px;
+                    padding: 14px;
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                    min-height: 100px;
+                    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.03);
+                    box-sizing: border-box;
+                    cursor: pointer;
+                    transition: all 0.2s ease;
+                }}
+                .card:hover {{
+                    border: 1.5px solid #C5A059;
+                    transform: translateY(-2px);
+                    box-shadow: 0 6px 18px rgba(197, 160, 89, 0.2);
+                }}
+                .card.active {{
+                    border: 2px solid #C5A059;
+                    box-shadow: 0 6px 20px rgba(197, 160, 89, 0.18);
+                }}
+                .icon-box {{
+                    width: 48px;
+                    height: 48px;
+                    background: #FBF8F3;
+                    border: 1px solid #EAE3D5;
+                    border-radius: 12px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 1.6rem;
+                    color: #8C7355;
+                    flex-shrink: 0;
+                }}
+                .card-texts {{
+                    display: flex;
+                    flex-direction: column;
+                    min-width: 0;
+                }}
+                .card-title {{
+                    margin: 0;
+                    font-size: 0.98rem;
+                    font-weight: 700;
+                    color: #2D241E;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                }}
+                .card-sub {{
+                    margin: 3px 0 0 0;
+                    font-size: 0.76rem;
+                    color: #8A7E75;
+                    line-height: 1.25;
+                    display: -webkit-box;
+                    -webkit-line-clamp: 2;
+                    -webkit-box-orient: vertical;
+                    overflow: hidden;
+                }}
+            </style>
 
-        cards_visiveis = cards_acesso[st.session_state.quick_carousel_index:st.session_state.quick_carousel_index + 3]
-        colunas_cards = [col_q1, col_q2, col_q3]
+            <div class="carousel-wrapper">
+                <button class="arrow-btn" id="btnPrev">‹</button>
+                <div class="track-window">
+                    <div class="track" id="track"></div>
+                </div>
+                <button class="arrow-btn" id="btnNext">›</button>
+            </div>
 
-        for indice_c, col_slot in enumerate(colunas_cards):
-            with col_slot:
-                if indice_c < len(cards_visiveis):
-                    card = cards_visiveis[indice_c]
-                    is_active = "active" if card["alvo"] in aba_ativa else ""
-                    st.markdown(f"""
-                        <div class='quick-card {is_active}'>
-                            <div class='quick-card-icon-light'>{card['icone']}</div>
-                            <div>
-                                <p class='quick-card-title'>{card['titulo']}</p>
-                                <p class='quick-card-sub'>{card['descricao']}</p>
-                            </div>
+            <script>
+                const cardsData = {cards_json};
+                const track = document.getElementById('track');
+                const btnPrev = document.getElementById('btnPrev');
+                const btnNext = document.getElementById('btnNext');
+                const visibleCount = 3;
+                let currentIndex = 0;
+                let intervalTimer = null;
+
+                cardsData.forEach((c) => {{
+                    const el = document.createElement('div');
+                    el.className = 'card';
+                    el.innerHTML = `
+                        <div class="icon-box">${{c.icone}}</div>
+                        <div class="card-texts">
+                            <p class="card-title">${{c.titulo}}</p>
+                            <p class="card-sub">${{c.descricao}}</p>
                         </div>
-                    """, unsafe_allow_html=True)
-                    if st.button(f"Acessar {card['titulo']}", key=f"btn_c_card_{st.session_state.quick_carousel_index}_{indice_c}", use_container_width=True):
-                        set_nav(card["alvo"])
-                        st.rerun()
+                    `;
+                    el.addEventListener('click', () => {{
+                        try {{
+                            const parentWindow = window.parent;
+                            // Dispara a navegação simulando clique no botão lateral respectivo
+                            const sidebarBtns = Array.from(parentWindow.document.querySelectorAll('section[data-testid="stSidebar"] button'));
+                            const targetBtn = sidebarBtns.find(b => b.innerText && b.innerText.includes(c.alvo));
+                            if (targetBtn) {{
+                                targetBtn.click();
+                            }} else {{
+                                const url = new URL(parentWindow.location.href);
+                                url.searchParams.set('nav', c.alvo);
+                                parentWindow.location.href = url.href;
+                            }}
+                        }} catch (e) {{
+                            window.parent.location.search = '?nav=' + encodeURIComponent(c.alvo);
+                        }}
+                    }});
+                    track.appendChild(el);
+                }});
 
-        with col_next:
-            st.markdown("<div class='arrow-card-btn'>", unsafe_allow_html=True)
-            if st.button("›", key="btn_c_next", disabled=st.session_state.quick_carousel_index >= limite_carrossel, use_container_width=True):
-                st.session_state.quick_carousel_index = min(limite_carrossel, st.session_state.quick_carousel_index + 1)
-                st.rerun()
-            st.markdown("</div>", unsafe_allow_html=True)
+                const maxIndex = Math.max(0, cardsData.length - visibleCount);
+
+                function updateTrack() {{
+                    const cardPercent = 100 / visibleCount;
+                    const gapPx = (currentIndex * 14) / visibleCount;
+                    track.style.transform = `translateX(calc(-${{currentIndex * cardPercent}}% - ${{gapPx}}px))`;
+                }}
+
+                function stepNext() {{
+                    if (currentIndex < maxIndex) {{
+                        currentIndex++;
+                    }} else {{
+                        currentIndex = 0;
+                    }}
+                    updateTrack();
+                }}
+
+                function stepPrev() {{
+                    if (currentIndex > 0) {{
+                        currentIndex--;
+                    }} else {{
+                        currentIndex = maxIndex;
+                    }}
+                    updateTrack();
+                }}
+
+                btnNext.addEventListener('click', stepNext);
+                btnPrev.addEventListener('click', stepPrev);
+
+                btnNext.addEventListener('mouseenter', () => {{
+                    clearInterval(intervalTimer);
+                    intervalTimer = setInterval(stepNext, 2000);
+                }});
+                btnNext.addEventListener('mouseleave', () => {{
+                    clearInterval(intervalTimer);
+                }});
+
+                btnPrev.addEventListener('mouseenter', () => {{
+                    clearInterval(intervalTimer);
+                    intervalTimer = setInterval(stepPrev, 2000);
+                }});
+                btnPrev.addEventListener('mouseleave', () => {{
+                    clearInterval(intervalTimer);
+                }});
+            </script>
+            """,
+            height=125
+        )
 
         st.markdown("<br>", unsafe_allow_html=True)
         st.markdown("<h4 style='color: #2D241E; font-weight: 700; margin-bottom: 16px;'>Cronograma Geral de Manutenção</h4>", unsafe_allow_html=True)
@@ -1929,7 +2082,7 @@ else:
                 @keyframes pulse {
                     0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 75, 75, 0.7); }
                     70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(255, 75, 75, 0); }
-                    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 75, 75, 0); }
+                    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 75, 75, 0.8); }
                 }
             </style>
         """, unsafe_allow_html=True)
