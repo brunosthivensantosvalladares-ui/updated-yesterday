@@ -722,7 +722,6 @@ st.markdown(f"""
     }}
 
     header[data-testid="stHeader"] {{
-        background: transparent !important;
         height: 2rem !important;
         visibility: visible !important;
         display: block !important;
