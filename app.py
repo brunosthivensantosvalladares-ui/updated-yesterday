@@ -732,7 +732,7 @@ st.markdown(f"""
         padding-bottom: 2rem !important;
         padding-left: 1.5rem !important;
         padding-right: 1.5rem !important;
-        margin-top: -0.5rem !important;
+        margin-top: 5.0rem !important;
     }}
 
     /* ========================================================= */
@@ -930,7 +930,7 @@ st.markdown(f"""
         top: 0px !important;
         z-index: 99999 !important;
         background-color: {COR_CHAPA} !important;
-        padding-top: -20.0px !important;
+        padding-top: 0px !important;
         padding-bottom: 2px !important;
         border-bottom: 1.5px solid #E2D9CB !important;
         box-shadow: 0 4px 16px rgba(35, 31, 32, 0.06) !important;
@@ -938,7 +938,7 @@ st.markdown(f"""
         margin-right: -1.5rem !important;
         padding-left: 1.5rem !important;
         padding-right: 1.5rem !important;
-        margin-bottom: 12px !important;
+        margin-bottom: 2px !important;
     }}
 
     /* Compactação dos Inputs e Botões do Header */
