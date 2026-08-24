@@ -907,6 +907,21 @@ st.markdown(f"""
         -webkit-text-fill-color: {COR_TEXTO} !important;
     }}
 
+    /* ========================================================= */
+    /* CABEÇALHO GLOBAL FIXO NO TOPO (STICKY HEADER ROBUSTO)     */
+    /* ========================================================= */
+    div.header-sticky-container {{
+        position: -webkit-sticky !important;
+        position: sticky !important;
+        top: 0 !important;
+        z-index: 99999 !important;
+        background-color: {COR_CHAPA} !important;
+        padding-top: 6px !important;
+        padding-bottom: 6px !important;
+        border-bottom: 1px solid #ECE7DE !important;
+        margin-top: -1.2rem !important;
+    }}
+
     /* Cartões Modernos de Dashboard */
     .quick-card {{
         background: #FFFFFF;
@@ -958,21 +973,6 @@ st.markdown(f"""
         font-size: 0.82rem;
         color: #8A7E75;
         margin: 2px 0 0 0;
-    }}
-
-    /* Cabeçalho fixo durante a rolagem da área principal. */
-    div[data-testid="stHorizontalBlock"]:has(input[aria-label="Buscar..."]),
-    div[data-testid="stHorizontalBlock"]:has(input[placeholder*="Buscar veículo"]),
-    div[data-testid="stHorizontalBlock"]:has(input[placeholder*="Search vehicle"]) {{
-        position: sticky !important;
-        top: 0 !important;
-        z-index: 1000 !important;
-        background: rgba(247, 245, 240, 0.97) !important;
-        padding: 10px 12px 8px 12px !important;
-        margin-top: -1rem !important;
-        border-bottom: 1px solid #E6DED1 !important;
-        box-shadow: 0 4px 12px rgba(35, 31, 32, 0.08) !important;
-        backdrop-filter: blur(8px) !important;
     }}
     
     /* Cartões de Métricas */
@@ -1457,9 +1457,11 @@ else:
             st.session_state["logado"] = False
             st.rerun()
 
-    # --- BARRA DE TOPO (HEADER) ---
+    # --- BARRA DE TOPO (HEADER FIXO STICKY NO TOPO) ---
     qtd_atrasadas_header, qtd_chamados_header = obter_notificacoes_header()
     total_notificacoes_header = qtd_atrasadas_header + qtd_chamados_header
+    
+    st.markdown("<div class='header-sticky-container'>", unsafe_allow_html=True)
     c_srch, c_help, c_lang, c_notify = st.columns([0.54, 0.16, 0.14, 0.16])
 
     with c_srch:
@@ -1510,15 +1512,14 @@ else:
                     st.rerun()
             if not total_notificacoes_header:
                 st.success(tr("Nenhuma notificação nova."))
-
-    st.markdown("<hr style='margin: 10px 0 20px 0; border: none; border-top: 1px solid #ECE7DE;'>", unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
 
     aba_ativa = st.session_state.opcao_selecionada
 
-    # ==================================================
-    # NOVA ABA: DASHBOARD EXCLUSIVA
-    # ==================================================
-    if "Dashboard" in aba_ativa:
+    # =========================================================================
+    # CARROSSEL GLOBAL DE ACESSO RÁPIDO (EXIBIDO NO TOPO DE TODAS AS ABAS)
+    # =========================================================================
+    def renderizar_carrossel_acesso_rapido():
         cards_acesso = [
             {"alvo": "Dashboard", "icone": "⌂", "titulo": "Dashboard", "descricao": "Visão geral da operação e dos principais indicadores."},
             {"alvo": "Agenda Principal", "icone": "◰", "titulo": "Agenda Principal", "descricao": "Controle de janelas de box e manutenções programadas."},
@@ -1543,7 +1544,7 @@ else:
 
         st.markdown(
             """
-            <div style='display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;'>
+            <div style='display: flex; align-items: center; justify-content: space-between; margin: 10px 0 6px 0;'>
                 <h4 style='color: #2D241E; font-weight: 700; margin: 0;'>Acesso Rápido</h4>
                 <span style='color: #8A7E75; font-size: 0.78rem;'>Mantenha o mouse sobre as setas para rolar ou clique no card para navegar</span>
             </div>
@@ -1690,7 +1691,6 @@ else:
                     el.addEventListener('click', () => {{
                         try {{
                             const parentWindow = window.parent;
-                            // Dispara a navegação simulando clique no botão lateral respectivo
                             const sidebarBtns = Array.from(parentWindow.document.querySelectorAll('section[data-testid="stSidebar"] button'));
                             const targetBtn = sidebarBtns.find(b => b.innerText && b.innerText.includes(c.alvo));
                             if (targetBtn) {{
@@ -1755,8 +1755,15 @@ else:
             """,
             height=125
         )
+        st.markdown("<hr style='margin: 15px 0 20px 0; border: none; border-top: 1px solid #ECE7DE;'>", unsafe_allow_html=True)
 
-        st.markdown("<br>", unsafe_allow_html=True)
+    # Renderiza o carrossel no topo de todas as páginas
+    renderizar_carrossel_acesso_rapido()
+
+    # ==================================================
+    # CONTEÚDO DAS ABAS DO SISTEMA
+    # ==================================================
+    if "Dashboard" in aba_ativa:
         st.markdown("<h4 style='color: #2D241E; font-weight: 700; margin-bottom: 16px;'>Cronograma Geral de Manutenção</h4>", unsafe_allow_html=True)
         
         df_dash_stats = pd.read_sql(text("SELECT data, realizado FROM tarefas WHERE empresa_id = :eid"), engine, params={"eid": str(emp_id)})
@@ -1829,7 +1836,6 @@ else:
                 3. Finalize a execução na aba de baixa técnica para atualizar os relatórios em tempo real.
                 """)
 
-    # --- DEMAIS ABAS DO SISTEMA ---
     elif "Gestão Master" in aba_ativa and usuario_ativo == "bruno":
         st.subheader("👑 Painel de Controle Master")
         
@@ -2080,9 +2086,9 @@ else:
                     box-shadow: 0 0 0 0 rgba(255, 75, 75, 1); animation: pulse 1.5s infinite;
                 }
                 @keyframes pulse {
-                    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 75, 75, 0.7); }
+                    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 75, 75, 0.8); }
                     70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(255, 75, 75, 0); }
-                    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 75, 75, 0.8); }
+                    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 75, 75, 0); }
                 }
             </style>
         """, unsafe_allow_html=True)
