@@ -721,20 +721,22 @@ st.markdown(f"""
         font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif !important;
     }}
 
-    /* AJUSTE FINO DO ESPAÇO SUPERIOR (MANTÉM O LOGO E O BOTÃO COMPARTILHAR VISÍVEIS) */
-    header[data-testid="stHeader"] {{
+    /* ELIMINAÇÃO TOTAL DA FAIXA SUPERIOR DO STREAMLIT */
+    header[data-testid="stHeader"] {
         background: transparent !important;
-        height: 1.5rem !important;
-        z-index: 1 !important;
-    }}
-    .main .block-container {{
+        height: 0px !important;
+        min-height: 0px !important;
+        display: none !important;
+    }
+    
+    .main .block-container {
         padding-top: 0rem !important;
         padding-bottom: 2rem !important;
         padding-left: 1.5rem !important;
         padding-right: 1.5rem !important;
-        margin-top: -5.0rem !important;
-    }}
-
+        margin-top: -5.5rem !important;
+    }
+    
     /* ========================================================= */
     /* 1. CONTROLE E FIXAÇÃO DA SIDEBAR (SEM ROLAGEM)            */
     /* ========================================================= */
