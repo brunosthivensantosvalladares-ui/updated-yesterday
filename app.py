@@ -734,7 +734,7 @@ st.markdown(f"""
         padding-bottom: 2rem !important;
         padding-left: 1.5rem !important;
         padding-right: 1.5rem !important;
-        margin-top: -5.8rem !important;
+        margin-top: -6.5rem !important;
     }}
     
     /* ========================================================= */
@@ -927,7 +927,7 @@ st.markdown(f"""
     .top-fixed-section {{
         position: -webkit-sticky !important;
         position: sticky !important;
-        top: 2.2rem !important;
+        top: 0rem !important;
         z-index: 99999 !important;
         background-color: {COR_CHAPA} !important;
         padding-top: 4px !important;
