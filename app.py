@@ -722,13 +722,29 @@ st.markdown(f"""
     }}
 
     /* ELIMINAÇÃO TOTAL DO ESPAÇO SUPERIOR NO AMBIENTE LOGADO */
+    header[data-testid="stHeader"],
+    div[data-testid="stDecoration"],
+    div[data-testid="stStatusWidget"] {{
+        display: none !important;
+        height: 0px !important;
+        min-height: 0px !important;
+        margin: 0px !important;
+        padding: 0px !important;
+        visibility: hidden !important;
+    }}
+
     .main:has(.top-fixed-section) .block-container,
-    [data-testid="stAppViewBlockContainer"]:has(.top-fixed-section) {{
+    [data-testid="stAppViewBlockContainer"]:has(.top-fixed-section),
+    div[data-testid="stMainBlockContainer"]:has(.top-fixed-section) {{
         padding-top: 0rem !important;
         padding-bottom: 2rem !important;
         padding-left: 1.2rem !important;
         padding-right: 1.2rem !important;
         margin-top: 0.0rem !important;
+    }}
+
+    section.main > div {{
+        padding-top: 0px !important;
     }}
 
     /* ========================================================= */
@@ -934,7 +950,7 @@ st.markdown(f"""
         margin-right: -1.2rem !important;
         padding-left: 1.2rem !important;
         padding-right: 1.2rem !important;
-        margin-bottom: 10px !important;
+        margin-bottom: 8px !important;
     }}
 
     /* Compactação dos Inputs e Botões do Header */
