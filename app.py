@@ -721,18 +721,14 @@ st.markdown(f"""
         font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif !important;
     }}
 
-    /* ELIMINAÇÃO TOTAL DO ESPAÇO SUPERIOR NATIVO DO STREAMLIT */
-    header[data-testid="stHeader"] {{
-        display: none !important;
-        height: 0px !important;
-        visibility: hidden !important;
-    }}
-    .main, [data-testid="stAppViewBlockContainer"], .block-container {{
+    /* ELIMINAÇÃO TOTAL DO ESPAÇO SUPERIOR NO AMBIENTE LOGADO */
+    .main:has(.top-fixed-section) .block-container,
+    [data-testid="stAppViewBlockContainer"]:has(.top-fixed-section) {{
         padding-top: 0rem !important;
         padding-bottom: 2rem !important;
         padding-left: 1.2rem !important;
         padding-right: 1.2rem !important;
-        margin-top: -1.8rem !important;
+        margin-top: -2.8rem !important;
     }}
 
     /* ========================================================= */
@@ -930,7 +926,7 @@ st.markdown(f"""
         top: 0px !important;
         z-index: 99999 !important;
         background-color: {COR_CHAPA} !important;
-        padding-top: 10px !important;
+        padding-top: 6px !important;
         padding-bottom: 2px !important;
         border-bottom: 1.5px solid #E2D9CB !important;
         box-shadow: 0 4px 16px rgba(35, 31, 32, 0.06) !important;
