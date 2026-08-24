@@ -930,7 +930,7 @@ st.markdown(f"""
         top: 0px !important;
         z-index: 99999 !important;
         background-color: {COR_CHAPA} !important;
-        padding-top: 8px !important;
+        padding-top: 0px !important;
         padding-bottom: 2px !important;
         border-bottom: 1.5px solid #E2D9CB !important;
         box-shadow: 0 4px 16px rgba(35, 31, 32, 0.06) !important;
