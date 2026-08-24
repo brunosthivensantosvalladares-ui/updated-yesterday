@@ -933,7 +933,7 @@ st.markdown(f"""
         padding-top: 0px !important;
         padding-bottom: 2px !important;
         border-bottom: 1.5px solid #E2D9CB !important;
-        box-shadow: 0 4px 16px rgba(35, 31, 32, 0.06) !important;
+        box-shadow: 0 4px 2px rgba(35, 31, 32, 0.06) !important;
         margin-left: -1.5rem !important;
         margin-right: -1.5rem !important;
         padding-left: 1.5rem !important;
