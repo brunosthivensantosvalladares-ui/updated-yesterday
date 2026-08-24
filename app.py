@@ -745,18 +745,17 @@ st.markdown(f"""
 
     header[data-testid="stHeader"] {{
         background: transparent !important;
-        height: 1.5rem !important;
-        visibility: visible !important;
-        display: block !important;
+        height: 0px !important;
+        visibility: hidden !important;
+        display: none !important;
     }}
     
-    /* FORÇA O CONTEÚDO PRINCIPAL A ENCOSTAR NO TOPO */
     .main .block-container {{
         padding-top: 0rem !important;
         padding-bottom: 2rem !important;
         padding-left: 1.5rem !important;
         padding-right: 1.5rem !important;
-        margin-top: -6.5rem !important;
+        margin-top: -6.5rem !important; /* Puxa todo o conteúdo para o topo absoluto */
     }}
     
     /* ========================================================= */
@@ -949,9 +948,9 @@ st.markdown(f"""
     .top-fixed-section {{
         position: -webkit-sticky !important;
         position: sticky !important;
-        top: 0rem !important;
+        top: 0rem !important; /* Gruda logo na borda superior da tela */
         z-index: 99999 !important;
-        background-color: {COR_CHAPA} !important;
+        background-color: #F7F5F0 !important;
         padding-top: 4px !important;
         padding-bottom: 2px !important;
         border-bottom: 1.5px solid #E2D9CB !important;
