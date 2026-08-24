@@ -728,7 +728,7 @@ st.markdown(f"""
         padding-bottom: 2rem !important;
         padding-left: 1.2rem !important;
         padding-right: 1.2rem !important;
-        margin-top: 1.0rem !important;
+        margin-top: 0.0rem !important;
     }}
 
     /* ========================================================= */
