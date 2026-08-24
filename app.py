@@ -722,20 +722,20 @@ st.markdown(f"""
     }}
 
     /* ELIMINAÇÃO TOTAL DA FAIXA SUPERIOR DO STREAMLIT */
-    header[data-testid="stHeader"] {
+    header[data-testid="stHeader"] {{
         background: transparent !important;
         height: 0px !important;
         min-height: 0px !important;
         display: none !important;
-    }
+    }}
     
-    .main .block-container {
+    .main .block-container {{
         padding-top: 0rem !important;
         padding-bottom: 2rem !important;
         padding-left: 1.5rem !important;
         padding-right: 1.5rem !important;
         margin-top: -5.5rem !important;
-    }
+    }}
     
     /* ========================================================= */
     /* 1. CONTROLE E FIXAÇÃO DA SIDEBAR (SEM ROLAGEM)            */
