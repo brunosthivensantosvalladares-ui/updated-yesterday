@@ -751,11 +751,9 @@ st.markdown(f"""
     }}
     
     /* ZERA O ESPAÇAMENTO NATIVO DO STREAMLIT NO TOPO */
-    .main .block-container {{
+    .main, .main .block-container, div[data-testid="stMainBlockContainer"], div[data-testid="stAppViewBlockContainer"] {{
         padding-top: 0rem !important;
-        padding-bottom: 2rem !important;
-        padding-left: 1.5rem !important;
-        padding-right: 1.5rem !important;
+        margin-top: -6rem !important; /* Puxa todo o container raiz do Streamlit para cima */
     }}
     
     /* ========================================================= */
