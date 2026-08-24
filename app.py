@@ -948,10 +948,10 @@ st.markdown(f"""
     .top-fixed-section {{
         position: -webkit-sticky !important;
         position: sticky !important;
-        top: 0rem !important; /* Gruda logo na borda superior da tela */
+        top: 0px !important;
         z-index: 99999 !important;
-        background-color: #F7F5F0 !important;
-        padding-top: 4px !important;
+        background-color: {COR_CHAPA} !important;
+        padding-top: 0px !important;  /* <--- Zera o espaço acima da linha da flecha */
         padding-bottom: 2px !important;
         border-bottom: 1.5px solid #E2D9CB !important;
         box-shadow: 0 4px 16px rgba(35, 31, 32, 0.06) !important;
@@ -959,6 +959,7 @@ st.markdown(f"""
         margin-right: -1.5rem !important;
         padding-left: 1.5rem !important;
         padding-right: 1.5rem !important;
+        margin-top: -1rem !important;   /* <--- Puxa a linha apontada pela flecha para cima */
         margin-bottom: 10px !important;
     }}
     
