@@ -721,15 +721,19 @@ st.markdown(f"""
         font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif !important;
     }}
 
-    /* ELIMINAÇÃO TOTAL DO ESPAÇO SUPERIOR NO AMBIENTE LOGADO */
-    .main:has(.top-fixed-section) .block-container,
-    [data-testid="stAppViewBlockContainer"]:has(.top-fixed-section) {{
+    /* REMOVE O ESPAÇO SUPERIOR VAZIO NATIVO DO STREAMLIT */
+    .block-container,
+    div[data-testid="stAppViewBlockContainer"],
+    div[data-testid="stMainBlockContainer"] {
         padding-top: 0rem !important;
-        padding-bottom: 2rem !important;
-        padding-left: 1.2rem !important;
-        padding-right: 1.2rem !important;
-        margin-top: -2.8rem !important;
-    }}
+        padding-bottom: 1.5rem !important;
+        margin-top: -4.5rem !important;
+    }
+
+    div[data-testid="stVerticalBlockBorderWrapper"]:first-child {
+        margin-top: 0 !important;
+        padding-top: 0 !important;
+    }
 
     /* ========================================================= */
     /* 1. CONTROLE E FIXAÇÃO DA SIDEBAR (SEM ROLAGEM)            */
