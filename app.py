@@ -721,12 +721,11 @@ st.markdown(f"""
         font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif !important;
     }}
 
-    /* ELIMINAÇÃO TOTAL DA FAIXA SUPERIOR DO STREAMLIT */
     header[data-testid="stHeader"] {{
         background: transparent !important;
-        height: 0px !important;
-        min-height: 0px !important;
-        display: none !important;
+        height: 2rem !important;
+        visibility: visible !important;
+        display: block !important;
     }}
     
     .main .block-container {{
