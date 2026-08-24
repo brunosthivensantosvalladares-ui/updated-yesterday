@@ -307,7 +307,7 @@ Rascunho Existente: {rascunho_json}
 Em Fluxo de OS Ativo? {em_fluxo}
 Veículo em Análise Recente na Tela: {veiculo_contexto}
 Relato da Análise Recente: "{relato_contexto}"
-Referência da Data Atual do Sistema: {hoje}
+Referência da Data Atual o Sistema: {hoje}
 
 CAMPOS DA OS:
 - prefixo: Número/placa do veículo (capture do contexto se for "esse veículo" ou "último veículo")
@@ -710,7 +710,7 @@ COR_TEXTO = "#231F20"
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title=f"{NOME_SISTEMA} - Painel de Controle", layout="wide", page_icon="⚙️")
 
-# --- DESIGN SYSTEM LUXO & SIDEBAR MODERNA COM CABEÇALHO 100% FIXO E SEM ESPAÇOS ---
+# --- DESIGN SYSTEM LUXO & CORREÇÃO DEFINITIVA DO ESPAÇO SUPERIOR ---
 st.markdown(f"""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&display=swap');
@@ -721,18 +721,23 @@ st.markdown(f"""
         font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif !important;
     }}
 
-    /* ELIMINAÇÃO TOTAL DO ESPAÇO SUPERIOR NATIVO DO STREAMLIT */
-    header[data-testid="stHeader"] {{
-        background: transparent !important;
-        height: 0rem !important;
-        z-index: 1 !important;
+    /* ELIMINAÇÃO TOTAL DA FAIXA SUPERIOR BRANCA DO STREAMLIT */
+    header[data-testid="stHeader"],
+    div[data-testid="stDecoration"],
+    div[data-testid="stStatusWidget"] {{
+        display: none !important;
+        height: 0px !important;
+        visibility: hidden !important;
     }}
-    .main .block-container {{
+
+    .main .block-container,
+    [data-testid="stAppViewBlockContainer"],
+    div[data-testid="stMainBlockContainer"] {{
         padding-top: 0rem !important;
         padding-bottom: 2rem !important;
-        padding-left: 1.5rem !important;
-        padding-right: 1.5rem !important;
-        margin-top: -3.5rem !important;
+        padding-left: 1.2rem !important;
+        padding-right: 1.2rem !important;
+        margin-top: -3.8rem !important;
     }}
 
     /* ========================================================= */
@@ -922,7 +927,7 @@ st.markdown(f"""
     }}
 
     /* ========================================================================= */
-    /* SEÇÃO SUPERIOR 100% FIXA NO TOPO (STICKY INTEGRADO SEM ESPAÇOS VAZIOS)   */
+    /* SEÇÃO SUPERIOR 100% FIXA NO TOPO (STICKY INTEGRADO TOTAL)                */
     /* ========================================================================= */
     .top-fixed-section {{
         position: -webkit-sticky !important;
@@ -930,20 +935,20 @@ st.markdown(f"""
         top: 0px !important;
         z-index: 99999 !important;
         background-color: {COR_CHAPA} !important;
-        padding-top: 8px !important;
+        padding-top: 6px !important;
         padding-bottom: 2px !important;
         border-bottom: 1.5px solid #E2D9CB !important;
         box-shadow: 0 4px 16px rgba(35, 31, 32, 0.06) !important;
-        margin-left: -1.5rem !important;
-        margin-right: -1.5rem !important;
-        padding-left: 1.5rem !important;
-        padding-right: 1.5rem !important;
-        margin-bottom: 12px !important;
+        margin-left: -1.2rem !important;
+        margin-right: -1.2rem !important;
+        padding-left: 1.2rem !important;
+        padding-right: 1.2rem !important;
+        margin-bottom: 10px !important;
     }}
 
     /* Compactação dos Inputs e Botões do Header */
     .top-fixed-section div[data-testid="stTextInput"] {{
-        margin-top: -2px !important;
+        margin-top: 0px !important;
     }}
     .top-fixed-section div[data-testid="stPopover"] button {{
         padding: 4px 10px !important;
@@ -1487,7 +1492,7 @@ else:
             st.rerun()
 
     # =========================================================================
-    # SEÇÃO SUPERIOR COMPLETA E COMPACTA FIXADA NO TOPO (STICKY INTEGRADO)
+    # SEÇÃO SUPERIOR COMPLETA E 100% FIXA NO TOPO (STICKY INTEGRADO TOTAL)
     # =========================================================================
     st.markdown("<div class='top-fixed-section'>", unsafe_allow_html=True)
     
@@ -1546,34 +1551,34 @@ else:
             if not total_notificacoes_header:
                 st.success(tr("Nenhuma notificação nova."))
 
-    # 2. Carrossel Compacto de Acesso Rápido
+    # 2. Carrossel Compacto com Descrições Completas Restauradas
     cards_acesso = [
-        {"alvo": "Dashboard", "icone": "⌂", "titulo": "Dashboard", "descricao": "Visão geral e indicadores."},
-        {"alvo": "Agenda Principal", "icone": "◰", "titulo": "Agenda Principal", "descricao": "Janelas de box e manutenções."},
-        {"alvo": "Cadastro Direto", "icone": "🗎", "titulo": "Cadastro Direto", "descricao": "Preventivas e revisões."},
-        {"alvo": "Chamados Oficina", "icone": "🗀", "titulo": "Chamados Oficina", "descricao": "Triagem e diagnósticos."},
-        {"alvo": "Chat Mr. Halley", "icone": "🗩", "titulo": "Chat Mr. Halley", "descricao": "Dúvidas técnicas e OS."},
-        {"alvo": "OSs Pendentes", "icone": "⧖", "titulo": "OSs Pendentes", "descricao": "Serviços em aberto."},
-        {"alvo": "OSs Concluídas", "icone": "✓", "titulo": "OSs Concluídas", "descricao": "Histórico de serviços."},
-        {"alvo": "Indicadores", "icone": "🗠", "titulo": "Indicadores", "descricao": "Métricas operacionais."},
-        {"alvo": "Manual do Sistema", "icone": "🕮", "titulo": "Manual do Sistema", "descricao": "Guia operacional completo."}
+        {"alvo": "Dashboard", "icone": "⌂", "titulo": "Dashboard", "descricao": "Visão geral da operação e dos principais indicadores."},
+        {"alvo": "Agenda Principal", "icone": "◰", "titulo": "Agenda Principal", "descricao": "Controle de janelas de box e manutenções programadas."},
+        {"alvo": "Cadastro Direto", "icone": "🗎", "titulo": "Cadastro Direto", "descricao": "Agendamento de preventivas e revisões periódicas."},
+        {"alvo": "Chamados Oficina", "icone": "🗀", "titulo": "Chamados Oficina", "descricao": "Triagem técnica e diagnósticos com o Mr. Halley."},
+        {"alvo": "Chat Mr. Halley", "icone": "🗩", "titulo": "Chat Mr. Halley", "descricao": "Primeira triagem de dúvidas técnicas e abertura de OS."},
+        {"alvo": "OSs Pendentes", "icone": "⧖", "titulo": "OSs Pendentes", "descricao": "Acompanhe serviços que ainda aguardam conclusão."},
+        {"alvo": "OSs Concluídas", "icone": "✓", "titulo": "OSs Concluídas", "descricao": "Consulte o histórico de serviços finalizados."},
+        {"alvo": "Indicadores", "icone": "🗠", "titulo": "Indicadores", "descricao": "Visualize métricas e desempenho da manutenção."},
+        {"alvo": "Manual do Sistema", "icone": "🕮", "titulo": "Manual do Sistema", "descricao": "Consulte o guia operacional completo da plataforma."}
     ]
     if usuario_ativo == "bruno":
         cards_acesso.extend([
-            {"alvo": "Minha Equipe", "icone": "👥", "titulo": "Minha Equipe", "descricao": "Gestão de acessos."},
-            {"alvo": "Gestão Master", "icone": "★", "titulo": "Gestão Master", "descricao": "Recursos avançados."}
+            {"alvo": "Minha Equipe", "icone": "👥", "titulo": "Minha Equipe", "descricao": "Gerencie usuários, perfis e acessos da empresa."},
+            {"alvo": "Gestão Master", "icone": "★", "titulo": "Gestão Master", "descricao": "Acesse os recursos administrativos avançados."}
         ])
     if st.session_state["perfil"] == "motorista":
         cards_acesso = [
-            {"alvo": "Abrir Solicitação", "icone": "✍", "titulo": "Abrir Solicitação", "descricao": "Solicitar manutenção."},
-            {"alvo": "Status", "icone": "📋", "titulo": "Status", "descricao": "Acompanhar veículos."}
+            {"alvo": "Abrir Solicitação", "icone": "✍", "titulo": "Abrir Solicitação", "descricao": "Registre uma nova necessidade para a oficina."},
+            {"alvo": "Status", "icone": "📋", "titulo": "Status", "descricao": "Acompanhe o andamento das suas solicitações."}
         ]
 
     st.markdown(
         """
-        <div style='display: flex; align-items: center; justify-content: space-between; margin: 2px 0 1px 0;'>
-            <span style='color: #2D241E; font-weight: 700; font-size: 0.86rem;'>Acesso Rápido</span>
-            <span style='color: #8A7E75; font-size: 0.70rem;'>Hover de 2s para rolar continuamente ou clique no card</span>
+        <div style='display: flex; align-items: center; justify-content: space-between; margin: 2px 0 2px 0;'>
+            <span style='color: #2D241E; font-weight: 700; font-size: 0.88rem;'>Acesso Rápido</span>
+            <span style='color: #8A7E75; font-size: 0.72rem;'>Hover de 2s para rolar continuamente ou clique no card</span>
         </div>
         """,
         unsafe_allow_html=True
@@ -1598,7 +1603,7 @@ else:
                 border: 1.2px solid #C5A059;
                 color: #FFFFFF;
                 width: 32px;
-                height: 56px;
+                height: 60px;
                 border-radius: 8px;
                 cursor: pointer;
                 display: flex;
@@ -1634,7 +1639,7 @@ else:
                 display: flex;
                 align-items: center;
                 gap: 8px;
-                height: 56px;
+                height: 60px;
                 box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
                 box-sizing: border-box;
                 cursor: pointer;
@@ -1646,15 +1651,15 @@ else:
                 box-shadow: 0 4px 12px rgba(197, 160, 89, 0.18);
             }}
             .icon-box {{
-                width: 32px;
-                height: 32px;
+                width: 34px;
+                height: 34px;
                 background: #FBF8F3;
                 border: 1px solid #EAE3D5;
                 border-radius: 8px;
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                font-size: 1.15rem;
+                font-size: 1.2rem;
                 color: #8C7355;
                 flex-shrink: 0;
             }}
@@ -1666,22 +1671,23 @@ else:
             }}
             .card-title {{
                 margin: 0;
-                font-size: 0.82rem;
+                font-size: 0.84rem;
                 font-weight: 700;
                 color: #2D241E;
                 white-space: nowrap;
                 overflow: hidden;
                 text-overflow: ellipsis;
-                line-height: 1.1;
+                line-height: 1.15;
             }}
             .card-sub {{
                 margin: 1px 0 0 0;
-                font-size: 0.68rem;
+                font-size: 0.70rem;
                 color: #8A7E75;
-                line-height: 1.1;
-                white-space: nowrap;
+                line-height: 1.15;
+                display: -webkit-box;
+                -webkit-line-clamp: 2;
+                -webkit-box-orient: vertical;
                 overflow: hidden;
-                text-overflow: ellipsis;
             }}
         </style>
 
@@ -1777,7 +1783,7 @@ else:
             }});
         </script>
         """,
-        height=62
+        height=66
     )
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -2109,7 +2115,7 @@ else:
                     box-shadow: 0 0 0 0 rgba(255, 75, 75, 1); animation: pulse 1.5s infinite;
                 }
                 @keyframes pulse {
-                    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 75, 75, 0.8); }
+                    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 75, 75, 0.7); }
                     70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(255, 75, 75, 0); }
                     100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 75, 75, 0); }
                 }
@@ -2639,7 +2645,7 @@ else:
                             elif col_real == "login":
                                 conn.execute(text("UPDATE usuarios SET login = :v WHERE id = :i AND empresa_id = :eid"), {"v": str(val).lower().strip(), "i": uid, "eid": str(emp_id)})
                     conn.commit()
-                st.rerun()
+                st.rer0n() if hasattr(st, "rerun") else st.experimental_rerun()
 
 # --- ATIVAÇÃO GLOBAL DO CHAT FLUTUANTE (EXCETO NA ABA DO CHAT PRINCIPAL) ---
 if st.session_state.get("logado") and "empresa" in st.session_state:
