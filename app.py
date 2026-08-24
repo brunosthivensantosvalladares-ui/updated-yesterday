@@ -951,7 +951,7 @@ st.markdown(f"""
         top: 0px !important;
         z-index: 99999 !important;
         background-color: #F7F5F0 !important;
-        padding-top: 4px !important;
+        padding-top: 0px !important;  /* <--- Zera o preenchimento interno superior */
         padding-bottom: 2px !important;
         border-bottom: 1.5px solid #E2D9CB !important;
         box-shadow: 0 4px 16px rgba(35, 31, 32, 0.06) !important;
@@ -960,7 +960,7 @@ st.markdown(f"""
         padding-left: 1.5rem !important;
         padding-right: 1.5rem !important;
         margin-bottom: 10px !important;
-        transform: translateY(-55px) !important; /* <--- Move exatamente a barra para cima, eliminando o vão */
+        transform: translateY(-115px) !important; /* <--- Joga todo o conjunto de busca para o topo absoluto */
     }}
     
     /* Compactação dos Inputs e Botões do Header */
