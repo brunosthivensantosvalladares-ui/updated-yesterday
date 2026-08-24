@@ -732,7 +732,7 @@ st.markdown(f"""
         padding-bottom: 2rem !important;
         padding-left: 1.2rem !important;
         padding-right: 1.2rem !important;
-        margin-top: -3.8rem !important;
+        margin-top: -1.8rem !important;
     }}
 
     /* ========================================================= */
@@ -930,8 +930,8 @@ st.markdown(f"""
         top: 0px !important;
         z-index: 99999 !important;
         background-color: {COR_CHAPA} !important;
-        padding-top: 6px !important;
-        padding-bottom: 4px !important;
+        padding-top: 10px !important;
+        padding-bottom: 2px !important;
         border-bottom: 1.5px solid #E2D9CB !important;
         box-shadow: 0 4px 16px rgba(35, 31, 32, 0.06) !important;
         margin-left: -1.2rem !important;
@@ -1487,7 +1487,7 @@ else:
             st.rerun()
 
     # =========================================================================
-    # SEÇÃO SUPERIOR COMPACTA E 100% FIXA NO TOPO (STICKY INTEGRADO TOTAL)
+    # SEÇÃO SUPERIOR COMPLETA E 100% FIXA NO TOPO (STICKY INTEGRADO TOTAL)
     # =========================================================================
     st.markdown("<div class='top-fixed-section'>", unsafe_allow_html=True)
     
