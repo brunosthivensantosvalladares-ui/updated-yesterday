@@ -745,9 +745,9 @@ st.markdown(f"""
 
     header[data-testid="stHeader"] {{
         background: transparent !important;
-        height: 0px !important;
-        visibility: hidden !important;
-        display: none !important;
+        visibility: visible !important;
+        display: block !important;
+        height: 2.5rem !important;
     }}
     
     /* ZERA O ESPAÇAMENTO NATIVO DO STREAMLIT NO TOPO */
