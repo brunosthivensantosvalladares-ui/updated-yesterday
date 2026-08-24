@@ -11,6 +11,25 @@ from fpdf import FPDF
 import time as time_module
 import requests
 import re
+import streamlit.components.v1 as components
+
+# --- FUNÇÃO PARA PUXAR O TOPO PARA CIMA (ELIMINA O ESPAÇO VAZIO) ---
+def puxar_topo_para_cima():
+    components.html("""
+        <script>
+            const doc = window.parent.document;
+            const target = doc.querySelector('.main .block-container');
+            if (target) {
+                target.style.paddingTop = '0px';
+                target.style.marginTop = '0px';
+            }
+            const header = doc.querySelector('header[data-testid="stHeader"]');
+            if (header) {
+                header.style.minHeight = '30px';
+                header.style.height = '30px';
+            }
+        </script>
+    """, height=0)
 
 # --- MÓDULO DE SEGURANÇA AVANÇADA (PBKDF2-HMAC-SHA256 COM SALT) ---
 def gerar_hash_senha(senha_pura: str) -> str:
@@ -426,7 +445,7 @@ def responder_chat_mr_halley(mensagem_usuario, emp_id):
 
     llm = obter_llm()
     if not llm:
-        return "Desculpe, a conexão com a IA (GROQ_API_KEY) não está configurada nos Secrets do Streamlit."
+        return "Desculpe, a conexão com a IA (GROQ_API_KEY) não está configurada nos Secrets del Streamlit."
 
     contexto_foco_atual = "Nenhum chamado foi analisado recentemente nesta tela."
     if "analises_halley" in st.session_state and st.session_state.analises_halley:
@@ -709,6 +728,9 @@ COR_TEXTO = "#231F20"
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title=f"{NOME_SISTEMA} - Painel de Controle", layout="wide", page_icon="⚙️")
+
+# --- CHAMADA DO SCRIPT JS PARA PUXAR O TOPO EXATAMENTE ---
+puxar_topo_para_cima()
 
 # --- DESIGN SYSTEM LUXO & SIDEBAR MODERNA COM CABEÇALHO 100% FIXO E SEM EXcesso ---
 st.markdown(f"""
@@ -1488,7 +1510,7 @@ else:
 
     # =========================================================================
     # SEÇÃO SUPERIOR COMPLETA E 100% FIXA NO TOPO (STICKY INTEGRADO TOTAL)
-    # =========================================================================
+    # ==================================================
     st.markdown("<div class='top-fixed-section'>", unsafe_allow_html=True)
     
     # 1. Cabeçalho de Busca, Ajuda, Idioma e Notificações
