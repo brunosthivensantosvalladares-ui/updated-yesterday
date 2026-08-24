@@ -721,8 +721,10 @@ st.markdown(f"""
         font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif !important;
     }}
 
+    /* FORÇA A TELA A SUBIR E ELIMINA O ESPAÇO EM BRANCO */
     header[data-testid="stHeader"] {{
-        height: 2rem !important;
+        background: transparent !important;
+        height: 1.5rem !important;
         visibility: visible !important;
         display: block !important;
     }}
@@ -732,7 +734,7 @@ st.markdown(f"""
         padding-bottom: 2rem !important;
         padding-left: 1.5rem !important;
         padding-right: 1.5rem !important;
-        margin-top: 0rem !important;
+        margin-top: -4.5rem !important; /* <--- Altere este valor se precisar ajustar o topo */
     }}
     
     /* ========================================================= */
