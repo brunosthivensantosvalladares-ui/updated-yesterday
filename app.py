@@ -734,7 +734,7 @@ st.markdown(f"""
         padding-bottom: 2rem !important;
         padding-left: 1.5rem !important;
         padding-right: 1.5rem !important;
-        margin-top: -15.5rem !important; /* <--- Altere este valor se precisar ajustar o topo */
+        margin-top: -1.5rem !important; /* <--- Altere este valor se precisar ajustar o topo */
     }}
     
     /* ========================================================= */
