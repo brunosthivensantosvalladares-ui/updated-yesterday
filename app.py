@@ -721,30 +721,18 @@ st.markdown(f"""
         font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif !important;
     }}
 
-    /* ELIMINAÇÃO TOTAL DO ESPAÇO SUPERIOR NO AMBIENTE LOGADO */
-    header[data-testid="stHeader"],
-    div[data-testid="stDecoration"],
-    div[data-testid="stStatusWidget"] {{
-        display: none !important;
-        height: 0px !important;
-        min-height: 0px !important;
-        margin: 0px !important;
-        padding: 0px !important;
-        visibility: hidden !important;
+    /* ELIMINAÇÃO TOTAL DO ESPAÇO SUPERIOR (APENAS QUANDO LOGADO) */
+    header[data-testid="stHeader"] {{
+        background: transparent !important;
+        height: 0rem !important;
+        z-index: 1 !important;
     }}
-
-    .main:has(.top-fixed-section) .block-container,
-    [data-testid="stAppViewBlockContainer"]:has(.top-fixed-section),
-    div[data-testid="stMainBlockContainer"]:has(.top-fixed-section) {{
+    .main .block-container {{
         padding-top: 0rem !important;
         padding-bottom: 2rem !important;
-        padding-left: 1.2rem !important;
-        padding-right: 1.2rem !important;
-        margin-top: 0.0rem !important;
-    }}
-
-    section.main > div {{
-        padding-top: 0px !important;
+        padding-left: 1.5rem !important;
+        padding-right: 1.5rem !important;
+        margin-top: -3.5rem !important;
     }}
 
     /* ========================================================= */
@@ -757,10 +745,10 @@ st.markdown(f"""
     }}
     section[data-testid="stSidebar"] > div:first-child {{
         overflow: hidden !important;
-        padding-top: 0.2rem !important;
-        padding-bottom: 0.4rem !important;
-        padding-left: 0.6rem !important;
-        padding-right: 0.6rem !important;
+        padding-top: 0rem !important;
+        padding-bottom: 0.8rem !important;
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
         display: flex !important;
         flex-direction: column !important;
         height: 100vh !important;
@@ -771,14 +759,14 @@ st.markdown(f"""
 
     /* Espaçamentos verticais compactados */
     section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] {{
-        gap: 0 !important;
+        gap: 0.12rem !important;
     }}
     section[data-testid="stSidebar"] hr {{
-        margin: 2px 0 20px 0 !important;
+        margin: 4px 0 10px 0 !important;
         border-color: rgba(197, 160, 89, 0.25) !important;
     }}
 
-    /* Container do Brasão Circular (90px) */
+    /* Container do Brasão Circular (90px perfeito) */
     .logo-container-circular {{
         margin: 0 auto !important;
         border-radius: 50%;
@@ -813,93 +801,35 @@ st.markdown(f"""
         width: 100% !important;
     }}
 
-    .sidebar-nav-title {{
-        margin: 10px 0 20px 0 !important;
-        padding: 0 !important;
-        font-size: 0.82rem !important;
-        line-height: 1.15 !important;
-        color: #F0EDE6 !important;
-    }}
-
-    /* Navegação feita com botões; o item ativo é indicado pelo fundo dourado. */
-    section[data-testid="stSidebar"] button[kind="secondary"],
-    section[data-testid="stSidebar"] button[data-testid="stBaseButton-secondary"],
-    section[data-testid="stSidebar"] div[data-testid="stButton"] button[kind="secondary"] {{
-        width: 100% !important;
-        min-height: 30px !important;
-        height: 30px !important;
-        margin: 0 !important;
-        padding: 2px 8px !important;
-        border-radius: 8px !important;
-        font-size: 0.90rem !important;
-        line-height: 1 !important;
-        justify-content: flex-start !important;
-        text-align: left !important;
-        box-sizing: border-box !important;
+    /* Radio / Navegação Ultra-Compacta na Sidebar */
+    section[data-testid="stSidebar"] [data-testid="stRadio"] > div {{
         background: transparent !important;
-        border-color: transparent !important;
+        border: none !important;
+        gap: 0px !important;
+    }}
+    section[data-testid="stSidebar"] [data-testid="stRadio"] label {{
+        background-color: transparent !important;
+        padding: 2.5px 5px !important;
+        border-radius: 5px !important;
+        font-size: 0.82rem !important;
+        line-height: 1.1 !important;
+        transition: all 0.15s ease !important;
+        min-height: auto !important;
+    }}
+    section[data-testid="stSidebar"] [data-testid="stRadio"] label:hover {{
+        background-color: rgba(197, 160, 89, 0.18) !important;
     }}
 
-    section[data-testid="stSidebar"] button[kind="secondary"] p,
-    section[data-testid="stSidebar"] button[kind="secondary"] span,
-    section[data-testid="stSidebar"] button[kind="secondary"] div,
-    section[data-testid="stSidebar"] button[data-testid="stBaseButton-secondary"] p,
-    section[data-testid="stSidebar"] button[data-testid="stBaseButton-secondary"] span,
-    section[data-testid="stSidebar"] button[data-testid="stBaseButton-secondary"] div {{
-        font-size: 0.90rem !important;
-        line-height: 1 !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        color: #FFFFFF !important;
-        -webkit-text-fill-color: #FFFFFF !important;
+    /* Textos e Botões na Sidebar */
+    section[data-testid="stSidebar"] p, 
+    section[data-testid="stSidebar"] span, 
+    section[data-testid="stSidebar"] div {{
+        font-size: 0.79rem !important;
     }}
-
-    section[data-testid="stSidebar"] button[kind="secondary"]:hover,
-    section[data-testid="stSidebar"] button[data-testid="stBaseButton-secondary"]:hover,
-    section[data-testid="stSidebar"] button[kind="primary"]:hover,
-    section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"]:hover {{
-        background: rgba(0, 0, 0, 0.38) !important;
-        border-color: rgba(197, 160, 89, 0.55) !important;
-        box-shadow: inset 0 0 0 1px rgba(197, 160, 89, 0.18), 0 2px 8px rgba(0, 0, 0, 0.22) !important;
-    }}
-
-    section[data-testid="stSidebar"] button[kind="primary"],
-    section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"],
-    section[data-testid="stSidebar"] div[data-testid="stButton"] button[kind="primary"] {{
-        width: 100% !important;
-        min-height: 30px !important;
-        height: 30px !important;
-        margin: 0 !important;
-        padding: 2px 8px !important;
-        border-radius: 8px !important;
-        font-size: 0.90rem !important;
-        line-height: 1 !important;
-        justify-content: flex-start !important;
-        text-align: left !important;
-        box-sizing: border-box !important;
-        background: rgba(197, 160, 89, 0.32) !important;
-        border-color: rgba(197, 160, 89, 0.6) !important;
-        font-weight: 700 !important;
-    }}
-
-    section[data-testid="stSidebar"] button[kind="primary"] p,
-    section[data-testid="stSidebar"] button[kind="primary"] span,
-    section[data-testid="stSidebar"] button[kind="primary"] div,
-    section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"] p,
-    section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"] span,
-    section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"] div {{
-        font-size: 0.90rem !important;
-        line-height: 1 !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        color: #FFFFFF !important;
-        -webkit-text-fill-color: #FFFFFF !important;
-    }}
-
-    section[data-testid="stSidebar"] button:not([key^="nav_btn_"]) {{
-        padding: 0.30rem 0.6rem !important;
-        min-height: 30px !important;
-        font-size: 0.84rem !important;
+    section[data-testid="stSidebar"] button {{
+        padding: 0.22rem 0.5rem !important;
+        min-height: 27px !important;
+        font-size: 0.79rem !important;
     }}
 
     /* Botões Padrão */
@@ -933,34 +863,18 @@ st.markdown(f"""
         -webkit-text-fill-color: {COR_TEXTO} !important;
     }}
 
-    /* ========================================================================= */
-    /* SEÇÃO SUPERIOR 100% FIXA NO TOPO (STICKY INTEGRADO SEM ESPAÇOS VAZIOS)   */
-    /* ========================================================================= */
-    .top-fixed-section {{
+    /* ========================================================= */
+    /* CABEÇALHO GLOBAL FIXO NO TOPO (STICKY HEADER ROBUSTO)     */
+    /* ========================================================= */
+    div.header-sticky-container {{
         position: -webkit-sticky !important;
         position: sticky !important;
-        top: 0px !important;
-        z-index: 99999 !important;
-        background-color: {COR_CHAPA} !important;
-        padding-top: 6px !important;
-        padding-bottom: 2px !important;
-        border-bottom: 1.5px solid #E2D9CB !important;
-        box-shadow: 0 4px 16px rgba(35, 31, 32, 0.06) !important;
-        margin-left: -1.2rem !important;
-        margin-right: -1.2rem !important;
-        padding-left: 1.2rem !important;
-        padding-right: 1.2rem !important;
-        margin-bottom: 8px !important;
-    }}
-
-    /* Compactação dos Inputs e Botões do Header */
-    .top-fixed-section div[data-testid="stTextInput"] {{
-        margin-top: 0px !important;
-    }}
-    .top-fixed-section div[data-testid="stPopover"] button {{
-        padding: 4px 10px !important;
-        min-height: 38px !important;
-        font-size: 0.85rem !important;
+        top: 0 !important;
+        z-index: 1000 !important;
+        background: {COR_CHAPA} !important;
+        padding: 6px 0px 4px 0px !important;
+        border-bottom: 1px solid #E6DED1 !important;
+        box-shadow: 0 4px 12px rgba(35, 31, 32, 0.05) !important;
     }}
 
     /* Cartões Modernos de Dashboard */
@@ -1200,7 +1114,7 @@ if not st.session_state["logado"]:
                     <img src='{LOGO_URL}' class='logo-img-crop'>
                 </div>
                 <p class='login-brand-title'>UPDATED YESTERDAY</p>
-                <p style='text-align: center; font-style: italic; color: #8F847B; margin: 4px 0 30px 0; font-size: 0.78rem;'>{SLOGAN}</p>
+                <p style='text-align: center; font-style: italic; color: #8F847B; margin: 4px 0 20px 0; font-size: 0.78rem;'>{SLOGAN}</p>
             </div>
         """, unsafe_allow_html=True)
         
@@ -2122,7 +2036,7 @@ else:
                     box-shadow: 0 0 0 0 rgba(255, 75, 75, 1); animation: pulse 1.5s infinite;
                 }
                 @keyframes pulse {
-                    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 75, 75, 0.8); }
+                    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 75, 75, 0.7); }
                     70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(255, 75, 75, 0); }
                     100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 75, 75, 0); }
                 }
