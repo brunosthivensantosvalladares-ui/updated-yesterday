@@ -124,7 +124,7 @@ def obter_llm():
         return None
     return ChatGroq(
         groq_api_key=api_key,
-        model_name="llama-3.3-70b-versatile",
+        model_name="llama-3.1-70b-versatile",
         temperature=0.0,
         max_retries=2
     )
@@ -316,46 +316,47 @@ def processar_comando_os(texto_usuario, emp_id):
         ultimas_msgs = "\n".join([f"{m['role'].upper()}: {m['content']}" for m in mensagens_recentes])
 
     template_fluxo = """
-Você é o assistente Mr. Halley da plataforma Up 2 Today, especialista em agendamento de OS.
+Você é o assistente Mr. Halley da plataforma Up 2 Today, especialista em agendamento de OS e suporte ao usuário.
+
+MANUAL DA PLATAFORMA (PARA ORIENTAÇÃO DOS USUÁRIOS):
+- O Up 2 Today é um sistema de gestão de frotas e oficinas.
+- **Dashboard:** Visão geral da operação, cartões de métricas (Agendados hoje, Concluídos, Pendentes), filtro operacional e exportações rápidas em PDF/Excel.
+- **Agenda Principal:** Cronograma diário de manutenções, controle de janelas de box (Início e Fim Disp.), alteração dinâmica de dados e baixa de OSs atrasadas.
+- **Cadastro Direto:** Utilizado para manutenções programadas preventivas ou trocas de óleo diretas que não vieram de chamados de motoristas.
+- **Chamados Oficina:** Onde o gestor visualiza os problemas relatados pelos motoristas, clica em "Aprovar" para o Mr. Halley emitir o diagnóstico técnico com base no histórico/web, define o mecânico e a área, e processa os agendamentos.
+- **Chat Mr. Halley:** Assistente de inteligência artificial que ajuda em diagnósticos e permite abrir Ordens de Serviço (OS) de forma conversacional.
+- **OSs Pendentes / Concluídas:** Histórico e acompanhamento de serviços em andamento ou finalizados, com tela de baixa técnica detalhada.
+- **Indicadores:** Gráficos de serviços por área, taxa de conclusão e tempo médio de retenção (Lead Time).
+- **Manual do Sistema:** Aba onde o usuário pode baixar o PDF do Manual Master oficial da plataforma.
 
 Histórico Recente da Conversa no Chat:
 {ultimas_msgs}
 
 Mensagem Atual do Usuário: "{mensagem}"
-Rascunho Existente: {rascunho_json}
+Rascunho Existente de OS em Andamento: {rascunho_json}
 Em Fluxo de OS Ativo? {em_fluxo}
 Veículo em Análise Recente na Tela: {veiculo_contexto}
 Relato da Análise Recente: "{relato_contexto}"
 Referência da Data Atual do Sistema: {hoje}
 
-CAMPOS DA OS:
-- prefixo: Número/placa do veículo (capture do contexto se for "esse veículo" ou "último veículo")
-- descricao: Descrição do problema/serviço (capture do contexto se for "mesmo problema")
-- executor: Mecânico ou responsável
-- data: Data no formato AAAA-MM-DD. REGRA CRÍTICA: Deixe NULO/VAZIO se o usuário NÃO tiver informado explicitamente uma data ou termos como "hoje", "amanhã", "17/08". NUNCA preencha automaticamente.
-- area: APENAS UMA DAS 5 OPÇÕES: Mecânica, Elétrica, Borracharia, Chapeamento ou Limpeza. Deixe NULO/VAZIO se o usuário não disse explicitamente.
-- turno: Não definido, Dia ou Noite (opcional)
-- inicio: Horário inicial no formato HH:MM (opcional)
-- fim: Horário final no formato HH:MM (opcional)
-
-REGRAS:
-1. Capture os dados da mensagem e do histórico recente.
-2. NUNCA assuma a Data nem a Área como padrão; deixe vazias se não forem informadas.
-
-Responda EXCLUSIVAMENTE em formato JSON puro:
+INSTRUÇÃO CRÍTICA DE INTERRUPÇÃO:
+- Se houver um rascunho de OS em andamento ou aguardando confirmação, MAS a mensagem atual do usuário for uma DUVIDA TÉCNICA (ex: por que o pneu fura, falha no motor), uma PERGUNTA SOBRE O FUNCIONALIDADE/SITE (ex: como usar a agenda, quais funcionalidades você possui) ou qualquer assunto que NÃO seja estritamente o fornecimento do dado faltante para a OS:
+  --> Você DEVE AUTOMATICAMENTE CANCELAR E DESCARTAR o fluxo de OS ("em_fluxo_os": false) e responder à pergunta do usuário de forma prestativa, explicando o funcionamento do site ou tirando a dúvida mecânica.
 
 Se NÃO for assunto de OS e NÃO houver fluxo em andamento:
 {{"em_fluxo_os": false}}
 
-Se for fluxo de OS:
+Se for continuidade estrita de fluxo de OS:
 {{"em_fluxo_os": true, "prefixo": "...", "descricao": "...", "executor": "...", "data": "...", "area": "...", "turno": "...", "inicio": "...", "fim": "..."}}
+
+Responda EXCLUSIVAMENTE em formato JSON puro se for fluxo de OS, ou texto comum caso o fluxo tenha sido cancelado para responder à dúvida.
 """
 
     prompt = ChatPromptTemplate.from_template(template_fluxo)
     chain = prompt | llm
 
     try:
-        resultado = chain.invoke({
+        resposta_ia = chain.invoke({
             "ultimas_msgs": ultimas_msgs if ultimas_msgs else "Nenhuma mensagem anterior.",
             "mensagem": texto_usuario,
             "rascunho_json": json.dumps(rascunho, ensure_ascii=False),
@@ -365,65 +366,73 @@ Se for fluxo de OS:
             "hoje": hoje_str
         }).content.strip()
 
-        resultado_limpo = resultado.replace("```json", "").replace("```", "").strip()
-        dados = json.loads(resultado_limpo)
+        if "em_fluxo_os" in resposta_ia or resposta_ia.startswith("{"):
+            resultado_limpo = resposta_ia.replace("```json", "").replace("```", "").strip()
+            dados = json.loads(resultado_limpo)
 
-        if not dados.get("em_fluxo_os"):
-            return None
+            if not dados.get("em_fluxo_os"):
+                st.session_state.rascunho_os = None
+                st.session_state.aguardando_confirmacao_os = False
+                return None
 
-        novo_rascunho = rascunho.copy()
-        for k in ["prefixo", "descricao", "executor", "data", "area", "turno", "inicio", "fim"]:
-            v = dados.get(k)
-            if v and v not in ["...", "None", "null", "Não informado"]:
-                novo_rascunho[k] = v
+            novo_rascunho = rascunho.copy()
+            for k in ["prefixo", "descricao", "executor", "data", "area", "turno", "inicio", "fim"]:
+                v = dados.get(k)
+                if v and v not in ["...", "None", "null", "Não informado"]:
+                    novo_rascunho[k] = v
 
-        if not novo_rascunho.get("prefixo") and veiculo_contexto != "Não informado":
-            novo_rascunho["prefixo"] = veiculo_contexto
-        if not novo_rascunho.get("descricao") and relato_contexto:
-            novo_rascunho["descricao"] = relato_contexto
+            if not novo_rascunho.get("prefixo") and veiculo_contexto != "Não informado":
+                novo_rascunho["prefixo"] = veiculo_contexto
+            if not novo_rascunho.get("descricao") and relato_contexto:
+                novo_rascunho["descricao"] = relato_contexto
 
-        if not novo_rascunho.get("turno"):
-            novo_rascunho["turno"] = "Não definido"
-        if not novo_rascunho.get("inicio"):
-            novo_rascunho["inicio"] = "00:00"
-        if not novo_rascunho.get("fim"):
-            novo_rascunho["fim"] = "00:00"
+            if not novo_rascunho.get("turno"):
+                novo_rascunho["turno"] = "Não definido"
+            if not novo_rascunho.get("inicio"):
+                novo_rascunho["inicio"] = "00:00"
+            if not novo_rascunho.get("fim"):
+                novo_rascunho["fim"] = "00:00"
 
-        st.session_state.rascunho_os = novo_rascunho
+            st.session_state.rascunho_os = novo_rascunho
 
-        # Validação estrita dos 5 campos obrigatórios
-        campos_faltantes = []
-        if not novo_rascunho.get("prefixo"):
-            campos_faltantes.append("Prefixo do Veículo")
-        if not novo_rascunho.get("descricao"):
-            campos_faltantes.append("Descrição do Serviço")
-        if not novo_rascunho.get("executor"):
-            campos_faltantes.append("Mecânico Responsável")
-        if not novo_rascunho.get("data"):
-            campos_faltantes.append("Data de Agendamento")
-        if not novo_rascunho.get("area"):
-            campos_faltantes.append("Área (Mecânica, Elétrica, Borracharia, Chapeamento ou Limpeza)")
+            # Validação estrita dos 5 campos obrigatórios
+            campos_faltantes = []
+            if not novo_rascunho.get("prefixo"):
+                campos_faltantes.append("Prefixo do Veículo")
+            if not novo_rascunho.get("descricao"):
+                campos_faltantes.append("Descrição do Serviço")
+            if not novo_rascunho.get("executor"):
+                campos_faltantes.append("Mecânico Responsável")
+            if not novo_rascunho.get("data"):
+                campos_faltantes.append("Data de Agendamento")
+            if not novo_rascunho.get("area"):
+                campos_faltantes.append("Área (Mecânica, Elétrica, Borracharia, Chapeamento ou Limpeza)")
 
-        if campos_faltantes:
-            st.session_state.aguardando_confirmacao_os = False
+            if campos_faltantes:
+                st.session_state.aguardando_confirmacao_os = False
+                return (
+                    f"Para prosseguir com a abertura da OS, por favor informe:\n\n"
+                    f"- **{', '.join(campos_faltantes)}**\n\n"
+                    f"*(Horários e Turno são opcionais)*"
+                )
+
+            st.session_state.aguardando_confirmacao_os = True
             return (
-                f"Para prosseguir com a abertura da OS, por favor informe:\n\n"
-                f"- **{', '.join(campos_faltantes)}**\n\n"
-                f"*(Horários e Turno são opcionais)*"
+                f"📋 **Resumo da Ordem de Serviço:**\n\n"
+                f"- **Veículo:** {novo_rascunho.get('prefixo')}\n"
+                f"- **Serviço:** {novo_rascunho.get('descricao')}\n"
+                f"- **Área:** {novo_rascunho.get('area')}\n"
+                f"- **Data:** {novo_rascunho.get('data')}\n"
+                f"- **Turno:** {novo_rascunho.get('turno')}\n"
+                f"- **Horário:** {novo_rascunho.get('inicio')} às {novo_rascunho.get('fim')}\n"
+                f"- **Executor:** {novo_rascunho.get('executor')}\n\n"
+                f"👉 Digite **Ok** para confirmar ou informe ajustes (ex: *Mudar data para amanhã*, *Área Elétrica* ou *Horário 08:00 às 10:00*)."
             )
-
-        st.session_state.aguardando_confirmacao_os = True
-        return (
-            f"📋 **Resumo da Ordem de Serviço:**\n\n"
-            f"- **Veículo:** {novo_rascunho.get('prefixo')}\n"
-            f"- **Serviço:** {novo_rascunho.get('descricao')}\n"
-            f"- **Área:** {novo_rascunho.get('area')}\n"
-            f"- **Data:** {novo_rascunho.get('data')}\n"
-            f"- **Turno:** {novo_rascunho.get('turno')}\n"
-            f"- **Horário:** {novo_rascunho.get('inicio')} às {novo_rascunho.get('fim')}\n"
-            f"- **Executor:** {novo_rascunho.get('executor')}\n\n"
-            f"👉 Digite **Ok** para confirmar ou informe ajustes (ex: *Mudar data para amanhã*, *Área Elétrica* ou *Horário 08:00 às 10:00*)."
-        )
+        else:
+            # O usuário fez uma pergunta paralela e o fluxo foi cancelado
+            st.session_state.rascunho_os = None
+            st.session_state.aguardando_confirmacao_os = False
+            return resposta_ia
     except Exception:
         return None
         
@@ -445,7 +454,7 @@ def responder_chat_mr_halley(mensagem_usuario, emp_id):
 
     llm = obter_llm()
     if not llm:
-        return "Desculpe, a conexão com a IA (GROQ_API_KEY) não está configurada nos Secrets del Streamlit."
+        return "Desculpe, a conexão com a IA (GROQ_API_KEY) não está configurada nos Secrets do Streamlit."
 
     contexto_foco_atual = "Nenhum chamado foi analisado recentemente nesta tela."
     if "analises_halley" in st.session_state and st.session_state.analises_halley:
@@ -463,7 +472,16 @@ def responder_chat_mr_halley(mensagem_usuario, emp_id):
     )
 
     template = """
-Você é o Mr. Halley, assistente técnico de manutenção e telemetria da plataforma Up 2 Today.
+Você é o Mr. Halley, assistente técnico de manutenção, telemetria e suporte da plataforma Up 2 Today.
+
+MANUAL DA PLATAFORMA (ORIENTE O USUÁRIO COM PRECISÃO):
+- **Dashboard:** Visão geral da operação e cartões de métricas (agendados, concluídos, pendentes).
+- **Agenda Principal:** Cronograma diário de manutenções, controle de janelas de box (Início e Fim Disp.) e baixa de tarefas.
+- **Cadastro Direto:** Usado para manutenções programadas preventivas ou trocas de óleo diretas.
+- **Chamados Oficina:** Tela onde o gestor visualiza os problemas relatados pelos motoristas e clica em "Aprovar" para acionar o Mr. Halley.
+- **Chat Mr. Halley:** Ferramenta conversacional para triagem e abertura automática de Ordens de Serviço (OS).
+- **Indicadores:** Gráficos de performance operacional e tempo médio de retenção (Lead Time).
+- **Manual do Sistema:** Guia completo e exportação do manual em PDF.
 
 {contexto_foco_atual}
 
@@ -472,9 +490,8 @@ Você é o Mr. Halley, assistente técnico de manutenção e telemetria da plata
 Pergunta do Usuário: "{mensagem_usuario}"
 
 DIRETRIZES DE RESPOSTA:
-1. Responda de forma direta e concisa (2 a 3 frases no máximo).
-2. Se houver registros no histórico, liste os veículos e datas encontrados diretamente, sem tentar adivinhar ou antecipar o número total se não for exato.
-3. Não repita informações na mesma frase.
+1. Responda de forma clara, prestativa e objetiva, explicando o passo a passo de como usar o site ou tirando dúvidas mecânicas.
+2. Se houver registros no histórico de OS, cite-os diretamente.
 """
 
     prompt = ChatPromptTemplate.from_template(template)
@@ -2651,7 +2668,7 @@ else:
         if not df_users.empty:
             df_users['Exc'] = False
             ed_users = st.data_editor(
-                df_users[['Exc'], ['login', 'cargo', 'id']], 
+                df_users[['Exc', 'login', 'cargo', 'id']], 
                 hide_index=True, 
                 use_container_width=True, 
                 column_config={
