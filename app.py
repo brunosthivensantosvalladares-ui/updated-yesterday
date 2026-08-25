@@ -444,7 +444,7 @@ Se for fluxo de OS:
     except Exception:
         return None
         
-# --- RESPOSTAS GERAIS E HISTÓRICOS ---
+# --- RESPOSTAS GERAIS E HISTÓRICOS (ATUALIZADO COM CHAMADA DIRETA E MANUAL DO SISTEMA) ---
 def responder_chat_mr_halley(mensagem_usuario, emp_id):
     texto_baixo = mensagem_usuario.lower().strip()
 
@@ -460,13 +460,15 @@ def responder_chat_mr_halley(mensagem_usuario, emp_id):
     if resposta_os:
         return resposta_os
 
-    llm = obter_llm()
-    if not llm:
+    api_key = obter_llm()
+    if not api_key:
         return "Desculpe, a conexão com a IA (GROQ_API_KEY) não está configurada nos Secrets do Streamlit."
 
     contexto_foco_atual = "Nenhum chamado foi analisado recentemente nesta tela."
+    prefixo_foco = None
     if "analises_halley" in st.session_state and st.session_state.analises_halley:
         ultima = st.session_state.analises_halley[-1]
+        prefixo_foco = ultima.get("veiculo")
         contexto_foco_atual = (
             f"ÚLTIMA ANÁLISE REALIZADA (FOCO ATUAL):\n"
             f"- Veículo em análise: {ultima['veiculo']}\n"
@@ -474,36 +476,44 @@ def responder_chat_mr_halley(mensagem_usuario, emp_id):
             f"- Diagnóstico emitido: {ultima['parecer']}"
         )
 
-    historicos_banco = buscar_historico_relevante(mensagem_usuario, emp_id)
+    # Busca o histórico garantindo que traga os dados do veículo em foco se houver
+    historicos_banco = buscar_historico_relevante(mensagem_usuario, emp_id, prefixo=prefixo_foco)
     contexto_banco = "REGISTROS E HISTÓRICOS DE MANUTENÇÃO NO BANCO:\n" + (
         "\n".join(historicos_banco) if historicos_banco else "Nenhum registro anterior no banco."
     )
 
-    template = """
-Você é o Mr. Halley, assistente técnico de manutenção e telemetria da plataforma Up 2 Today.
+    manual_plataforma = """
+FUNCIONALIDADES E PASSO A PASSO DA PLATAFORMA UP 2 TODAY:
+1. Dashboard: Visão geral da operação, métricas de agendados, concluídos e pendentes, e filtros rápidos por período e setor.
+2. Agenda Principal: Centro operacional para controle de janelas de box, horários de disponibilidade (início/fim) e conclusão de serviços.
+3. Cadastro Direto: Utilizado para manutenções preventivas ou revisões periódicas que não vieram de chamados de motoristas.
+4. Chamados Oficina: Espaço onde o gestor visualiza os apontamentos da ponta, aprova chamados, aciona o Mr. Halley para triagem técnica automática e define executores.
+5. Chat Mr. Halley: Assistente virtual integrado para triagem de falhas, consulta de histórico e abertura conversacional de Ordens de Serviço (OS).
+6. OSs Pendentes e Concluídas: Gestão de Lead Time, relatórios exportáveis em Excel e PDF, e histórico completo de prontuários por veículo.
+7. Perfil Motorista: Versão simplificada para dispositivos móveis focada na abertura rápida de solicitações e acompanhamento de status.
+"""
+
+    template_geral = f"""
+Você é o Mr. Halley, assistente técnico de manutenção, telemetria e suporte da plataforma Up 2 Today.
 
 {contexto_foco_atual}
 
 {contexto_banco}
 
+{manual_plataforma}
+
 Pergunta do Usuário: "{mensagem_usuario}"
 
 DIRETRIZES DE RESPOSTA:
-1. Responda de forma direta e concisa (2 a 3 frases no máximo).
-2. Se houver registros no histórico, liste os veículos e datas encontrados diretamente, sem tentar adivinhar ou antecipar o número total se não for exato.
-3. Não repita informações na mesma frase.
+1. Responda de forma direta, clara e prestativa.
+2. Se o usuário perguntar sobre o sistema, funcionalidades ou como usar a plataforma, explique detalhadamente com base no manual acima.
+3. Se houver registros correlatos no histórico do banco, cite-os claramente.
+4. Mantenha um tom profissional e técnico.
 """
 
-    prompt = ChatPromptTemplate.from_template(template)
-    chain = prompt | llm
-
     try:
-        resposta = chain.invoke({
-            "contexto_foco_atual": contexto_foco_atual,
-            "contexto_banco": contexto_banco,
-            "mensagem_usuario": mensagem_usuario
-        })
-        return resposta.content.strip()
+        resposta = chamar_groq_direto(template_geral, api_key)
+        return resposta
     except Exception as e:
         return f"Erro ao processar consulta: {str(e)}"
         
