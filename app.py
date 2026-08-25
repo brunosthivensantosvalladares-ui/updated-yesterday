@@ -120,27 +120,27 @@ def get_engine():
 # --- CONFIGURAÇÃO DO MODELO LLAMA 3 (GROQ) & BUSCA WEB ---
 def obter_llm():
     api_key = st.secrets.get("GROQ_API_KEY") or os.environ.get("GROQ_API_KEY")
-    if not api_key:
-        return None
-    return ChatGroq(
-        groq_api_key=api_key,
-        model_name="llama-3.1-8b-instant",
-        temperature=0.0,
-        max_retries=2
-    )
+    return api_key
 
-def pesquisar_solucao_web(termo_busca: str) -> str:
-    """Pesquisa dados técnicos e diagnósticos na internet diretamente via DDGS."""
+def chamar_groq_direto(prompt_texto, api_key):
+    url = "https://api.groq.com/openai/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "model": "llama-3.1-8b-instant",
+        "messages": [{"role": "user", "content": prompt_texto}],
+        "temperature": 0.0
+    }
     try:
-        query = f"manutencao automotiva defeito {termo_busca} causa solucao"
-        with DDGS() as ddgs:
-            resultados = list(ddgs.text(query, max_results=2))
-            if resultados:
-                trechos = [r.get("body", "") for r in resultados if "body" in r]
-                return " ".join(trechos)
-        return ""
-    except Exception:
-        return ""
+        response = requests.post(url, json=payload, headers=headers, timeout=15)
+        if response.status_code == 200:
+            return response.json()["choices"][0]["message"]["content"].strip()
+        else:
+            return f"Erro da API Groq ({response.status_code}): {response.text}"
+    except Exception as e:
+        return f"Erro de conexão: {str(e)}"
 
 # --- BUSCA DE HISTÓRICO BLINDADA CONTRA ERROS ---
 def buscar_historico_relevante(sintoma, emp_id, prefixo=None):
@@ -205,48 +205,39 @@ def buscar_historico_relevante(sintoma, emp_id, prefixo=None):
 # --- TRIAGEM DO MR. HALLEY BLINDADA E EXPLICITA ---
 def triagem_mr_halley(sintoma, emp_id, prefixo=None, incluir_saudacao=False):
     try:
-        llm = obter_llm()
+        api_key = obter_llm()
         historicos = buscar_historico_relevante(sintoma, emp_id, prefixo=prefixo)
         
-        if not llm:
-            return f"Erro: Chave da API Groq não configurada corretamente."
+        if not api_key:
+            return "Erro: Chave da API Groq não configurada."
 
         historico_formatado = "\n".join(historicos) if historicos else "Nenhum histórico anterior."
         resultado_web = pesquisar_solucao_web(sintoma)
 
-        template = """
+        prompt_texto = f"""
 Você é o assistente técnico Mr. Halley da plataforma Up 2 Today.
 Analise a falha e dê um diagnóstico mecânico cirúrgico.
 
-Veículo: {prefixo}
+Veículo: {prefixo if prefixo else "Não informado"}
 Sintoma: "{sintoma}"
 
 Histórico da Frota:
 {historico_formatado}
 
 Dados da Web:
-{contexto_web}
+{resultado_web[:400] if resultado_web else "Inspeção padrão."}
 
 REGRAS DE RESPOSTA:
 1. Se houver OS anterior correlata no histórico, inicie obrigatoriamente com: "Baseado no histórico local da frota, recomenda-se"
 2. Se não houver, inicie obrigatoriamente com: "Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se"
 3. Proibido saudações.
-4. Descreva a ação técnica exata no infinitivo citando componentes específicos (ex: trocar bicos injetores, regular alinhamento de direção, substituir filtros de combustível) em até 35 palavras. NUNCA repita o sintoma de forma genérica.
+4. Descreva a ação técnica exata no infinitivo citando componentes específicos em até 35 palavras. NUNCA repita o sintoma de forma genérica.
 """
 
-        prompt = ChatPromptTemplate.from_template(template)
-        chain = prompt | llm
-
-        resposta = chain.invoke({
-            "prefixo": str(prefixo) if prefixo else "Não informado",
-            "sintoma": str(sintoma),
-            "historico_formatado": str(historico_formatado),
-            "contexto_web": str(resultado_web[:400]) if resultado_web else "Inspeção padrão."
-        })
-        return resposta.content.strip()
+        resposta = chamar_groq_direto(prompt_texto, api_key)
+        return resposta
         
     except Exception as e:
-        # Mostra o erro exato na tela em vez de esconder com uma frase genérica
         return f"⚠️ Erro interno na IA: {str(e)}"
         
 # --- PROCESSAMENTO DETERMINÍSTICO DE ABERTURA DE OS VIA CHAT ---
