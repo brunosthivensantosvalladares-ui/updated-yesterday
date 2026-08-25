@@ -142,29 +142,39 @@ def pesquisar_solucao_web(termo_busca: str) -> str:
     except Exception:
         return ""
 
+# --- BUSCA DE HISTÓRICO BLINDADA CONTRA ERROS ---
 def buscar_historico_relevante(sintoma, emp_id, prefixo=None):
-    """Busca ordens de serviço anteriores priorizando o mesmo veículo e termos correlatos."""
+    """Busca ordens de serviço anteriores na tabela tarefas sem risco de falha."""
     engine = get_engine()
     
-    # Busca específica para o veículo atual
-    query_especifica = text("""
-        SELECT data, prefixo, descricao, COALESCE(executor, 'Não informado') as executor, numero_os 
-        FROM tarefas 
-        WHERE empresa_id = :eid AND LOWER(prefixo) = LOWER(:pref)
-        ORDER BY id DESC LIMIT 15
-    """)
-    
-    # Busca geral de respaldo na frota
-    query_geral = text("""
+    # Consulta direta e segura na tabela de tarefas
+    query = text("""
         SELECT data, prefixo, descricao, COALESCE(executor, 'Não informado') as executor, numero_os 
         FROM tarefas 
         WHERE empresa_id = :eid
-        ORDER BY id DESC LIMIT 30
+        ORDER BY id DESC LIMIT 25
     """)
     
     try:
         historico_formatado = []
-        vistos = set()
+        with engine.connect() as conn:
+            resultados = conn.execute(query, {"eid": str(emp_id)}).fetchall()
+            
+            for r in resultados:
+                # r[0]=data, r[1]=prefixo, r[2]=descricao, r[3]=executor, r[4]=numero_os
+                dt = str(r[0]) if r[0] else "Data S/N"
+                pref = str(r[1]) if r[1] else "S/P"
+                desc = str(r[2]).strip() if r[2] else ""
+                execut = str(r[3]) if r[3] else "Não informado"
+                num_os = f"OS {r[4]}" if r[4] else "Sem Nº"
+                
+                linha = f"- Data: {dt} | Veículo {pref} | {num_os} | Serviço: {desc} | Mecânico: {execut}"
+                historico_formatado.append(linha)
+
+        return historico_formatado
+    except Exception as e:
+        # Se houver qualquer erro no banco, retorna o erro impresso para sabermos o motivo exato
+        return [f"Erro ao buscar histórico: {str(e)}"]
         
         with engine.connect() as conn:
             if prefixo and prefixo != "Não informado":
