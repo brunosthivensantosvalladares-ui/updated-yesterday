@@ -564,7 +564,7 @@ def renderizar_chat_flutuante(emp_id):
                 with st.chat_message(msg["role"], avatar=avatar):
                     st.markdown(msg["content"])
 
-        # --- CAPTAÇÃO DE VOZ OTIMIZADA VIA GOOGLE SPEECH (SEM EXIGIR FFMEG) ---
+        # --- CAPTAÇÃO DE VOZ CORRIGIDA PARA STREAMLIT AUDIO INPUT ---
         audio_file = st.audio_input("🎤 Falar por voz", key="audio_input_halley")
         
         texto_transcrito = None
@@ -572,26 +572,21 @@ def renderizar_chat_flutuante(emp_id):
             with st.spinner("🎧 Transcrevendo áudio..."):
                 try:
                     import speech_recognition as sr
-                    import tempfile
+                    import io
                     
-                    # Salva os bytes do st.audio_input em um arquivo temporário WAV
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as f:
-                        f.write(audio_file.getvalue())
-                        caminho_temp = f.name
+                    # Lê os bytes do arquivo de áudio enviado pelo st.audio_input
+                    audio_bytes = audio_file.read()
                     
                     r = sr.Recognizer()
-                    with sr.AudioFile(caminho_temp) as source:
+                    # Utiliza io.BytesIO para ler o stream de áudio diretamente sem falhas de extensão
+                    with sr.AudioFile(io.BytesIO(audio_bytes)) as source:
                         audio_data = r.record(source)
-                        # Utiliza o serviço web gratuito de reconhecimento do Google em português
                         texto_transcrito = r.recognize_google(audio_data, language="pt-BR")
                         
-                    # Remove o arquivo temporário após o uso
-                    if os.path.exists(caminho_temp):
-                        os.remove(caminho_temp)
-                        
-                except Exception:
+                except Exception as e:
+                    # Caso o navegador grave em um formato que o decodificador exija conversão, orientamos o fallback limpo
                     texto_transcrito = None
-                    st.warning("⚠️ Não foi possível capturar o áudio automaticamente. Por favor, digite sua mensagem abaixo.")
+                    st.warning("⚠️ Formato de áudio não suportado diretamente pelo navegador neste dispositivo. Por favor, digite sua mensagem abaixo.")
 
         prompt_texto = st.chat_input("Dúvida técnica ou agendar OS...", key="chat_flutuante_input")
         
