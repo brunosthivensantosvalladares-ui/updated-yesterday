@@ -564,26 +564,34 @@ def renderizar_chat_flutuante(emp_id):
                 with st.chat_message(msg["role"], avatar=avatar):
                     st.markdown(msg["content"])
 
-        # --- CAPTAÇÃO DE VOZ DIRETO NO CHAT (COM TRATAMENTO DE ERRO CASO FALTE O WHISPER) ---
+        # --- CAPTAÇÃO DE VOZ OTIMIZADA VIA GOOGLE SPEECH (SEM EXIGIR FFMEG) ---
         audio_file = st.audio_input("🎤 Falar por voz", key="audio_input_halley")
         
         texto_transcrito = None
         if audio_file is not None:
             with st.spinner("🎧 Transcrevendo áudio..."):
                 try:
-                    import whisper
+                    import speech_recognition as sr
                     import tempfile
                     
+                    # Salva os bytes do st.audio_input em um arquivo temporário WAV
                     with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as f:
                         f.write(audio_file.getvalue())
                         caminho_temp = f.name
                     
-                    model = whisper.load_model("base")
-                    resultado_whisper = model.transcribe(caminho_temp, language="pt")
-                    texto_transcrito = resultado_whisper["text"].strip()
+                    r = sr.Recognizer()
+                    with sr.AudioFile(caminho_temp) as source:
+                        audio_data = r.record(source)
+                        # Utiliza o serviço web gratuito de reconhecimento do Google em português
+                        texto_transcrito = r.recognize_google(audio_data, language="pt-BR")
+                        
+                    # Remove o arquivo temporário após o uso
+                    if os.path.exists(caminho_temp):
+                        os.remove(caminho_temp)
+                        
                 except Exception:
                     texto_transcrito = None
-                    st.warning("⚠️ Transcrição de áudio indisponível neste ambiente (biblioteca Whisper/FFmpeg não instalada). Por favor, digite sua mensagem abaixo.")
+                    st.warning("⚠️ Não foi possível capturar o áudio automaticamente. Por favor, digite sua mensagem abaixo.")
 
         prompt_texto = st.chat_input("Dúvida técnica ou agendar OS...", key="chat_flutuante_input")
         
