@@ -562,36 +562,74 @@ def renderizar_chat_flutuante(emp_id):
                 with st.chat_message(msg["role"], avatar=avatar):
                     st.markdown(msg["content"])
 
-        # --- GRAVADOR DE VOZ ROBUSTO VIA STREAMLIT-MIC-RECORDER ---
-        texto_transcrito = None
-        try:
-            col_mic, col_txt = st.columns([0.25, 0.75])
-            with col_mic:
-                voz_gravada = mic_recorder(
-                    start_prompt="🎤 Falar",
-                    stop_prompt="⏹️ Parar",
-                    key='mic_halley'
-                )
-            with col_txt:
-                st.caption("Toque em Falar para gravar sua voz.")
+        # --- CAPTAÇÃO DE VOZ NATIVA VIA JAVASCRIPT (WEB SPEECH API) ---
+        voz_html = """
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+            <button id="btnVoz" onclick="ouvirVoz()" style="background-color: #3B2E25; color: #C5A059; border: 1.5px solid #C5A059; border-radius: 8px; padding: 6px 12px; cursor: pointer; font-weight: bold; font-size: 0.85rem; display: flex; align-items: center; gap: 6px;">
+                🎤 <span id="txtVoz">Falar por Voz</span>
+            </button>
+            <span id="lblStatus" style="font-size: 0.75rem; color: #666; font-style: italic;"></span>
+        </div>
+        <script>
+            function ouvirVoz() {
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                if (!SpeechRecognition) {
+                    alert("Seu navegador não suporta reconhecimento de voz.");
+                    return;
+                }
+                const recognition = new SpeechRecognition();
+                recognition.lang = 'pt-BR';
+                recognition.interimResults = false;
+                
+                document.getElementById('btnVoz').style.backgroundColor = '#C5A059';
+                document.getElementById('btnVoz').style.color = '#3B2E25';
+                document.getElementById('txtVoz').textContent = 'Ouvindo...';
+                document.getElementById('lblStatus').textContent = 'Pode falar o problema do veículo.';
 
-            if voz_gravada:
-                audio_bytes = voz_gravada.get('bytes')
-                if audio_bytes:
-                    with st.spinner("🎧 Convertendo áudio..."):
-                        try:
-                            r = sr.Recognizer()
-                            with sr.AudioFile(BytesIO(audio_bytes)) as source:
-                                audio_data = r.record(source)
-                                texto_transcrito = r.recognize_google(audio_data, language="pt-BR")
-                        except Exception:
-                            st.warning("⚠️ Não foi possível transcrever. Digite sua mensagem abaixo.")
-        except Exception:
-            pass
+                recognition.onresult = function(event) {
+                    const textoFalado = event.results[0][0].transcript;
+                    if (textoFalado) {
+                        try {
+                            const parentWindow = window.parent;
+                            const url = new URL(parentWindow.location.href);
+                            url.searchParams.set('voz_prompt', textoFalado);
+                            parentWindow.location.href = url.href;
+                        } catch (e) {
+                            window.parent.location.search = '?voz_prompt=' + encodeURIComponent(textoFalado);
+                        }
+                    }
+                };
+
+                recognition.onerror = function() {
+                    document.getElementById('lblStatus').textContent = 'Erro ao ouvir. Tente novamente.';
+                    resetarBotao();
+                };
+
+                recognition.onend = function() {
+                    resetarBotao();
+                };
+
+                recognition.start();
+            }
+
+            function resetarBotao() {
+                document.getElementById('btnVoz').style.backgroundColor = '#3B2E25';
+                document.getElementById('btnVoz').style.color = '#C5A059';
+                document.getElementById('txtVoz').textContent = 'Falar por Voz';
+            }
+        </script>
+        """
+        components.html(voz_html, height=42)
+
+        # --- CAPTURA O TEXTO FALADO VINDO DA URL ---
+        texto_capturado = None
+        if "voz_prompt" in st.query_params:
+            texto_capturado = st.query_params.get("voz_prompt")
+            del st.query_params["voz_prompt"]
 
         prompt_texto = st.chat_input("Dúvida técnica ou agendar OS...", key="chat_flutuante_input")
         
-        prompt = texto_transcrito if texto_transcrito else prompt_texto
+        prompt = texto_capturado if texto_capturado else prompt_texto
 
         if prompt:
             st.session_state.chat_aberto_usuario = True
