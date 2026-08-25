@@ -124,7 +124,7 @@ def obter_llm():
         return None
     return ChatGroq(
         groq_api_key=api_key,
-        model_name="llama-3.1-8b-instant",
+        model_name="llama-3.3-70b-versatile",
         temperature=0.0,
         max_retries=2
     )
@@ -206,7 +206,7 @@ REGRAS DE RESPOSTA:
 2. Se não houver registro com a mesma causa raiz:
    - Inicie OBRIGATORIAMENTE com: "Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se"
 3. Proibido usar saudações ou apresentações.
-4. Complete a recomendação indicando ações mecânicas precisas no infinitivo (ex: substituir bicos injetores, alinhar geometria, inspecionar chicote elétrico, testar compressão), citando os componentes reais envolvidos e evitando repetir o texto bruto do sintoma de forma genérica (20 a 35 palavras).
+4. Complete a recomendação indicando ações no infinitivo com precisão de diagnóstico (20 a 35 palavras).
 """
 
     prompt = ChatPromptTemplate.from_template(template)
@@ -222,9 +222,9 @@ REGRAS DE RESPOSTA:
         return resposta.content.strip()
     except Exception:
         if historicos:
-            return f"Baseado no histórico local da frota, recomenda-se inspeção técnica detalhada e aferição dos componentes do sistema."
-        return f"Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se varredura eletrônica e testes práticos de bancada."
-        
+            return f"Baseado no histórico local da frota, recomenda-se inspeção técnica do sistema de {sintoma}."
+        return f"Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se inspeção técnica do sistema de {sintoma}."
+
 # --- PROCESSAMENTO DETERMINÍSTICO DE ABERTURA DE OS VIA CHAT ---
 def processar_comando_os(texto_usuario, emp_id):
     """Gerencia a coleta progressiva exigindo Prefixo, Descrição, Mecânico, Data e Área."""
@@ -445,7 +445,7 @@ def responder_chat_mr_halley(mensagem_usuario, emp_id):
 
     llm = obter_llm()
     if not llm:
-        return "Desculpe, a conexão com a IA (GROQ_API_KEY) não está configurada nos Secrets del Streamlit."
+        return "Desculpe, a conexão com a IA (GROQ_API_KEY) não está configurada nos Secrets do Streamlit."
 
     contexto_foco_atual = "Nenhum chamado foi analisado recentemente nesta tela."
     if "analises_halley" in st.session_state and st.session_state.analises_halley:
@@ -489,7 +489,7 @@ DIRETRIZES DE RESPOSTA:
         return resposta.content.strip()
     except Exception as e:
         return f"Erro ao processar consulta: {str(e)}"
-
+        
 # --- CHAT FLUTUANTE EM CSS/HTML + PYTHON COM ESTADO PERSISTENTE ---
 def renderizar_chat_flutuante(emp_id):
     URL_AVATAR_HALLEY = "https://i.postimg.cc/5tBtrL6C/Whats-App-Image-2026-07-23-at-22-35-53.png"
