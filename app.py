@@ -743,17 +743,18 @@ st.markdown(f"""
         font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif !important;
     }}
 
+    /* RESTAURA O CABEÇALHO NATIVO COM ALTURA ADEQUADA PARA O BOTÃO COMPARTILHAR */
     header[data-testid="stHeader"] {{
         background: transparent !important;
         visibility: visible !important;
         display: block !important;
-        height: 2.5rem !important;
+        height: 3rem !important;
     }}
     
-    /* ZERA O ESPAÇAMENTO NATIVO DO STREAMLIT NO TOPO */
+    /* ZERA O ESPAÇAMENTO NATIVO DO STREAMLIT NO TOPO SEM CORTAR O LOGO */
     .main, .main .block-container, div[data-testid="stMainBlockContainer"], div[data-testid="stAppViewBlockContainer"] {{
         padding-top: 0rem !important;
-        margin-top: -1rem !important; /* Puxa todo o container raiz do Streamlit para cima */
+        margin-top: 0rem !important; 
     }}
     
     /* ========================================================= */
@@ -942,14 +943,14 @@ st.markdown(f"""
         -webkit-text-fill-color: {COR_TEXTO} !important;
     }}
 
-   /* PUXA APENAS O SEU CABEÇALHO PARA CIMA VISUALMENTE */
+   /* ANCORAGEM PERFEITA LOGO ABAIXO DA BARRA SUPERIOR */
     .top-fixed-section {{
         position: -webkit-sticky !important;
         position: sticky !important;
         top: 0px !important;
         z-index: 99999 !important;
         background-color: #F7F5F0 !important;
-        padding-top: 0px !important;  /* <--- Zera o preenchimento interno superior */
+        padding-top: 0px !important; 
         padding-bottom: 2px !important;
         border-bottom: 1.5px solid #E2D9CB !important;
         box-shadow: 0 4px 16px rgba(35, 31, 32, 0.06) !important;
@@ -958,7 +959,7 @@ st.markdown(f"""
         padding-left: 1.5rem !important;
         padding-right: 1.5rem !important;
         margin-bottom: 10px !important;
-        transform: translateY(-115px) !important; /* <--- Joga todo o conjunto de busca para o topo absoluto */
+        transform: translateY(-115px) !important; 
     }}
     
     /* Compactação dos Inputs e Botões do Header */
