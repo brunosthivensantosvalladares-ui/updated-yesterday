@@ -563,44 +563,15 @@ def renderizar_chat_flutuante(emp_id):
                 with st.chat_message(msg["role"], avatar=avatar):
                     st.markdown(msg["content"])
 
-        # --- CAPTAÇÃO DE VOZ ROBUSTA VIA BOKEH EVENTS & WEB SPEECH API ---
-        stt_button = Button(label="🎤 Falar por Voz", width=140, height=35)
-        stt_button.js_on_event("button_click", CustomJS(code="""
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if (!SpeechRecognition) {
-                alert("Seu navegador não suporta reconhecimento de voz.");
-                return;
-            }
-            const recognition = new SpeechRecognition();
-            recognition.lang = 'pt-BR';
-            recognition.interimResults = false;
-            
-            recognition.onresult = function(e) {
-                const texto = e.results[0][0].transcript;
-                document.dispatchEvent(new CustomEvent('GET_TEXT', {detail: texto}));
-                recognition.stop();
-            };
-            recognition.onerror = function(e) {
-                recognition.stop();
-            };
-            recognition.start();
-        """))
-
-        result = streamlit_bokeh_events(
-            stt_button,
-            events="GET_TEXT",
-            key="listen_mic_halley",
-            refresh_on_update=False,
-            debounce_time=0
-        )
-
-        texto_voz = None
-        if result:
-            texto_voz = result.get("GET_TEXT")
+        # --- CAPTURA O TEXTO FALADO VINDO DA URL (SE HOUVER) ---
+        texto_capturado = None
+        if "voz_prompt" in st.query_params:
+            texto_capturado = st.query_params.get("voz_prompt")
+            del st.query_params["voz_prompt"]
 
         prompt_texto = st.chat_input("Dúvida técnica ou agendar OS...", key="chat_flutuante_input")
         
-        prompt = texto_voz if texto_voz else prompt_texto
+        prompt = texto_capturado if texto_capturado else prompt_texto
 
         if prompt:
             st.session_state.chat_aberto_usuario = True
