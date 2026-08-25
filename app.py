@@ -157,23 +157,25 @@ def chamar_groq_direto(prompt_texto, api_key):
     except Exception as e:
         return f"Erro de conexão: {str(e)}"
 
-# --- BUSCA DE HISTÓRICO INTELIGENTE E BLINDADA ---
+# --- BUSCA DE HISTÓRICO COMPLETA (TODAS AS OSs DO VEÍCULO) ---
 def buscar_historico_relevante(sintoma, emp_id, prefixo=None):
-    """Busca ordens de serviço anteriores priorizando o mesmo veículo e geral da frota."""
+    """Busca todas as ordens de serviço históricas do veículo específico e o recente da frota."""
     engine = get_engine()
     
-    query_especifica = text("""
+    # Busca 100% sem limites de todas as OSs do veículo específico
+    query_todos_veiculo = text("""
         SELECT data, prefixo, descricao, COALESCE(executor, 'Não informado') as executor, numero_os 
         FROM tarefas 
         WHERE empresa_id = :eid AND LOWER(prefixo) = LOWER(:pref)
-        ORDER BY id DESC LIMIT 15
+        ORDER BY id DESC
     """)
     
-    query_geral = text("""
+    # Busca geral recente da frota para contexto amplo
+    query_frota_recente = text("""
         SELECT data, prefixo, descricao, COALESCE(executor, 'Não informado') as executor, numero_os 
         FROM tarefas 
         WHERE empresa_id = :eid
-        ORDER BY id DESC LIMIT 25
+        ORDER BY id DESC LIMIT 20
     """)
     
     try:
@@ -181,30 +183,38 @@ def buscar_historico_relevante(sintoma, emp_id, prefixo=None):
         vistos = set()
         
         with engine.connect() as conn:
-            # 1. Tenta buscar primeiro do veículo específico
+            # 1. Puxa TODAS as manutenções da história desse veículo
             if prefixo and prefixo != "Não informado":
-                resultados_esp = conn.execute(query_especifica, {"eid": str(emp_id), "pref": str(prefixo)}).fetchall()
-                for r in resultados_esp:
-                    dt_formatada = str(r[0]) if r[0] else "Data S/N"
-                    os_num = f"OS {r[4]}" if r[4] else "Sem Nº"
-                    linha = f"[HISTÓRICO DO VEÍCULO {r[1]}] Data: {dt_formatada} | {os_num} | Serviço: {str(r[2]).strip()} | Executor: {r[3]}"
-                    chave = (dt_formatada, str(r[1]), str(r[2]).strip().lower())
+                res_veiculo = conn.execute(query_todos_veiculo, {"eid": str(emp_id), "pref": str(prefixo)}).fetchall()
+                for r in res_veiculo:
+                    dt = str(r[0]) if r[0] else "Data S/N"
+                    pref = str(r[1]) if r[1] else "S/P"
+                    desc = str(r[2]).strip() if r[2] else ""
+                    execut = str(r[3]) if r[3] else "Não informado"
+                    num_os = f"OS {r[4]}" if r[4] else "Sem Nº"
+                    
+                    linha = f"[HISTÓRICO COMPLETO DO VEÍCULO {pref}] Data: {dt} | {num_os} | Serviço: {desc} | Mecânico: {execut}"
+                    chave = (dt, pref, desc.lower())
                     if chave not in vistos:
                         vistos.add(chave)
                         historico_formatado.append(linha)
 
-            # 2. Completa com o histórico geral da frota
-            resultados_ger = conn.execute(query_geral, {"eid": str(emp_id)}).fetchall()
-            for r in resultados_ger:
-                dt_formatada = str(r[0]) if r[0] else "Data S/N"
-                os_num = f"OS {r[4]}" if r[4] else "Sem Nº"
-                linha = f"[Frota] Data: {dt_formatada} | Veículo {r[1]} | {os_num} | Serviço: {str(r[2]).strip()} | Executor: {r[3]}"
-                chave = (dt_formatada, str(r[1]), str(r[2]).strip().lower())
+            # 2. Completa com o histórico recente da frota
+            res_frota = conn.execute(query_frota_recente, {"eid": str(emp_id)}).fetchall()
+            for r in res_frota:
+                dt = str(r[0]) if r[0] else "Data S/N"
+                pref = str(r[1]) if r[1] else "S/P"
+                desc = str(r[2]).strip() if r[2] else ""
+                execut = str(r[3]) if r[3] else "Não informado"
+                num_os = f"OS {r[4]}" if r[4] else "Sem Nº"
+                
+                linha = f"[Frota Geral] Data: {dt} | Veículo {pref} | {num_os} | Serviço: {desc} | Mecânico: {execut}"
+                chave = (dt, pref, desc.lower())
                 if chave not in vistos:
                     vistos.add(chave)
                     historico_formatado.append(linha)
 
-        return historico_formatado[:25]
+        return historico_formatado[:50]
     except Exception as e:
         return [f"Erro ao buscar histórico: {str(e)}"]
 
