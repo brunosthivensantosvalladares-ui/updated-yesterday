@@ -560,8 +560,7 @@ def renderizar_chat_flutuante(emp_id):
                 with st.chat_message(msg["role"], avatar=avatar):
                     st.markdown(msg["content"])
 
-        # --- COMPONENTE DE GRAVAÇÃO DE VOZ NATIVO VIA JS (WEB SPEECH API) ---
-        # Este componente usa o recurso do próprio navegador do celular/PC de graça e sem erros de codec
+        # --- COMPONENTE DE GRAVAÇÃO DE VOZ CORRIGIDO (COM COMUNICAÇÃO SEGURA COM A PÁGINA PAI) ---
         audio_html = """
         <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
             <button id="micBtn" onclick="toggleSpeech()" style="background-color: #3B2E25; color: #C5A059; border: 1.5px solid #C5A059; border-radius: 8px; padding: 6px 12px; cursor: pointer; font-weight: bold; font-size: 0.85rem; display: flex; align-items: center; gap: 6px;">
@@ -591,18 +590,19 @@ def renderizar_chat_flutuante(emp_id):
                         document.getElementById('micBtn').style.backgroundColor = '#C5A059';
                         document.getElementById('micBtn').style.color = '#3B2E25';
                         document.getElementById('micText').textContent = 'Ouvindo...';
-                        document.getElementById('statusVoz').textContent = 'Pode falar o que aconteceu com o veículo.';
+                        document.getElementById('statusVoz').textContent = 'Pode falar o que aconteceu.';
                     };
 
                     recognition.onresult = function(event) {
                         const speechResult = event.results[0][0].transcript;
-                        // Encontra o input de texto nativo do Streamlit na página e preenche com a voz
-                        const textInputs = window.parent.document.querySelectorAll('input[type="text"]');
-                        for (let input of textInputs) {
-                            if (input.placeholder && input.placeholder.includes("Dúvida técnica")) {
-                                input.value = speechResult;
-                                input.dispatchEvent(new Event('input', { bubbles: true }));
-                                break;
+                        if (speechResult) {
+                            try {
+                                const parentWindow = window.parent;
+                                const url = new URL(parentWindow.location.href);
+                                url.searchParams.set('voz_prompt', speechResult);
+                                parentWindow.location.href = url.href;
+                            } catch (e) {
+                                window.parent.location.search = '?voz_prompt=' + encodeURIComponent(speechResult);
                             }
                         }
                     };
