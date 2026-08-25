@@ -12,6 +12,8 @@ import time as time_module
 import requests
 import re
 import streamlit.components.v1 as components
+import speech_recognition as sr
+from streamlit_mic_recorder import mic_recorder
 
 # --- FUNÇÃO PARA PUXAR O TOPO PARA CIMA (ELIMINA O ESPAÇO VAZIO) ---
 def puxar_topo_para_cima():
