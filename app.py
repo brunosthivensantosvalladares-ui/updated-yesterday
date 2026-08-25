@@ -507,7 +507,6 @@ DIRETRIZES DE RESPOSTA:
     except Exception as e:
         return f"Erro ao processar consulta: {str(e)}"
 
-# --- CHAT FLUTUANTE EM CSS/HTML + PYTHON COM ESTADO PERSISTENTE ---
 def renderizar_chat_flutuante(emp_id):
     URL_AVATAR_HALLEY = "https://i.postimg.cc/5tBtrL6C/Whats-App-Image-2026-07-23-at-22-35-53.png"
     
@@ -535,16 +534,13 @@ def renderizar_chat_flutuante(emp_id):
             border-radius: 12px !important;
             box-shadow: 0px 6px 20px rgba(0, 0, 0, 0.25) !important;
         }
-
         details[data-testid="stExpander"][open] {
             max-height: 80vh !important;
         }
-
         div[data-testid="stExpander"] div[data-testid="stChatMessage"] p {
             font-size: 0.95rem !important;
             line-height: 1.45 !important;
         }
-
         div[data-testid="stExpander"] div[data-testid="stChatMessage"] img,
         div[data-testid="stExpander"] div[data-testid="stChatMessageAvatarCustom"] {
             width: 44px !important;
@@ -564,30 +560,80 @@ def renderizar_chat_flutuante(emp_id):
                 with st.chat_message(msg["role"], avatar=avatar):
                     st.markdown(msg["content"])
 
-        # --- CAPTAÇÃO DE VOZ CORRIGIDA PARA STREAMLIT AUDIO INPUT ---
-        audio_file = st.audio_input("🎤 Falar por voz", key="audio_input_halley")
-        
-        texto_transcrito = None
-        if audio_file is not None:
-            with st.spinner("🎧 Transcrevendo áudio..."):
-                try:
-                    import speech_recognition as sr
-                    import io
-                    
-                    # Lê os bytes do arquivo de áudio enviado pelo st.audio_input
-                    audio_bytes = audio_file.read()
-                    
-                    r = sr.Recognizer()
-                    # Utiliza io.BytesIO para ler o stream de áudio diretamente sem falhas de extensão
-                    with sr.AudioFile(io.BytesIO(audio_bytes)) as source:
-                        audio_data = r.record(source)
-                        texto_transcrito = r.recognize_google(audio_data, language="pt-BR")
-                        
-                except Exception as e:
-                    # Caso o navegador grave em um formato que o decodificador exija conversão, orientamos o fallback limpo
-                    texto_transcrito = None
-                    st.warning("⚠️ Formato de áudio não suportado diretamente pelo navegador neste dispositivo. Por favor, digite sua mensagem abaixo.")
+        # --- COMPONENTE DE GRAVAÇÃO DE VOZ NATIVO VIA JS (WEB SPEECH API) ---
+        # Este componente usa o recurso do próprio navegador do celular/PC de graça e sem erros de codec
+        audio_html = """
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+            <button id="micBtn" onclick="toggleSpeech()" style="background-color: #3B2E25; color: #C5A059; border: 1.5px solid #C5A059; border-radius: 8px; padding: 6px 12px; cursor: pointer; font-weight: bold; font-size: 0.85rem; display: flex; align-items: center; gap: 6px;">
+                🎤 <span id="micText">Falar por Voz</span>
+            </button>
+            <span id="statusVoz" style="font-size: 0.75rem; color: #666; font-style: italic;"></span>
+        </div>
+        <script>
+            let recognition;
+            let isRecording = false;
 
+            function toggleSpeech() {
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                if (!SpeechRecognition) {
+                    alert("Seu navegador não suporta reconhecimento de voz.");
+                    return;
+                }
+
+                if (!isRecording) {
+                    recognition = new SpeechRecognition();
+                    recognition.lang = 'pt-BR';
+                    recognition.interimResults = false;
+                    recognition.maxAlternatives = 1;
+
+                    recognition.onstart = function() {
+                        isRecording = true;
+                        document.getElementById('micBtn').style.backgroundColor = '#C5A059';
+                        document.getElementById('micBtn').style.color = '#3B2E25';
+                        document.getElementById('micText').textContent = 'Ouvindo...';
+                        document.getElementById('statusVoz').textContent = 'Pode falar o que aconteceu com o veículo.';
+                    };
+
+                    recognition.onresult = function(event) {
+                        const speechResult = event.results[0][0].transcript;
+                        // Encontra o input de texto nativo do Streamlit na página e preenche com a voz
+                        const textInputs = window.parent.document.querySelectorAll('input[type="text"]');
+                        for (let input of textInputs) {
+                            if (input.placeholder && input.placeholder.includes("Dúvida técnica")) {
+                                input.value = speechResult;
+                                input.dispatchEvent(new Event('input', { bubbles: true }));
+                                break;
+                            }
+                        }
+                    };
+
+                    recognition.onerror = function(event) {
+                        document.getElementById('statusVoz').textContent = 'Erro ao capturar voz. Tente digitar.';
+                        resetMic();
+                    };
+
+                    recognition.onend = function() {
+                        resetMic();
+                    };
+
+                    recognition.start();
+                } else {
+                    recognition.stop();
+                    resetMic();
+                }
+            }
+
+            function resetMic() {
+                isRecording = false;
+                document.getElementById('micBtn').style.backgroundColor = '#3B2E25';
+                document.getElementById('micBtn').style.color = '#C5A059';
+                document.getElementById('micText').textContent = 'Falar por Voz';
+            }
+        </script>
+        """
+        components.html(audio_html, height=45)
+
+        # Caixa de texto padrão do chat que recebe o texto falado ou digitado
         prompt = st.chat_input("Dúvida técnica ou agendar OS...", key="chat_flutuante_input")
 
         if prompt:
