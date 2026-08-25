@@ -1,6 +1,7 @@
 streamlit
 pandas
 sqlalchemy
+psycopg2-binary
 fpdf2
 requests
 openai-whisper
