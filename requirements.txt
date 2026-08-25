@@ -1,11 +1,11 @@
 streamlit
 pandas
-SQLAlchemy
-psycopg2-binary
-fpdf
-xlsxwriter
+sqlalchemy
+fpdf2
 requests
-langchain
-langchain-groq
+openai-whisper
 duckduckgo-search
+langchain-groq
+xlsxwriter
+SpeechRecognition
 streamlit-mic-recorder
