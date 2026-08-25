@@ -117,14 +117,14 @@ def get_engine():
         st.stop()
     return create_engine(db_url.replace("postgres://", "postgresql://", 1), pool_pre_ping=True)
 
-# --- CONFIGURAÇÃO DO MODELO LLAMA 3 (GROQ) & BUSCA WEB ---
+# --- CONFIGURAÇÃO DO MODELO LLAMA 3 (GROQ) ATUALIZADO ---
 def obter_llm():
     api_key = st.secrets.get("GROQ_API_KEY") or os.environ.get("GROQ_API_KEY")
     if not api_key:
         return None
     return ChatGroq(
         groq_api_key=api_key,
-        model_name="llama-3.1-70b-versatile",
+        model_name="llama-3.3-70b-versatile",
         temperature=0.0,
         max_retries=2
     )
@@ -340,7 +340,7 @@ Relato da Análise Recente: "{relato_contexto}"
 Referência da Data Atual do Sistema: {hoje}
 
 INSTRUÇÃO CRÍTICA DE INTERRUPÇÃO:
-- Se houver um rascunho de OS em andamento ou aguardando confirmação, MAS a mensagem atual do usuário for uma DUVIDA TÉCNICA (ex: por que o pneu fura, falha no motor), uma PERGUNTA SOBRE O FUNCIONALIDADE/SITE (ex: como usar a agenda, quais funcionalidades você possui) ou qualquer assunto que NÃO seja estritamente o fornecimento do dado faltante para a OS:
+- Se houver um rascunho de OS em andamento ou aguardando confirmação, MAS a mensagem atual do usuário for uma DUVIDA TÉCNICA (ex: por que o pneu fura, falha no motor), uma PERGUNTA SOBRE O FUNCIONALIDADE/SITE (ex: como uso a agenda, quais funcionalidades você possui) ou qualquer assunto que NÃO seja estritamente o fornecimento do dado faltante para a OS:
   --> Você DEVE AUTOMATICAMENTE CANCELAR E DESCARTAR o fluxo de OS ("em_fluxo_os": false) e responder à pergunta do usuário de forma prestativa, explicando o funcionamento do site ou tirando a dúvida mecânica.
 
 Se NÃO for assunto de OS e NÃO houver fluxo em andamento:
@@ -564,7 +564,7 @@ def renderizar_chat_flutuante(emp_id):
                 with st.chat_message(msg["role"], avatar=avatar):
                     st.markdown(msg["content"])
 
-        # --- CAPTAÇÃO DE VOZ DIRETO NO CHAT (WHISPER LOCAL / ZERO CUSTO) ---
+        # --- CAPTAÇÃO DE VOZ DIRETO NO CHAT (COM TRATAMENTO DE ERRO CASO FALTE O WHISPER) ---
         audio_file = st.audio_input("🎤 Falar por voz", key="audio_input_halley")
         
         texto_transcrito = None
@@ -582,7 +582,8 @@ def renderizar_chat_flutuante(emp_id):
                     resultado_whisper = model.transcribe(caminho_temp, language="pt")
                     texto_transcrito = resultado_whisper["text"].strip()
                 except Exception:
-                    texto_transcrito = "Não foi possível transcrever o áudio. Por favor, digite."
+                    texto_transcrito = None
+                    st.warning("⚠️ Transcrição de áudio indisponível neste ambiente (biblioteca Whisper/FFmpeg não instalada). Por favor, digite sua mensagem abaixo.")
 
         prompt_texto = st.chat_input("Dúvida técnica ou agendar OS...", key="chat_flutuante_input")
         
