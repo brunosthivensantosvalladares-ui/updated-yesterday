@@ -547,7 +547,31 @@ def renderizar_chat_flutuante(emp_id):
                 with st.chat_message(msg["role"], avatar=avatar):
                     st.markdown(msg["content"])
 
-        if prompt := st.chat_input("Dúvida técnica ou agendar OS...", key="chat_flutuante_input"):
+        # --- CAPTAÇÃO DE VOZ DIRETO NO CHAT (WHISPER LOCAL / ZERO CUSTO) ---
+        audio_file = st.audio_input("🎤 Falar por voz", key="audio_input_halley")
+        
+        texto_transcrito = None
+        if audio_file is not None:
+            with st.spinner("🎧 Transcrevendo áudio..."):
+                try:
+                    import whisper
+                    import tempfile
+                    
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as f:
+                        f.write(audio_file.getvalue())
+                        caminho_temp = f.name
+                    
+                    model = whisper.load_model("base")
+                    resultado_whisper = model.transcribe(caminho_temp, language="pt")
+                    texto_transcrito = resultado_whisper["text"].strip()
+                except Exception:
+                    texto_transcrito = "Não foi possível transcrever o áudio. Por favor, digite."
+
+        prompt_texto = st.chat_input("Dúvida técnica ou agendar OS...", key="chat_flutuante_input")
+        
+        prompt = texto_transcrito if texto_transcrito else prompt_texto
+
+        if prompt:
             st.session_state.chat_aberto_usuario = True
             st.session_state.mensagens_chat_halley.append({"role": "user", "content": prompt})
             with chat_box:
@@ -2627,7 +2651,7 @@ else:
         if not df_users.empty:
             df_users['Exc'] = False
             ed_users = st.data_editor(
-                df_users[['Exc', 'login', 'cargo', 'id']], 
+                df_users[['Exc'], ['login', 'cargo', 'id']], 
                 hide_index=True, 
                 use_container_width=True, 
                 column_config={
