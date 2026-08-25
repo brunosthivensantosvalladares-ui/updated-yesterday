@@ -202,59 +202,53 @@ def buscar_historico_relevante(sintoma, emp_id, prefixo=None):
     except Exception:
         return []
 
+# --- TRIAGEM DO MR. HALLEY BLINDADA E EXPLICITA ---
 def triagem_mr_halley(sintoma, emp_id, prefixo=None, incluir_saudacao=False):
-    # Passa o prefixo para a busca afunilar direto no veículo correto
-    historicos = buscar_historico_relevante(sintoma, emp_id, prefixo=prefixo)
-    llm = obter_llm()
-    
-    if not llm:
-        return f"Recomenda-se verificação técnica preventiva para o sistema de {sintoma}."
+    try:
+        llm = obter_llm()
+        historicos = buscar_historico_relevante(sintoma, emp_id, prefixo=prefixo)
+        
+        if not llm:
+            return f"Erro: Chave da API Groq não configurada corretamente."
 
-    historico_formatado = "\n".join(historicos) if historicos else "Nenhum registro anterior cadastrado no banco."
-    resultado_web = pesquisar_solucao_web(sintoma)
+        historico_formatado = "\n".join(historicos) if historicos else "Nenhum histórico anterior."
+        resultado_web = pesquisar_solucao_web(sintoma)
 
-    template = """
+        template = """
 Você é o assistente técnico Mr. Halley da plataforma Up 2 Today.
-Sua função é realizar a triagem técnica de manutenção com rigor de causa raiz e inteligência contextual.
+Analise a falha e dê um diagnóstico mecânico cirúrgico.
 
 Veículo: {prefixo}
-Sintoma Relatado: "{sintoma}"
+Sintoma: "{sintoma}"
 
-Histórico de Manutenções da Frota:
+Histórico da Frota:
 {historico_formatado}
 
-Dados Técnicos Externos (Web):
+Dados da Web:
 {contexto_web}
 
-CRITÉRIO DE AVALIAÇÃO DE HISTÓRICO:
-- Analise se o histórico acima traz manutenções passadas para este veículo ou frota relacionadas ao problema (ex: fumaça preta remete a injeção, turbo, filtros; direção puxando remete a alinhamento, suspensão).
-- Se houver correspondência de causa raiz, aponte-a diretamente.
-
 REGRAS DE RESPOSTA:
-1. Se houver registro correspondente no histórico da frota:
-   - Inicie OBRIGATORIAMENTE com: "Baseado no histórico local da frota, recomenda-se"
-2. Se não houver registro correspondente:
-   - Inicie OBRIGATORIAMENTE com: "Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se"
-3. Proibido usar saudações ou apresentações.
-4. Complete a recomendação indicando a ação corretiva exata no infinitivo (ex: substituir bicos injetores, aferir alinhamento, limpar coletor), citando componentes mecânicos reais e evitando repetir frases genéricas em caixa alta (20 a 35 palavras).
+1. Se houver OS anterior correlata no histórico, inicie obrigatoriamente com: "Baseado no histórico local da frota, recomenda-se"
+2. Se não houver, inicie obrigatoriamente com: "Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se"
+3. Proibido saudações.
+4. Descreva a ação técnica exata no infinitivo citando componentes específicos (ex: trocar bicos injetores, regular alinhamento de direção, substituir filtros de combustível) em até 35 palavras. NUNCA repita o sintoma de forma genérica.
 """
 
-    prompt = ChatPromptTemplate.from_template(template)
-    chain = prompt | llm
+        prompt = ChatPromptTemplate.from_template(template)
+        chain = prompt | llm
 
-    try:
         resposta = chain.invoke({
-            "prefixo": prefixo if prefixo else "Não informado",
-            "sintoma": sintoma,
-            "historico_formatado": historico_formatado,
-            "contexto_web": resultado_web[:600] if resultado_web else "Inspeção técnica padrão de montadora."
+            "prefixo": str(prefixo) if prefixo else "Não informado",
+            "sintoma": str(sintoma),
+            "historico_formatado": str(historico_formatado),
+            "contexto_web": str(resultado_web[:400]) if resultado_web else "Inspeção padrão."
         })
         return resposta.content.strip()
-    except Exception:
-        if historicos:
-            return f"Baseado no histórico local da frota, recomenda-se inspeção técnica detalhada e aferição dos componentes do sistema."
-        return f"Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se varredura eletrônica e testes práticos de bancada."
-
+        
+    except Exception as e:
+        # Mostra o erro exato na tela em vez de esconder com uma frase genérica
+        return f"⚠️ Erro interno na IA: {str(e)}"
+        
 # --- PROCESSAMENTO DETERMINÍSTICO DE ABERTURA DE OS VIA CHAT ---
 def processar_comando_os(texto_usuario, emp_id):
     """Gerencia a coleta progressiva exigindo Prefixo, Descrição, Mecânico, Data e Área."""
