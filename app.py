@@ -157,12 +157,15 @@ def chamar_groq_direto(prompt_texto, api_key):
     except Exception as e:
         return f"Erro de conexão: {str(e)}"
 
-# --- BUSCA DE HISTÓRICO COMPLETA (TODAS AS OSs DO VEÍCULO) ---
+# --- BUSCA DE HISTÓRICO COMPLETA (100% DAS OSs DO VEÍCULO) ---
 def buscar_historico_relevante(sintoma, emp_id, prefixo=None):
-    """Busca todas as ordens de serviço históricas do veículo específico e o recente da frota."""
+    """Busca todas as ordens de serviço históricas do veículo específico sem limite de paginação."""
     engine = get_engine()
     
-    # Busca 100% sem limites de todas as OSs do veículo específico
+    # Se o prefixo não veio explícito, tentamos capturar o último veículo da análise recente na tela
+    if (not prefixo or prefixo == "Não informado") and "analises_halley" in st.session_state and st.session_state.analises_halley:
+        prefixo = st.session_state.analises_halley[-1].get("veiculo")
+
     query_todos_veiculo = text("""
         SELECT data, prefixo, descricao, COALESCE(executor, 'Não informado') as executor, numero_os 
         FROM tarefas 
@@ -170,7 +173,6 @@ def buscar_historico_relevante(sintoma, emp_id, prefixo=None):
         ORDER BY id DESC
     """)
     
-    # Busca geral recente da frota para contexto amplo
     query_frota_recente = text("""
         SELECT data, prefixo, descricao, COALESCE(executor, 'Não informado') as executor, numero_os 
         FROM tarefas 
@@ -183,7 +185,6 @@ def buscar_historico_relevante(sintoma, emp_id, prefixo=None):
         vistos = set()
         
         with engine.connect() as conn:
-            # 1. Puxa TODAS as manutenções da história desse veículo
             if prefixo and prefixo != "Não informado":
                 res_veiculo = conn.execute(query_todos_veiculo, {"eid": str(emp_id), "pref": str(prefixo)}).fetchall()
                 for r in res_veiculo:
@@ -199,7 +200,6 @@ def buscar_historico_relevante(sintoma, emp_id, prefixo=None):
                         vistos.add(chave)
                         historico_formatado.append(linha)
 
-            # 2. Completa com o histórico recente da frota
             res_frota = conn.execute(query_frota_recente, {"eid": str(emp_id)}).fetchall()
             for r in res_frota:
                 dt = str(r[0]) if r[0] else "Data S/N"
@@ -256,9 +256,9 @@ REGRAS DE RESPOSTA:
     except Exception as e:
         return f"⚠️ Erro interno na IA: {str(e)}"
         
-# --- PROCESSAMENTO DETERMINÍSTICO DE ABERTURA DE OS VIA CHAT ---
+# --- PROCESSAMENTO DETERMINÍSTICO DE ABERTURA DE OS VIA CHAT (ATUALIZADO SEM LANGCHAIN) ---
 def processar_comando_os(texto_usuario, emp_id):
-    """Gerencia a coleta progressiva exigindo Prefixo, Descrição, Mecânico, Data e Área."""
+    """Gerencia a coleta progressiva exigindo Prefixo, Descrição, Mecânico, Data e Área com suporte a contexto da última OS."""
     if "rascunho_os" not in st.session_state:
         st.session_state.rascunho_os = None
     if "aguardando_confirmacao_os" not in st.session_state:
@@ -331,8 +331,8 @@ def processar_comando_os(texto_usuario, emp_id):
         except Exception as e:
             return f"❌ Ocorreu um erro ao salvar a OS no banco: {str(e)}"
 
-    llm = obter_llm()
-    if not llm:
+    api_key = obter_llm()
+    if not api_key:
         return None
 
     veiculo_contexto = "Não informado"
@@ -346,32 +346,28 @@ def processar_comando_os(texto_usuario, emp_id):
         mensagens_recentes = st.session_state.mensagens_chat_halley[-6:]
         ultimas_msgs = "\n".join([f"{m['role'].upper()}: {m['content']}" for m in mensagens_recentes])
 
-    template_fluxo = """
+    template_fluxo = f"""
 Você é o assistente Mr. Halley da plataforma Up 2 Today, especialista em agendamento de OS.
 
 Histórico Recente da Conversa no Chat:
-{ultimas_msgs}
+{ultimas_msgs if ultimas_msgs else "Nenhuma mensagem anterior."}
 
-Mensagem Atual do Usuário: "{mensagem}"
-Rascunho Existente: {rascunho_json}
-Em Fluxo de OS Ativo? {em_fluxo}
-Veículo em Análise Recente na Tela: {veiculo_contexto}
+Mensagem Atual do Usuário: "{texto_usuario}"
+Rascunho Existente: {json.dumps(rascunho, ensure_ascii=False)}
+Em Fluxo de OS Ativo? {bool(rascunho or st.session_state.aguardando_confirmacao_os)}
+Veículo em Análise Recente na Tela (Última OS / Foco): {veiculo_contexto}
 Relato da Análise Recente: "{relato_contexto}"
-Referência da Data Atual do Sistema: {hoje}
+Referência da Data Atual do Sistema: {hoje_str}
 
 CAMPOS DA OS:
-- prefixo: Número/placa do veículo (capture do contexto se for "esse veículo" ou "último veículo")
-- descricao: Descrição do problema/serviço (capture do contexto se for "mesmo problema")
+- prefixo: Número/placa do veículo. REGRA CRÍTICA: Se o usuário disser "desse veículo", "desse", "último", "dele" ou similar, capture obrigatoriamente o Veículo em Análise Recente na Tela ({veiculo_contexto}).
+- descricao: Descrição do problema/serviço. Se o usuário disser "mesmo problema" ou similar, capture o Relato da Análise Recente ({relato_contexto}).
 - executor: Mecânico ou responsável
-- data: Data no formato AAAA-MM-DD. REGRA CRÍTICA: Deixe NULO/VAZIO se o usuário NÃO tiver informado explicitamente uma data ou termos como "hoje", "amanhã", "17/08". NUNCA preencha automaticamente.
-- area: APENAS UMA DAS 5 OPÇÕES: Mecânica, Elétrica, Borracharia, Chapeamento ou Limpeza. Deixe NULO/VAZIO se o usuário não disse explicitamente.
-- turno: Não definido, Dia ou Noite (opcional)
-- inicio: Horário inicial no formato HH:MM (opcional)
-- fim: Horário final no formato HH:MM (opcional)
-
-REGRAS:
-1. Capture os dados da mensagem e do histórico recente.
-2. NUNCA assuma a Data nem a Área como padrão; deixe vazias se não forem informadas.
+- data: Data no formato AAAA-MM-DD. Deixe nulo se não informada.
+- area: APENAS UMA DAS 5 OPÇÕES: Mecânica, Elétrica, Borracharia, Chapeamento ou Limpeza. Deixe nulo se não informada.
+- turno: Não definido, Dia ou Noite
+- inicio: Horário inicial HH:MM
+- fim: Horário final HH:MM
 
 Responda EXCLUSIVAMENTE em formato JSON puro:
 
@@ -382,20 +378,8 @@ Se for fluxo de OS:
 {{"em_fluxo_os": true, "prefixo": "...", "descricao": "...", "executor": "...", "data": "...", "area": "...", "turno": "...", "inicio": "...", "fim": "..."}}
 """
 
-    prompt = ChatPromptTemplate.from_template(template_fluxo)
-    chain = prompt | llm
-
     try:
-        resultado = chain.invoke({
-            "ultimas_msgs": ultimas_msgs if ultimas_msgs else "Nenhuma mensagem anterior.",
-            "mensagem": texto_usuario,
-            "rascunho_json": json.dumps(rascunho, ensure_ascii=False),
-            "em_fluxo": bool(rascunho or st.session_state.aguardando_confirmacao_os),
-            "veiculo_contexto": veiculo_contexto,
-            "relato_contexto": relato_contexto,
-            "hoje": hoje_str
-        }).content.strip()
-
+        resultado = chamar_groq_direto(template_fluxo, api_key)
         resultado_limpo = resultado.replace("```json", "").replace("```", "").strip()
         dados = json.loads(resultado_limpo)
 
@@ -408,10 +392,13 @@ Se for fluxo de OS:
             if v and v not in ["...", "None", "null", "Não informado"]:
                 novo_rascunho[k] = v
 
-        if not novo_rascunho.get("prefixo") and veiculo_contexto != "Não informado":
-            novo_rascunho["prefixo"] = veiculo_contexto
-        if not novo_rascunho.get("descricao") and relato_contexto:
-            novo_rascunho["descricao"] = relato_contexto
+        if not novo_rascunho.get("prefixo") or str(novo_rascunho.get("prefixo")).lower() in ["desse", "desse veículo", "último"]:
+            if veiculo_contexto != "Não informado":
+                novo_rascunho["prefixo"] = veiculo_contexto
+                
+        if not novo_rascunho.get("descricao") or str(novo_rascunho.get("descricao")).lower() in ["mesmo problema", "problema"]:
+            if relato_contexto:
+                novo_rascunho["descricao"] = relato_contexto
 
         if not novo_rascunho.get("turno"):
             novo_rascunho["turno"] = "Não definido"
@@ -422,7 +409,6 @@ Se for fluxo de OS:
 
         st.session_state.rascunho_os = novo_rascunho
 
-        # Validação estrita dos 5 campos obrigatórios
         campos_faltantes = []
         if not novo_rascunho.get("prefixo"):
             campos_faltantes.append("Prefixo do Veículo")
@@ -453,7 +439,7 @@ Se for fluxo de OS:
             f"- **Turno:** {novo_rascunho.get('turno')}\n"
             f"- **Horário:** {novo_rascunho.get('inicio')} às {novo_rascunho.get('fim')}\n"
             f"- **Executor:** {novo_rascunho.get('executor')}\n\n"
-            f"👉 Digite **Ok** para confirmar ou informe ajustes (ex: *Mudar data para amanhã*, *Área Elétrica* ou *Horário 08:00 às 10:00*)."
+            f"👉 Digite **Ok** para confirmar ou informe ajustes."
         )
     except Exception:
         return None
