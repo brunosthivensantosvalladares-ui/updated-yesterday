@@ -9,6 +9,5 @@ duckduckgo-search
 langchain-groq
 xlsxwriter
 SpeechRecognition
-streamlit-mic-recorder
 bokeh
 streamlit-bokeh-events
