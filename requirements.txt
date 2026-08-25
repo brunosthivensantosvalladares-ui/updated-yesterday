@@ -8,3 +8,4 @@ requests
 langchain
 langchain-groq
 duckduckgo-search
+streamlit-mic-recorder
