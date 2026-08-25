@@ -509,6 +509,7 @@ DIRETRIZES DE RESPOSTA:
     except Exception as e:
         return f"Erro ao processar consulta: {str(e)}"
 
+# --- CHAT FLUTUANTE EM CSS/HTML + PYTHON COM ESTADO PERSISTENTE ---
 def renderizar_chat_flutuante(emp_id):
     URL_AVATAR_HALLEY = "https://i.postimg.cc/5tBtrL6C/Whats-App-Image-2026-07-23-at-22-35-53.png"
     
@@ -536,13 +537,16 @@ def renderizar_chat_flutuante(emp_id):
             border-radius: 12px !important;
             box-shadow: 0px 6px 20px rgba(0, 0, 0, 0.25) !important;
         }
+
         details[data-testid="stExpander"][open] {
             max-height: 80vh !important;
         }
+
         div[data-testid="stExpander"] div[data-testid="stChatMessage"] p {
             font-size: 0.95rem !important;
             line-height: 1.45 !important;
         }
+
         div[data-testid="stExpander"] div[data-testid="stChatMessage"] img,
         div[data-testid="stExpander"] div[data-testid="stChatMessageAvatarCustom"] {
             width: 44px !important;
@@ -563,39 +567,31 @@ def renderizar_chat_flutuante(emp_id):
                     st.markdown(msg["content"])
 
         # --- GRAVADOR DE VOZ ROBUSTO VIA STREAMLIT-MIC-RECORDER ---
+        texto_transcrito = None
         try:
-            from streamlit_mic_recorder import mic_recorder
-            
             col_mic, col_txt = st.columns([0.25, 0.75])
             with col_mic:
-                # Botão oficial de microfone para Streamlit
                 voz_gravada = mic_recorder(
                     start_prompt="🎤 Falar",
                     stop_prompt="⏹️ Parar",
                     key='mic_halley'
                 )
             with col_txt:
-                st.caption("Toque em Falar para gravar sua voz.")
+                st.caption("Toque em Falar para gravar.")
 
-            texto_transcrito = None
             if voz_gravada:
-                # Se o componente capturou o áudio em bytes
                 audio_bytes = voz_gravada.get('bytes')
                 if audio_bytes:
                     with st.spinner("🎧 Convertendo áudio..."):
                         try:
-                            import speech_recognition as sr
-                            import io
-                            
                             r = sr.Recognizer()
-                            with sr.AudioFile(io.BytesIO(audio_bytes)) as source:
+                            with sr.AudioFile(BytesIO(audio_bytes)) as source:
                                 audio_data = r.record(source)
                                 texto_transcrito = r.recognize_google(audio_data, language="pt-BR")
                         except Exception:
-                            # Fallback caso o navegador grave em webm/ogg comprimido
-                            st.warning("⚠️ Formato de áudio do navegador em uso. Por favor, digite abaixo ou use o microfone do teclado.")
-        except ImportError:
-            texto_transcrito = None
+                            st.warning("⚠️ Não foi possível transcrever. Digite sua mensagem abaixo.")
+        except Exception:
+            pass
 
         prompt_texto = st.chat_input("Dúvida técnica ou agendar OS...", key="chat_flutuante_input")
         
@@ -760,8 +756,8 @@ def gerar_pdf_manual_oficial_pro():
         "baixa imediata ou reagendar tarefas para o presente com um único clique."
     ))
 
-    texto_pdf = pdf.output(dest='S')
-    return texto_pdf.encode('latin-1', 'replace')
+    # Correção compatível com fpdf2 para retornar os bytes do PDF
+    return pdf.output()
 
 # --- LÓGICA DE GERAÇÃO DE OS SEQUENCIAL ---
 def obter_proxima_os(engine, emp_id):
@@ -1239,7 +1235,7 @@ def gerar_pdf_periodo(df_periodo, data_inicio, data_fim):
                         pdf.cell(95, 6, str(row['descricao'])[:75], 1, 1, 'L')
                     pdf.ln(2)
                 
-    return pdf.output(dest='S').encode('latin-1')
+    return pdf.output()
 
 # --- INICIALIZAÇÃO DE ESTADOS DE SESSÃO ---
 if "logado" not in st.session_state:
