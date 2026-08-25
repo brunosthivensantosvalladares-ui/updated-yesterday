@@ -122,6 +122,21 @@ def obter_llm():
     api_key = st.secrets.get("GROQ_API_KEY") or os.environ.get("GROQ_API_KEY")
     return api_key
 
+# --- PESQUISA WEB TÉCNICA ---
+def pesquisar_solucao_web(termo_busca: str) -> str:
+    """Pesquisa dados técnicos e diagnósticos na internet diretamente via DDGS."""
+    try:
+        query = f"manutencao automotiva defeito {termo_busca} causa solucao"
+        with DDGS() as ddgs:
+            resultados = list(ddgs.text(query, max_results=2))
+            if resultados:
+                trechos = [r.get("body", "") for r in resultados if "body" in r]
+                return " ".join(trechos)
+        return ""
+    except Exception:
+        return ""
+
+# --- CHAMADA DIRETA À API GROQ ---
 def chamar_groq_direto(prompt_texto, api_key):
     url = "https://api.groq.com/openai/v1/chat/completions"
     headers = {
@@ -142,13 +157,19 @@ def chamar_groq_direto(prompt_texto, api_key):
     except Exception as e:
         return f"Erro de conexão: {str(e)}"
 
-# --- BUSCA DE HISTÓRICO BLINDADA CONTRA ERROS ---
+# --- BUSCA DE HISTÓRICO INTELIGENTE E BLINDADA ---
 def buscar_historico_relevante(sintoma, emp_id, prefixo=None):
-    """Busca ordens de serviço anteriores na tabela tarefas sem risco de falha."""
+    """Busca ordens de serviço anteriores priorizando o mesmo veículo e geral da frota."""
     engine = get_engine()
     
-    # Consulta direta e segura na tabela de tarefas
-    query = text("""
+    query_especifica = text("""
+        SELECT data, prefixo, descricao, COALESCE(executor, 'Não informado') as executor, numero_os 
+        FROM tarefas 
+        WHERE empresa_id = :eid AND LOWER(prefixo) = LOWER(:pref)
+        ORDER BY id DESC LIMIT 15
+    """)
+    
+    query_geral = text("""
         SELECT data, prefixo, descricao, COALESCE(executor, 'Não informado') as executor, numero_os 
         FROM tarefas 
         WHERE empresa_id = :eid
@@ -157,30 +178,14 @@ def buscar_historico_relevante(sintoma, emp_id, prefixo=None):
     
     try:
         historico_formatado = []
-        with engine.connect() as conn:
-            resultados = conn.execute(query, {"eid": str(emp_id)}).fetchall()
-            
-            for r in resultados:
-                # r[0]=data, r[1]=prefixo, r[2]=descricao, r[3]=executor, r[4]=numero_os
-                dt = str(r[0]) if r[0] else "Data S/N"
-                pref = str(r[1]) if r[1] else "S/P"
-                desc = str(r[2]).strip() if r[2] else ""
-                execut = str(r[3]) if r[3] else "Não informado"
-                num_os = f"OS {r[4]}" if r[4] else "Sem Nº"
-                
-                linha = f"- Data: {dt} | Veículo {pref} | {num_os} | Serviço: {desc} | Mecânico: {execut}"
-                historico_formatado.append(linha)
-
-        return historico_formatado
-    except Exception as e:
-        # Se houver qualquer erro no banco, retorna o erro impresso para sabermos o motivo exato
-        return [f"Erro ao buscar histórico: {str(e)}"]
+        vistos = set()
         
         with engine.connect() as conn:
+            # 1. Tenta buscar primeiro do veículo específico
             if prefixo and prefixo != "Não informado":
                 resultados_esp = conn.execute(query_especifica, {"eid": str(emp_id), "pref": str(prefixo)}).fetchall()
                 for r in resultados_esp:
-                    dt_formatada = str(r[0])
+                    dt_formatada = str(r[0]) if r[0] else "Data S/N"
                     os_num = f"OS {r[4]}" if r[4] else "Sem Nº"
                     linha = f"[HISTÓRICO DO VEÍCULO {r[1]}] Data: {dt_formatada} | {os_num} | Serviço: {str(r[2]).strip()} | Executor: {r[3]}"
                     chave = (dt_formatada, str(r[1]), str(r[2]).strip().lower())
@@ -188,9 +193,10 @@ def buscar_historico_relevante(sintoma, emp_id, prefixo=None):
                         vistos.add(chave)
                         historico_formatado.append(linha)
 
+            # 2. Completa com o histórico geral da frota
             resultados_ger = conn.execute(query_geral, {"eid": str(emp_id)}).fetchall()
             for r in resultados_ger:
-                dt_formatada = str(r[0])
+                dt_formatada = str(r[0]) if r[0] else "Data S/N"
                 os_num = f"OS {r[4]}" if r[4] else "Sem Nº"
                 linha = f"[Frota] Data: {dt_formatada} | Veículo {r[1]} | {os_num} | Serviço: {str(r[2]).strip()} | Executor: {r[3]}"
                 chave = (dt_formatada, str(r[1]), str(r[2]).strip().lower())
@@ -199,10 +205,10 @@ def buscar_historico_relevante(sintoma, emp_id, prefixo=None):
                     historico_formatado.append(linha)
 
         return historico_formatado[:25]
-    except Exception:
-        return []
+    except Exception as e:
+        return [f"Erro ao buscar histórico: {str(e)}"]
 
-# --- TRIAGEM DO MR. HALLEY BLINDADA E EXPLICITA ---
+# --- TRIAGEM DO MR. HALLEY COMPLETA ---
 def triagem_mr_halley(sintoma, emp_id, prefixo=None, incluir_saudacao=False):
     try:
         api_key = obter_llm()
