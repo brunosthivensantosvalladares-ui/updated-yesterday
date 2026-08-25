@@ -4,10 +4,6 @@ sqlalchemy
 psycopg2-binary
 fpdf2
 requests
-openai-whisper
 duckduckgo-search
 langchain-groq
 xlsxwriter
-SpeechRecognition
-bokeh
-streamlit-bokeh-events
