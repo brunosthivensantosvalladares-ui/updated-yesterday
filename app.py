@@ -560,90 +560,44 @@ def renderizar_chat_flutuante(emp_id):
                 with st.chat_message(msg["role"], avatar=avatar):
                     st.markdown(msg["content"])
 
-        # --- COMPONENTE DE VOZ COM TRATAMENTO DE PERMISSÃO ---
-        audio_html = """
-        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
-            <button id="micBtn" onclick="toggleSpeech()" style="background-color: #3B2E25; color: #C5A059; border: 1.5px solid #C5A059; border-radius: 8px; padding: 6px 12px; cursor: pointer; font-weight: bold; font-size: 0.85rem; display: flex; align-items: center; gap: 6px;">
-                🎤 <span id="micText">Falar por Voz</span>
-            </button>
-            <span id="statusVoz" style="font-size: 0.75rem; color: #666; font-style: italic;"></span>
-        </div>
-        <script>
-            let recognition;
-            let isRecording = false;
+        # --- GRAVADOR DE VOZ ROBUSTO VIA STREAMLIT-MIC-RECORDER ---
+        try:
+            from streamlit_mic_recorder import mic_recorder
+            
+            col_mic, col_txt = st.columns([0.25, 0.75])
+            with col_mic:
+                # Botão oficial de microfone para Streamlit
+                voz_gravada = mic_recorder(
+                    start_prompt="🎤 Falar",
+                    stop_prompt="⏹️ Parar",
+                    key='mic_halley'
+                )
+            with col_txt:
+                st.caption("Toque em Falar para gravar sua voz.")
 
-            function toggleSpeech() {
-                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-                if (!SpeechRecognition) {
-                    alert("Seu navegador não suporta reconhecimento de voz. Utilize o Chrome ou Edge.");
-                    return;
-                }
+            texto_transcrito = None
+            if voz_gravada:
+                # Se o componente capturou o áudio em bytes
+                audio_bytes = voz_gravada.get('bytes')
+                if audio_bytes:
+                    with st.spinner("🎧 Convertendo áudio..."):
+                        try:
+                            import speech_recognition as sr
+                            import io
+                            
+                            r = sr.Recognizer()
+                            with sr.AudioFile(io.BytesIO(audio_bytes)) as source:
+                                audio_data = r.record(source)
+                                texto_transcrito = r.recognize_google(audio_data, language="pt-BR")
+                        except Exception:
+                            # Fallback caso o navegador grave em webm/ogg comprimido
+                            st.warning("⚠️ Formato de áudio do navegador em uso. Por favor, digite abaixo ou use o microfone do teclado.")
+        except ImportError:
+            texto_transcrito = None
 
-                if (!isRecording) {
-                    recognition = new SpeechRecognition();
-                    recognition.lang = 'pt-BR';
-                    recognition.interimResults = false;
-                    recognition.maxAlternatives = 1;
-
-                    recognition.onstart = function() {
-                        isRecording = true;
-                        document.getElementById('micBtn').style.backgroundColor = '#C5A059';
-                        document.getElementById('micBtn').style.color = '#3B2E25';
-                        document.getElementById('micText').textContent = 'Ouvindo...';
-                        document.getElementById('statusVoz').textContent = 'Pode falar o que aconteceu com o veículo.';
-                    };
-
-                    recognition.onresult = function(event) {
-                        const speechResult = event.results[0][0].transcript;
-                        if (speechResult) {
-                            try {
-                                const parentWindow = window.parent;
-                                const url = new URL(parentWindow.location.href);
-                                url.searchParams.set('voz_prompt', speechResult);
-                                parentWindow.location.href = url.href;
-                            } catch (e) {
-                                window.parent.location.search = '?voz_prompt=' + encodeURIComponent(speechResult);
-                            }
-                        }
-                    };
-
-                    recognition.onerror = function(event) {
-                        if (event.error === 'not-allowed') {
-                            document.getElementById('statusVoz').textContent = 'Permissão de microfone negada. Libere no navegador.';
-                        } else {
-                            document.getElementById('statusVoz').textContent = 'Erro: ' + event.error;
-                        }
-                        resetMic();
-                    };
-
-                    recognition.onend = function() {
-                        resetMic();
-                    };
-
-                    try {
-                        recognition.start();
-                    } catch (e) {
-                        document.getElementById('statusVoz').textContent = 'Clique novamente para permitir o microfone.';
-                        resetMic();
-                    }
-                } else {
-                    recognition.stop();
-                    resetMic();
-                }
-            }
-
-            function resetMic() {
-                isRecording = false;
-                document.getElementById('micBtn').style.backgroundColor = '#3B2E25';
-                document.getElementById('micBtn').style.color = '#C5A059';
-                document.getElementById('micText').textContent = 'Falar por Voz';
-            }
-        </script>
-        """
-        components.html(audio_html, height=45)
-
-        # Caixa de texto padrão do chat que recebe o texto falado ou digitado
-        prompt = st.chat_input("Dúvida técnica ou agendar OS...", key="chat_flutuante_input")
+        prompt_texto = st.chat_input("Dúvida técnica ou agendar OS...", key="chat_flutuante_input")
+        
+        prompt = texto_transcrito if texto_transcrito else prompt_texto
 
         if prompt:
             st.session_state.chat_aberto_usuario = True
