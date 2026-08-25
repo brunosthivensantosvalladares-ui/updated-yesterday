@@ -144,7 +144,7 @@ def chamar_groq_direto(prompt_texto, api_key):
         "Content-Type": "application/json"
     }
     payload = {
-        "model": "llama-3.1-8b-instant",
+        "model": "mixtral-8x7b-32768",  # Alterado para o modelo universal estável da Groq
         "messages": [{"role": "user", "content": prompt_texto}],
         "temperature": 0.0
     }
