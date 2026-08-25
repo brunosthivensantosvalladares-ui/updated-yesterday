@@ -142,40 +142,60 @@ def pesquisar_solucao_web(termo_busca: str) -> str:
     except Exception:
         return ""
 
-# --- 1. BUSCA REAL NO BANCO SEM DUPLICIDADES ---
-def buscar_historico_relevante(sintoma_motorista, emp_id):
-    """Busca as ordens de serviço da empresa sem duplicatas e com dados consolidados."""
+def buscar_historico_relevante(sintoma, emp_id, prefixo=None):
+    """Busca ordens de serviço anteriores priorizando o mesmo veículo e termos correlatos."""
     engine = get_engine()
-    query = text("""
+    
+    # Busca específica para o veículo atual
+    query_especifica = text("""
+        SELECT data, prefixo, descricao, COALESCE(executor, 'Não informado') as executor, numero_os 
+        FROM tarefas 
+        WHERE empresa_id = :eid AND LOWER(prefixo) = LOWER(:pref)
+        ORDER BY id DESC LIMIT 15
+    """)
+    
+    # Busca geral de respaldo na frota
+    query_geral = text("""
         SELECT data, prefixo, descricao, COALESCE(executor, 'Não informado') as executor, numero_os 
         FROM tarefas 
         WHERE empresa_id = :eid
         ORDER BY id DESC LIMIT 30
     """)
+    
     try:
-        with engine.connect() as conn:
-            resultados = conn.execute(query, {"eid": str(emp_id)}).fetchall()
-        
         historico_formatado = []
         vistos = set()
-        for r in resultados:
-            dt_formatada = str(r[0])
-            os_num = f"OS {r[4]}" if r[4] else "Sem Nº"
-            linha = f"- Data: {dt_formatada} | Veículo {r[1]} | {os_num} | Serviço: {str(r[2]).strip()} | Executor: {r[3]}"
-            chave_duplicata = (dt_formatada, str(r[1]), str(r[2]).strip().lower())
-            
-            if chave_duplicata not in vistos:
-                vistos.add(chave_duplicata)
-                historico_formatado.append(linha)
+        
+        with engine.connect() as conn:
+            if prefixo and prefixo != "Não informado":
+                resultados_esp = conn.execute(query_especifica, {"eid": str(emp_id), "pref": str(prefixo)}).fetchall()
+                for r in resultados_esp:
+                    dt_formatada = str(r[0])
+                    os_num = f"OS {r[4]}" if r[4] else "Sem Nº"
+                    linha = f"[HISTÓRICO DO VEÍCULO {r[1]}] Data: {dt_formatada} | {os_num} | Serviço: {str(r[2]).strip()} | Executor: {r[3]}"
+                    chave = (dt_formatada, str(r[1]), str(r[2]).strip().lower())
+                    if chave not in vistos:
+                        vistos.add(chave)
+                        historico_formatado.append(linha)
 
-        return historico_formatado
+            resultados_ger = conn.execute(query_geral, {"eid": str(emp_id)}).fetchall()
+            for r in resultados_ger:
+                dt_formatada = str(r[0])
+                os_num = f"OS {r[4]}" if r[4] else "Sem Nº"
+                linha = f"[Frota] Data: {dt_formatada} | Veículo {r[1]} | {os_num} | Serviço: {str(r[2]).strip()} | Executor: {r[3]}"
+                chave = (dt_formatada, str(r[1]), str(r[2]).strip().lower())
+                if chave not in vistos:
+                    vistos.add(chave)
+                    historico_formatado.append(linha)
+
+        return historico_formatado[:25]
     except Exception:
         return []
 
-# --- TRIAGEM DO MR. HALLEY ---
 def triagem_mr_halley(sintoma, emp_id, prefixo=None, incluir_saudacao=False):
+    # Passa o prefixo para a busca afunilar direto no veículo correto
+    historicos = buscar_historico_relevante(sintoma, emp_id, prefixo=prefixo)
     llm = obter_llm()
-    historicos = buscar_historico_relevante(sintoma, emp_id)
     
     if not llm:
         return f"Recomenda-se verificação técnica preventiva para o sistema de {sintoma}."
@@ -185,7 +205,7 @@ def triagem_mr_halley(sintoma, emp_id, prefixo=None, incluir_saudacao=False):
 
     template = """
 Você é o assistente técnico Mr. Halley da plataforma Up 2 Today.
-Sua função é realizar a triagem técnica de manutenção com rigor de causa raiz.
+Sua função é realizar a triagem técnica de manutenção com rigor de causa raiz e inteligência contextual.
 
 Veículo: {prefixo}
 Sintoma Relatado: "{sintoma}"
@@ -197,16 +217,16 @@ Dados Técnicos Externos (Web):
 {contexto_web}
 
 CRITÉRIO DE AVALIAÇÃO DE HISTÓRICO:
-- Só considere que existe histórico local correlato se uma OS anterior compartilhar da MESMA CAUSA RAIZ e MECANISMO DE FALHA do sintoma atual.
-- Se o histórico contiver manutenções em componentes adjacentes ou gerais que não explicam a falha pontual relatada, considere que NÃO há histórico correspondente.
+- Analise se o histórico acima traz manutenções passadas para este veículo ou frota relacionadas ao problema (ex: fumaça preta remete a injeção, turbo, filtros; direção puxando remete a alinhamento, suspensão).
+- Se houver correspondência de causa raiz, aponte-a diretamente.
 
 REGRAS DE RESPOSTA:
-1. Se houver correspondência exata de causa raiz no histórico da frota:
+1. Se houver registro correspondente no histórico da frota:
    - Inicie OBRIGATORIAMENTE com: "Baseado no histórico local da frota, recomenda-se"
-2. Se não houver registro com a mesma causa raiz:
+2. Se não houver registro correspondente:
    - Inicie OBRIGATORIAMENTE com: "Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se"
 3. Proibido usar saudações ou apresentações.
-4. Complete a recomendação indicando ações no infinitivo com precisão de diagnóstico (20 a 35 palavras).
+4. Complete a recomendação indicando a ação corretiva exata no infinitivo (ex: substituir bicos injetores, aferir alinhamento, limpar coletor), citando componentes mecânicos reais e evitando repetir frases genéricas em caixa alta (20 a 35 palavras).
 """
 
     prompt = ChatPromptTemplate.from_template(template)
@@ -217,13 +237,13 @@ REGRAS DE RESPOSTA:
             "prefixo": prefixo if prefixo else "Não informado",
             "sintoma": sintoma,
             "historico_formatado": historico_formatado,
-            "contexto_web": resultado_web[:500] if resultado_web else "Inspeção técnica padrão de montadora."
+            "contexto_web": resultado_web[:600] if resultado_web else "Inspeção técnica padrão de montadora."
         })
         return resposta.content.strip()
     except Exception:
         if historicos:
-            return f"Baseado no histórico local da frota, recomenda-se inspeção técnica do sistema de {sintoma}."
-        return f"Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se inspeção técnica do sistema de {sintoma}."
+            return f"Baseado no histórico local da frota, recomenda-se inspeção técnica detalhada e aferição dos componentes do sistema."
+        return f"Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se varredura eletrônica e testes práticos de bancada."
 
 # --- PROCESSAMENTO DETERMINÍSTICO DE ABERTURA DE OS VIA CHAT ---
 def processar_comando_os(texto_usuario, emp_id):
