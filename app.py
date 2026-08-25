@@ -206,7 +206,7 @@ REGRAS DE RESPOSTA:
 2. Se não houver registro com a mesma causa raiz:
    - Inicie OBRIGATORIAMENTE com: "Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se"
 3. Proibido usar saudações ou apresentações.
-4. Complete a recomendação indicando ações no infinitivo com precisão de diagnóstico (20 a 35 palavras).
+4. Complete a recomendação indicando ações mecânicas precisas no infinitivo (ex: substituir bicos injetores, alinhar geometria, inspecionar chicote elétrico, testar compressão), citando os componentes reais envolvidos e evitando repetir o texto bruto do sintoma de forma genérica (20 a 35 palavras).
 """
 
     prompt = ChatPromptTemplate.from_template(template)
@@ -222,9 +222,9 @@ REGRAS DE RESPOSTA:
         return resposta.content.strip()
     except Exception:
         if historicos:
-            return f"Baseado no histórico local da frota, recomenda-se inspeção técnica do sistema de {sintoma}."
-        return f"Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se inspeção técnica do sistema de {sintoma}."
-
+            return f"Baseado no histórico local da frota, recomenda-se inspeção técnica detalhada e aferição dos componentes do sistema."
+        return f"Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se varredura eletrônica e testes práticos de bancada."
+        
 # --- PROCESSAMENTO DETERMINÍSTICO DE ABERTURA DE OS VIA CHAT ---
 def processar_comando_os(texto_usuario, emp_id):
     """Gerencia a coleta progressiva exigindo Prefixo, Descrição, Mecânico, Data e Área."""
