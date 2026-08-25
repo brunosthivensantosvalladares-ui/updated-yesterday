@@ -144,7 +144,7 @@ def chamar_groq_direto(prompt_texto, api_key):
         "Content-Type": "application/json"
     }
     payload = {
-        "model": "llama-3.3-70b-versatile",  # Usando o modelo atual suportado pela Groq
+        "model": "openai/gpt-oss-120b",  # Modelo atualizado e ativo na Groq
         "messages": [{"role": "user", "content": prompt_texto}],
         "temperature": 0.0
     }
