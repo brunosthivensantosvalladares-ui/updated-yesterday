@@ -125,12 +125,16 @@ def obter_llm():
     api_key = st.secrets.get("GROQ_API_KEY") or os.environ.get("GROQ_API_KEY")
     if not api_key:
         return None
-    return ChatGroq(
-        groq_api_key=api_key,
-        model_name="llama3-70b-8192",
-        temperature=0.0,
-        max_retries=2
-    )
+    try:
+        return ChatGroq(
+            groq_api_key=api_key,
+            model_name="llama-3.3-70b-versatile",
+            temperature=0.0,
+            max_retries=2
+        )
+    except Exception as e:
+        st.error(f"Erro ao inicializar Groq: {e}")
+        return None
 
 def pesquisar_solucao_web(termo_busca: str) -> str:
     """Pesquisa dados técnicos e diagnósticos na internet diretamente via DDGS."""
