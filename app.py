@@ -560,7 +560,7 @@ def renderizar_chat_flutuante(emp_id):
                 with st.chat_message(msg["role"], avatar=avatar):
                     st.markdown(msg["content"])
 
-        # --- COMPONENTE DE GRAVAÇÃO DE VOZ CORRIGIDO (COM COMUNICAÇÃO SEGURA COM A PÁGINA PAI) ---
+        # --- COMPONENTE DE VOZ COM TRATAMENTO DE PERMISSÃO ---
         audio_html = """
         <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
             <button id="micBtn" onclick="toggleSpeech()" style="background-color: #3B2E25; color: #C5A059; border: 1.5px solid #C5A059; border-radius: 8px; padding: 6px 12px; cursor: pointer; font-weight: bold; font-size: 0.85rem; display: flex; align-items: center; gap: 6px;">
@@ -575,7 +575,7 @@ def renderizar_chat_flutuante(emp_id):
             function toggleSpeech() {
                 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
                 if (!SpeechRecognition) {
-                    alert("Seu navegador não suporta reconhecimento de voz.");
+                    alert("Seu navegador não suporta reconhecimento de voz. Utilize o Chrome ou Edge.");
                     return;
                 }
 
@@ -590,7 +590,7 @@ def renderizar_chat_flutuante(emp_id):
                         document.getElementById('micBtn').style.backgroundColor = '#C5A059';
                         document.getElementById('micBtn').style.color = '#3B2E25';
                         document.getElementById('micText').textContent = 'Ouvindo...';
-                        document.getElementById('statusVoz').textContent = 'Pode falar o que aconteceu.';
+                        document.getElementById('statusVoz').textContent = 'Pode falar o que aconteceu com o veículo.';
                     };
 
                     recognition.onresult = function(event) {
@@ -608,7 +608,11 @@ def renderizar_chat_flutuante(emp_id):
                     };
 
                     recognition.onerror = function(event) {
-                        document.getElementById('statusVoz').textContent = 'Erro ao capturar voz. Tente digitar.';
+                        if (event.error === 'not-allowed') {
+                            document.getElementById('statusVoz').textContent = 'Permissão de microfone negada. Libere no navegador.';
+                        } else {
+                            document.getElementById('statusVoz').textContent = 'Erro: ' + event.error;
+                        }
                         resetMic();
                     };
 
@@ -616,7 +620,12 @@ def renderizar_chat_flutuante(emp_id):
                         resetMic();
                     };
 
-                    recognition.start();
+                    try {
+                        recognition.start();
+                    } catch (e) {
+                        document.getElementById('statusVoz').textContent = 'Clique novamente para permitir o microfone.';
+                        resetMic();
+                    }
                 } else {
                     recognition.stop();
                     resetMic();
