@@ -509,7 +509,6 @@ DIRETRIZES DE RESPOSTA:
     except Exception as e:
         return f"Erro ao processar consulta: {str(e)}"
 
-# --- CHAT FLUTUANTE EM CSS/HTML + PYTHON COM ESTADO PERSISTENTE ---
 def renderizar_chat_flutuante(emp_id):
     URL_AVATAR_HALLEY = "https://i.postimg.cc/5tBtrL6C/Whats-App-Image-2026-07-23-at-22-35-53.png"
     
@@ -537,16 +536,13 @@ def renderizar_chat_flutuante(emp_id):
             border-radius: 12px !important;
             box-shadow: 0px 6px 20px rgba(0, 0, 0, 0.25) !important;
         }
-
         details[data-testid="stExpander"][open] {
             max-height: 80vh !important;
         }
-
         div[data-testid="stExpander"] div[data-testid="stChatMessage"] p {
             font-size: 0.95rem !important;
             line-height: 1.45 !important;
         }
-
         div[data-testid="stExpander"] div[data-testid="stChatMessage"] img,
         div[data-testid="stExpander"] div[data-testid="stChatMessageAvatarCustom"] {
             width: 44px !important;
@@ -577,7 +573,7 @@ def renderizar_chat_flutuante(emp_id):
                     key='mic_halley'
                 )
             with col_txt:
-                st.caption("Toque em Falar para gravar.")
+                st.caption("Toque em Falar para gravar sua voz.")
 
             if voz_gravada:
                 audio_bytes = voz_gravada.get('bytes')
@@ -756,8 +752,8 @@ def gerar_pdf_manual_oficial_pro():
         "baixa imediata ou reagendar tarefas para o presente com um único clique."
     ))
 
-    # Correção compatível com fpdf2 para retornar os bytes do PDF
-    return pdf.output()
+    # Correção definitiva do output da FPDF2 para retornar bytes válidos para download
+    return bytes(pdf.output())
 
 # --- LÓGICA DE GERAÇÃO DE OS SEQUENCIAL ---
 def obter_proxima_os(engine, emp_id):
@@ -1235,7 +1231,7 @@ def gerar_pdf_periodo(df_periodo, data_inicio, data_fim):
                         pdf.cell(95, 6, str(row['descricao'])[:75], 1, 1, 'L')
                     pdf.ln(2)
                 
-    return pdf.output()
+    return bytes(pdf.output())
 
 # --- INICIALIZAÇÃO DE ESTADOS DE SESSÃO ---
 if "logado" not in st.session_state:
