@@ -588,9 +588,7 @@ def renderizar_chat_flutuante(emp_id):
                     texto_transcrito = None
                     st.warning("⚠️ Formato de áudio não suportado diretamente pelo navegador neste dispositivo. Por favor, digite sua mensagem abaixo.")
 
-        prompt_texto = st.chat_input("Dúvida técnica ou agendar OS...", key="chat_flutuante_input")
-        
-        prompt = texto_transcrito if texto_transcrito else prompt_texto
+        prompt = st.chat_input("Dúvida técnica ou agendar OS...", key="chat_flutuante_input")
 
         if prompt:
             st.session_state.chat_aberto_usuario = True
