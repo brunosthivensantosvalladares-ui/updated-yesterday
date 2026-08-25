@@ -12,8 +12,9 @@ import time as time_module
 import requests
 import re
 import streamlit.components.v1 as components
-import speech_recognition as sr
-from streamlit_mic_recorder import mic_recorder
+from bokeh.models.widgets import Button
+from bokeh.models import CustomJS
+from streamlit_bokeh_events import streamlit_bokeh_events
 
 # --- FUNÇÃO PARA PUXAR O TOPO PARA CIMA (ELIMINA O ESPAÇO VAZIO) ---
 def puxar_topo_para_cima():
@@ -297,7 +298,7 @@ def processar_comando_os(texto_usuario, emp_id):
                 f"- **Turno:** {turno_final}\n"
                 f"- **Horário:** {inicio_final} às {fim_final}\n"
                 f"- **Executor:** {exec_final}\n\n"
-                f"*A OS já foi enviada diretamente para a Agenda Principal.*"
+                f"*A OS já foi enviada diretamente para la Agenda Principal.*"
             )
         except Exception as e:
             return f"❌ Ocorreu um erro ao salvar a OS no banco: {str(e)}"
@@ -562,74 +563,44 @@ def renderizar_chat_flutuante(emp_id):
                 with st.chat_message(msg["role"], avatar=avatar):
                     st.markdown(msg["content"])
 
-        # --- CAPTAÇÃO DE VOZ NATIVA VIA JAVASCRIPT (WEB SPEECH API) ---
-        voz_html = """
-        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-            <button id="btnVoz" onclick="ouvirVoz()" style="background-color: #3B2E25; color: #C5A059; border: 1.5px solid #C5A059; border-radius: 8px; padding: 6px 12px; cursor: pointer; font-weight: bold; font-size: 0.85rem; display: flex; align-items: center; gap: 6px;">
-                🎤 <span id="txtVoz">Falar por Voz</span>
-            </button>
-            <span id="lblStatus" style="font-size: 0.75rem; color: #666; font-style: italic;"></span>
-        </div>
-        <script>
-            function ouvirVoz() {
-                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-                if (!SpeechRecognition) {
-                    alert("Seu navegador não suporta reconhecimento de voz.");
-                    return;
-                }
-                const recognition = new SpeechRecognition();
-                recognition.lang = 'pt-BR';
-                recognition.interimResults = false;
-                
-                document.getElementById('btnVoz').style.backgroundColor = '#C5A059';
-                document.getElementById('btnVoz').style.color = '#3B2E25';
-                document.getElementById('txtVoz').textContent = 'Ouvindo...';
-                document.getElementById('lblStatus').textContent = 'Pode falar o problema do veículo.';
-
-                recognition.onresult = function(event) {
-                    const textoFalado = event.results[0][0].transcript;
-                    if (textoFalado) {
-                        try {
-                            const parentWindow = window.parent;
-                            const url = new URL(parentWindow.location.href);
-                            url.searchParams.set('voz_prompt', textoFalado);
-                            parentWindow.location.href = url.href;
-                        } catch (e) {
-                            window.parent.location.search = '?voz_prompt=' + encodeURIComponent(textoFalado);
-                        }
-                    }
-                };
-
-                recognition.onerror = function() {
-                    document.getElementById('lblStatus').textContent = 'Erro ao ouvir. Tente novamente.';
-                    resetarBotao();
-                };
-
-                recognition.onend = function() {
-                    resetarBotao();
-                };
-
-                recognition.start();
+        # --- CAPTAÇÃO DE VOZ ROBUSTA VIA BOKEH EVENTS & WEB SPEECH API ---
+        stt_button = Button(label="🎤 Falar por Voz", width=140, height=35)
+        stt_button.js_on_event("button_click", CustomJS(code="""
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+                alert("Seu navegador não suporta reconhecimento de voz.");
+                return;
             }
+            const recognition = new SpeechRecognition();
+            recognition.lang = 'pt-BR';
+            recognition.interimResults = false;
+            
+            recognition.onresult = function(e) {
+                const texto = e.results[0][0].transcript;
+                document.dispatchEvent(new CustomEvent('GET_TEXT', {detail: texto}));
+                recognition.stop();
+            };
+            recognition.onerror = function(e) {
+                recognition.stop();
+            };
+            recognition.start();
+        """))
 
-            function resetarBotao() {
-                document.getElementById('btnVoz').style.backgroundColor = '#3B2E25';
-                document.getElementById('btnVoz').style.color = '#C5A059';
-                document.getElementById('txtVoz').textContent = 'Falar por Voz';
-            }
-        </script>
-        """
-        components.html(voz_html, height=42)
+        result = streamlit_bokeh_events(
+            stt_button,
+            events="GET_TEXT",
+            key="listen_mic_halley",
+            refresh_on_update=False,
+            debounce_time=0
+        )
 
-        # --- CAPTURA O TEXTO FALADO VINDO DA URL ---
-        texto_capturado = None
-        if "voz_prompt" in st.query_params:
-            texto_capturado = st.query_params.get("voz_prompt")
-            del st.query_params["voz_prompt"]
+        texto_voz = None
+        if result:
+            texto_voz = result.get("GET_TEXT")
 
         prompt_texto = st.chat_input("Dúvida técnica ou agendar OS...", key="chat_flutuante_input")
         
-        prompt = texto_capturado if texto_capturado else prompt_texto
+        prompt = texto_voz if texto_voz else prompt_texto
 
         if prompt:
             st.session_state.chat_aberto_usuario = True
@@ -790,7 +761,6 @@ def gerar_pdf_manual_oficial_pro():
         "baixa imediata ou reagendar tarefas para o presente com um único clique."
     ))
 
-    # Correção definitiva do output da FPDF2 para retornar bytes válidos para download
     return bytes(pdf.output())
 
 # --- LÓGICA DE GERAÇÃO DE OS SEQUENCIAL ---
