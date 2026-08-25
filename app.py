@@ -12,9 +12,8 @@ import time as time_module
 import requests
 import re
 import streamlit.components.v1 as components
-from bokeh.models.widgets import Button
-from bokeh.models import CustomJS
-from streamlit_bokeh_events import streamlit_bokeh_events
+import speech_recognition as sr
+from streamlit_mic_recorder import mic_recorder
 
 # --- FUNÇÃO PARA PUXAR O TOPO PARA CIMA (ELIMINA O ESPAÇO VAZIO) ---
 def puxar_topo_para_cima():
@@ -125,16 +124,12 @@ def obter_llm():
     api_key = st.secrets.get("GROQ_API_KEY") or os.environ.get("GROQ_API_KEY")
     if not api_key:
         return None
-    try:
-        return ChatGroq(
-            groq_api_key=api_key,
-            model_name="llama-3.3-70b-versatile",
-            temperature=0.0,
-            max_retries=2
-        )
-    except Exception as e:
-        st.error(f"Erro ao inicializar Groq: {e}")
-        return None
+    return ChatGroq(
+        groq_api_key=api_key,
+        model_name="llama-3.3-70b-versatile",
+        temperature=0.0,
+        max_retries=2
+    )
 
 def pesquisar_solucao_web(termo_busca: str) -> str:
     """Pesquisa dados técnicos e diagnósticos na internet diretamente via DDGS."""
@@ -302,7 +297,7 @@ def processar_comando_os(texto_usuario, emp_id):
                 f"- **Turno:** {turno_final}\n"
                 f"- **Horário:** {inicio_final} às {fim_final}\n"
                 f"- **Executor:** {exec_final}\n\n"
-                f"*A OS já foi enviada diretamente para la Agenda Principal.*"
+                f"*A OS já foi enviada diretamente para a Agenda Principal.*"
             )
         except Exception as e:
             return f"❌ Ocorreu um erro ao salvar a OS no banco: {str(e)}"
@@ -567,15 +562,44 @@ def renderizar_chat_flutuante(emp_id):
                 with st.chat_message(msg["role"], avatar=avatar):
                     st.markdown(msg["content"])
 
-        # --- CAPTURA O TEXTO FALADO VINDO DA URL (SE HOUVER) ---
-        texto_capturado = None
-        if "voz_prompt" in st.query_params:
-            texto_capturado = st.query_params.get("voz_prompt")
-            del st.query_params["voz_prompt"]
+        # --- GRAVADOR DE VOZ ROBUSTO VIA STREAMLIT-MIC-RECORDER ---
+        try:
+            from streamlit_mic_recorder import mic_recorder
+            
+            col_mic, col_txt = st.columns([0.25, 0.75])
+            with col_mic:
+                # Botão oficial de microfone para Streamlit
+                voz_gravada = mic_recorder(
+                    start_prompt="🎤 Falar",
+                    stop_prompt="⏹️ Parar",
+                    key='mic_halley'
+                )
+            with col_txt:
+                st.caption("Toque em Falar para gravar sua voz.")
+
+            texto_transcrito = None
+            if voz_gravada:
+                # Se o componente capturou o áudio em bytes
+                audio_bytes = voz_gravada.get('bytes')
+                if audio_bytes:
+                    with st.spinner("🎧 Convertendo áudio..."):
+                        try:
+                            import speech_recognition as sr
+                            import io
+                            
+                            r = sr.Recognizer()
+                            with sr.AudioFile(io.BytesIO(audio_bytes)) as source:
+                                audio_data = r.record(source)
+                                texto_transcrito = r.recognize_google(audio_data, language="pt-BR")
+                        except Exception:
+                            # Fallback caso o navegador grave em webm/ogg comprimido
+                            st.warning("⚠️ Formato de áudio do navegador em uso. Por favor, digite abaixo ou use o microfone do teclado.")
+        except ImportError:
+            texto_transcrito = None
 
         prompt_texto = st.chat_input("Dúvida técnica ou agendar OS...", key="chat_flutuante_input")
         
-        prompt = texto_capturado if texto_capturado else prompt_texto
+        prompt = texto_transcrito if texto_transcrito else prompt_texto
 
         if prompt:
             st.session_state.chat_aberto_usuario = True
@@ -736,7 +760,8 @@ def gerar_pdf_manual_oficial_pro():
         "baixa imediata ou reagendar tarefas para o presente com um único clique."
     ))
 
-    return bytes(pdf.output())
+    texto_pdf = pdf.output(dest='S')
+    return texto_pdf.encode('latin-1', 'replace')
 
 # --- LÓGICA DE GERAÇÃO DE OS SEQUENCIAL ---
 def obter_proxima_os(engine, emp_id):
@@ -1214,7 +1239,7 @@ def gerar_pdf_periodo(df_periodo, data_inicio, data_fim):
                         pdf.cell(95, 6, str(row['descricao'])[:75], 1, 1, 'L')
                     pdf.ln(2)
                 
-    return bytes(pdf.output())
+    return pdf.output(dest='S').encode('latin-1')
 
 # --- INICIALIZAÇÃO DE ESTADOS DE SESSÃO ---
 if "logado" not in st.session_state:
