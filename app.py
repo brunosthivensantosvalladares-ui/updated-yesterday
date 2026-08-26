@@ -204,7 +204,7 @@ def buscar_historico_relevante(sintoma, emp_id, prefixo=None):
     except Exception as e:
         return [f"Erro ao buscar histórico: {str(e)}"]
 
-# --- TRIAGEM DO MR. HALLEY COM HIERARQUIA DE HISTÓRICO E TEXTO EXTERNO EXATO ---
+# --- TRIAGEM DO MR. HALLEY COM BUSCA AMPLA NA FROTA E FILTRO DE SIMILARIDADE REAL ---
 def triagem_mr_halley(sintoma, emp_id, prefixo=None, incluir_saudacao=False):
     try:
         api_key = obter_llm()
@@ -213,31 +213,34 @@ def triagem_mr_halley(sintoma, emp_id, prefixo=None, incluir_saudacao=False):
         if not api_key:
             return "Erro: Chave da API Groq não configurada."
 
-        tem_historico_real = (
+        tem_registros_brutos = (
             len(historicos) > 0 
             and not any("Nenhum histórico" in h or "Erro" in h for h in historicos)
         )
         
-        palavras_sintoma = {p.lower() for p in sintoma.split() if len(p) > 3}
-        historico_realmente_compativel = False
+        # Extrai os termos principais do sintoma atual do usuário para validar se o histórico da frota é realmente correlato
+        sintoma_lower = sintoma.lower()
+        palavras_sintoma = [p for p in sintoma_lower.split() if len(p) > 3]
         
-        if tem_historico_real:
-            texto_total_hist = " ".join(historicos).lower()
-            historico_realmente_compativel = any(kw in texto_total_hist for kw in palavras_sintoma)
+        # Confere se os registros encontrados na frota contêm alguma palavra-chave correspondente ao problema atual
+        possui_historico_correlato = False
+        if tem_registros_brutos:
+            texto_banco_unificado = " ".join(historicos).lower()
+            # Verifica se há match de pelo menos uma palavra relevante (ex: fumaça, direção, puxando, etc.)
+            possui_historico_correlato = any(kw in texto_banco_unificado for kw in palavras_sintoma)
 
-        if historico_realmente_compativel:
+        if possui_historico_correlato:
             historico_formatado = "\n".join(historicos)
             resultado_web = "PROIBIDO USAR DADOS DA INTERNET."
-            # Instrução focada em priorizar soluções concluídas e evitar mandar esperar OS pendente se houver resolvidas
             instrucao_obrigatoria = (
                 'Inicie OBRIGATORIAMENTE com: "Baseado no histórico local da frota, recomenda-se". '
-                'Se houver OSs concluídas com o serviço realizado (ex: limpeza de bicos), priorize-as como recomendação principal. '
-                'NUNCA recomende aguardar retorno de OS pendente se já existirem OSs concluídas com a solução aplicada na frota.'
+                'Se houver OSs concluídas com o serviço realizado, priorize-as. '
+                'Se houver apenas ocorrências pendentes ou sem retorno, relate que o problema ocorreu em outro veículo, mas a OS ainda não teve retorno do serviço.'
             )
         else:
-            historico_formatado = "Nenhum histórico anterior correlato encontrado na frota."
+            historico_formatado = "Nenhum histórico anterior correlato na frota."
             resultado_web = pesquisar_solucao_web(sintoma)
-            # Instrução com o texto exato exigido por você para o caso sem histórico
+            # A frase exata que você pediu para quando não houver histórico na frota
             instrucao_obrigatoria = (
                 'Inicie OBRIGATORIAMENTE com: "Não identificamos registros de falhas semelhantes. '
                 'Mas com base em pesquisas externas, recomenda‑se"'
@@ -245,21 +248,21 @@ def triagem_mr_halley(sintoma, emp_id, prefixo=None, incluir_saudacao=False):
 
         prompt_texto = f"""
 Você é o assistente técnico Mr. Halley da plataforma Up 2 Today.
-Analise a falha com base absoluta nos dados fornecidos do banco de dados.
+Analise a falha cruzando os dados de toda a frota com base absoluta no banco de dados.
 
 Veículo Analisado: {prefixo if prefixo else "Não informado"}
 Sintoma Relatado: "{sintoma}"
 
-Histórico Geral Encontrado na Frota:
+Histórico Geral Encontrado na Frota (Qualquer veículo):
 {historico_formatado}
 
-Dados Externos (Web - USAR APENAS SE O HISTÓRICO COMPATÍVEL ESTIVER VAZIO):
-{resultado_web[:300] if not historico_realmente_compativel else "Nenhum."}
+Dados Externos (Web - USAR APENAS SE O HISTÓRICO CORRELATO ESTIVER VAZIO):
+{resultado_web[:300] if not possui_historico_correlato else "Nenhum."}
 
 REGRAS DE RESPOSTA ABSOLUTAS:
 1. {instrucao_obrigatoria}
-2. Seja conciso, técnico e direto (máximo de 35 palavras). 
-3. Siga estritamente o formato de início exigido na instrução 1, sem alterar as palavras solicitadas.
+2. Seja conciso, técnico e direto (máximo de 40 palavras). 
+3. Siga estritamente o formato de início exigido na instrução 1, sem misturar conceitos.
 """
 
         resposta = chamar_groq_direto(prompt_texto, api_key)
