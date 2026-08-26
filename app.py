@@ -204,52 +204,41 @@ def buscar_historico_relevante(sintoma, emp_id, prefixo=None):
     except Exception as e:
         return [f"Erro ao buscar histórico: {str(e)}"]
 
-# --- TRIAGEM DO MR. HALLEY 100% DINÂMICA E SEM TRAVAS DE PALAVRAS ---
+# --- TRIAGEM DO MR. HALLEY COM ANÁLISE SEMÂNTICA E CONTEXTUAL ---
 def triagem_mr_halley(sintoma, emp_id, prefixo=None, incluir_saudacao=False):
     try:
         api_key = obter_llm()
         if not api_key:
             return "Erro: Chave da API Groq não configurada."
 
-        # Puxa o histórico genérico da frota para o sintoma relatado
+        # Puxa o histórico de toda a frota
         historicos = buscar_historico_relevante(sintoma, emp_id, prefixo=prefixo)
-        
-        # Verifica de forma ampla se a função de busca trouxe algum registro válido
-        tem_historico = (
-            len(historicos) > 0 
-            and not any("Nenhum histórico" in h or "Erro" in h for h in historicos)
-        )
+        historico_formatado = "\n".join(historicos) if historicos else "Nenhum registro anterior na frota."
 
-        if tem_historico:
-            historico_formatado = "\n".join(historicos[:3])
-            prompt_texto = f"""
-Você é o assistente técnico Mr. Halley da plataforma Up 2 Today.
-Veículo: {prefixo if prefixo else "Não informado"}
+        # Deixamos a IA analisar semanticamente se o histórico do banco realmente se aplica ao sintoma atual
+        prompt_decisao_e_resposta = f"""
+Você é o Mr. Halley, o assistente técnico especialista em manutenção de frotas da plataforma Up 2 Today.
+Analise o sintoma relatado pelo usuário considerando o sentido real, o contexto mecânico e possíveis sinônimos.
+
+Veículo Analisado: {prefixo if prefixo else "Não informado"}
 Sintoma Relatado: "{sintoma}"
 
-Histórico Encontrado na Frota:
+Histórico Disponível no Banco de Dados da Frota:
 {historico_formatado}
 
-REGRAS:
-1. Inicie OBRIGATORIAMENTE com a frase exata: "Baseado no histórico local da frota, recomenda-se"
-2. Analise o histórico acima e descreva o procedimento corretivo correspondente de forma direta (máximo de 30 palavras).
-"""
-        else:
-            resultado_web = pesquisar_solucao_web(sintoma)
-            prompt_texto = f"""
-You are the technical assistant Mr. Halley from the Up 2 Today platform.
-Veículo: {prefixo if prefixo else "Não informado"}
-Sintoma Relatado: "{sintoma}"
-
-Dados da Web:
-{resultado_web[:350] if resultado_web else "Inspeção técnica padrão."}
-
-REGRAS:
-1. Inicie OBRIGATORIAMENTE com a frase exata: "Não identificamos registros de falhas semelhantes. Mas com base em pesquisas externas, recomenda‑se"
-2. Forneça o diagnóstico técnico externo de forma limpa, direta e concisa (máximo de 30 palavras).
+INSTRUÇÕES DE ANÁLISE E RESPOSTA:
+1. Verifique se o histórico acima contém registros com o **mesmo sentido ou contexto técnico** do sintoma relatado (por exemplo, sinônimos ou falhas equivalentes).
+2. CASO EXISTA histórico real com o mesmo sentido na frota:
+   - Você DEVE iniciar a resposta OBRIGATORIAMENTE com a frase exata: "Baseado no histórico local da frota, recomenda-se"
+   - Descreva o procedimento corretivo correspondente de forma direta com base no histórico encontrado.
+3. CASO NÃO EXISTA nenhum histórico com o mesmo sentido na frota (ou se os registros forem sobre problemas totalmente diferentes, como fumaça preta para um problema de direção ou limpador):
+   - Ignore o histórico do banco.
+   - Você DEVE iniciar a resposta OBRIGATORIAMENTE com a frase exata: "Não identificamos registros de falhas semelhantes. Mas com base em pesquisas externas, recomenda‑res..." (ajuste para recomenda-se).
+   - Traga um diagnóstico técnico externo limpo, direto e coerente.
+4. Mantenha a resposta concisa (máximo de 35 palavras). NUNCA misture os cenários.
 """
 
-        resposta = chamar_groq_direto(prompt_texto, api_key)
+        resposta = chamar_groq_direto(prompt_texto_modelo := prompt_decisao_e_resposta, api_key)
         return resposta
         
     except Exception as e:
