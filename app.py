@@ -204,69 +204,61 @@ def buscar_historico_relevante(sintoma, emp_id, prefixo=None):
     except Exception as e:
         return [f"Erro ao buscar histórico: {str(e)}"]
 
-# --- TRIAGEM DO MR. HALLEY HÍBRIDA (HISTÓRICO PENDENTE + DIAGNÓSTICO EXTERNO) ---
+# --- TRIAGEM DO MR. HALLEY 100% DETERMINÍSTICA E BLINDADA ---
 def triagem_mr_halley(sintoma, emp_id, prefixo=None, incluir_saudacao=False):
     try:
         api_key = obter_llm()
-        historicos = buscar_historico_relevante(sintoma, emp_id, prefixo=prefixo)
-        
         if not api_key:
             return "Erro: Chave da API Groq não configurada."
 
-        tem_registros = (
-            len(historicos) > 0 
-            and not any("Nenhum histórico" in h or "Erro" in h for h in historicos)
-        )
+        # Busca bruta na frota
+        historicos = buscar_historico_relevante(sintoma, emp_id, prefixo=prefixo)
         
         sintoma_lower = sintoma.lower()
         palavras_sintoma = [p for p in sintoma_lower.split() if len(p) > 3]
+
+        # Verifica se existe de fato uma OS CONCLUÍDA com serviço realizado na frota para este sintoma
+        tem_historico_concluido = False
+        historicos_filtrados = []
         
-        # Filtra histórico compatível com o sintoma
-        historico_compativel = []
-        if tem_registros:
-            for h in historicos:
-                if any(kw in h.lower() for kw in palavras_sintoma):
-                    historico_compativel.append(h)
+        for h in historicos:
+            h_low = h.lower()
+            # Checa se o registro bate com as palavras do sintoma atual
+            if any(kw in h_low for kw in palavras_sintoma):
+                historicos_filtrados.append(h)
+                # Verifica se é uma OS concluída com serviço de fato
+                if "concluída" in h_low or "realizado" in h_low or "limpeza" in h_low or "troca" in h_low:
+                    tem_historico_concluido = True
 
-        tem_solucao_concluida = any("concluída" in h.lower() or "realizado" in h.lower() or "limpeza" in h.lower() for h in historico_compativel)
-        tem_apenas_pendente = len(historico_compativel) > 0 and not tem_solucao_concluida
-
-        if tem_solucao_concluida:
-            historico_formatado = "\n".join(historico_compativel)
-            resultado_web = "PROIBIDO USAR DADOS DA INTERNET."
-            instrucao_obrigatoria = 'Inicie OBRIGATORIAMENTE com: "Baseado no histórico local da frota, recomenda-se" e cite o procedimento técnico solucionado.'
-        elif tem_apenas_pendente:
-            # Híbrido: Informa a OS pendente e busca o diagnóstico externo para complementar!
-            historico_formatado = "\n".join(historico_compativel)
-            resultado_web = pesquisar_solucao_web(sintoma)
-            instrucao_obrigatoria = (
-                'Inicie OBRIGATORIAMENTE com o seguinte formato exato: '
-                '"Identificamos registro anterior pendente para este sintoma (ex: cite a OS e o veículo). Como ainda não há retorno do serviço realizado, com base em pesquisas externas, recomenda-se"'
-            )
-        else:
-            historico_formatado = "Nenhum histórico anterior correlato."
-            resultado_web = pesquisar_solucao_web(sintoma)
-            instrucao_obrigatoria = (
-                'Inicie OBRIGATORIAMENTE com: "Não identificamos registros de falhas semelhantes. '
-                'Mas com base em pesquisas externas, recomenda‑se"'
-            )
-
-        prompt_texto = f"""
+        # CENÁRIO 1: Existe histórico concluído com solução na frota
+        if tem_historico_concluido and historicos_filtrados:
+            historico_formatado = "\n".join(historicos_filtrados[:3])
+            prompt_texto = f"""
 Você é o assistente técnico Mr. Halley da plataforma Up 2 Today.
-Analise a falha cruzando os dados do banco.
+Veículo: {prefixo if prefixo else "Não informado"}
+Sintoma: "{sintoma}"
 
-Veículo Analisado: {prefixo if prefixo else "Não informado"}
-Sintoma Relatado: "{sintoma}"
-
-Histórico Encontrado na Frota:
+Histórico Concluído na Frota:
 {historico_formatado}
 
-Dados Externos (Web):
-{resultado_web[:300]}
+REGRAS:
+1. Inicie OBRIGATORIAMENTE com a frase exata: "Baseado no histórico local da frota, recomenda-se"
+2. Descreva de forma concisa e direta a ação corretiva com base estritamente no histórico acima (máximo de 25 palavras). NUNCA invente peças.
+"""
+        # CENÁRIO 2: Não há histórico concluído (ou só tem pendente / nada) -> Vai para a Web com a frase exata exigida
+        else:
+            resultado_web = pesquisar_solucao_web(sintoma)
+            prompt_texto = f"""
+Você é o assistente técnico Mr. Halley da plataforma Up 2 Today.
+Veículo: {prefixo if prefixo else "Não informado"}
+Sintoma: "{sintoma}"
 
-REGRAS DE RESPOSTA ABSOLUTAS:
-1. {instrucao_obrigatoria}
-2. Seja técnico, direto e conciso (máximo de 45 palavras).
+Dados da Web:
+{resultado_web[:350] if resultado_web else "Inspeção padrão de alinhamento e componentes."}
+
+REGRAS:
+1. Inicie OBRIGATORIAMENTE com a frase exata: "Não identificamos registros de falhas semelhantes. Mas com base em pesquisas externas, recomenda‑se"
+2. Forneça o diagnóstico técnico externo de forma limpa, direta e concisa (máximo de 30 palavras).
 """
 
         resposta = chamar_groq_direto(prompt_texto, api_key)
