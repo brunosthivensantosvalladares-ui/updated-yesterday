@@ -204,56 +204,66 @@ def buscar_historico_relevante(sintoma, emp_id, prefixo=None):
     except Exception as e:
         return [f"Erro ao buscar histórico: {str(e)}"]
 
-# --- TRIAGEM DO MR. HALLEY COM VERIFICAÇÃO DINÂMICA DE HISTÓRICO REAL ---
+# --- TRIAGEM DO MR. HALLEY 100% CONTROLADA POR PYTHON (SEM ALUCINAÇÃO DA IA) ---
 def triagem_mr_halley(sintoma, emp_id, prefixo=None, incluir_saudacao=False):
     try:
         api_key = obter_llm()
         if not api_key:
             return "Erro: Chave da API Groq não configurada."
 
-        # Puxa o histórico real da frota para o sintoma digitado
-        historicos = buscar_historico_relevante(sintoma, emp_id, prefixo=prefixo)
-        
-        # Verifica se a busca retornou algo válido (ignorando mensagens de vazio ou erro)
-        tem_registros_brutos = (
-            len(historicos) > 0 
-            and not any("Nenhum histórico" in h or "Erro" in h for h in historicos)
-        )
-
-        # Validação inteligente: o histórico só é considerado válido se houver correspondência de termos com o sintoma
+        engine = get_engine()
         sintoma_lower = sintoma.lower()
-        palavras_sintoma = [p for p in sintoma_lower.split() if len(p) > 3]
         
-        possui_historico_valido = False
-        if tem_registros_brutos:
-            texto_unificado = " ".join(historicos).lower()
-            # Se pelo menos uma palavra relevante do sintoma estiver presente no histórico do banco, é um caso real!
-            possui_historico_valido = any(kw in texto_unificado for kw in palavras_sintoma)
+        # Extrai termos relevantes do sintoma (ex: "fumaça", "preta", "direção", "puxando")
+        termos_busca = [p.strip() for p in sintoma_lower.split() if len(p) > 3]
 
-        # CENÁRIO 1: Existe histórico real e compatível na frota (Ex: Fumaça preta)
-        if possui_historico_valido:
-            historico_formatado = "\n".join(historicos[:3])
+        # Busca cirúrgica direto no banco: procura se existe alguma OS na frota que contenha os termos do sintoma
+        # e que tenha o serviço de fato concluído/realizado.
+        query_busca_exata = text("""
+            SELECT data, prefixo, descricao, COALESCE(executor, 'Não informado') as executor, numero_os, realizado 
+            FROM tarefas 
+            WHERE empresa_id = :eid AND realizado = TRUE
+            ORDER BY id DESC LIMIT 30
+        """)
+
+        historico_encontrado = []
+        with engine.connect() as conn:
+            resultados = conn.execute(query_busca_exata, {"eid": str(emp_id)}).fetchall()
+            for r in resultados:
+                desc_banco = str(r[2]).lower()
+                # Verifica se pelo menos 2 termos principais do sintoma batem com a descrição do banco
+                matches = sum(1 for termo in termos_busca if termo in desc_banco)
+                if matches >= 1: # Encontrou histórico real concluído na frota!
+                    dt = str(r[0]) if r[0] else "Data S/N"
+                    pref = str(r[1]) if r[1] else "S/P"
+                    num_os = f"OS {r[4]}" if r[4] else "Sem Nº"
+                    desc_original = str(r[2])
+                    historico_encontrado.append(f"Veículo {pref} ({num_os} em {dt}): {desc_original}")
+
+        # SE O PYTHON ENCONTROU HISTÓRICO REAL CONCLUÍDO:
+        if historico_encontrado:
+            hist_texto = "\n".join(historico_encontrado[:2])
             prompt_texto = f"""
 Você é o assistente técnico Mr. Halley da plataforma Up 2 Today.
-Veículo Analisado: {prefixo if prefixo else "Não informado"}
-Sintoma Relatado: "{sintoma}"
+Veículo: {prefixo if prefixo else "Não informado"}
+Sintoma: "{sintoma}"
 
-Histórico Encontrado no Banco de Dados da Frota:
-{historico_formatado}
+Histórico Real Concluído na Frota:
+{hist_texto}
 
 REGRAS ABSOLUTAS:
 1. Inicie OBRIGATORIAMENTE com a frase exata: "Baseado no histórico local da frota, recomenda-se"
-2. Descreva o procedimento corretivo estritamente com base no histórico acima (ex: limpeza de bicos). Proibido inventar peças ou adicionar listas longas da internet. 
+2. Descreva o procedimento corretivo estritamente com base no histórico acima. Proibido trazer dados externos da web.
 3. Seja conciso (máximo de 30 palavras).
 """
-
-        # CENÁRIO 2: Não há histórico compatível (Ex: Direção puxando) -> Vai para a Web com a frase exata
+        # SE O PYTHON NÃO ENCONTROU NENHUM HISTÓRICO REAL CONCLUÍDO:
         else:
+            # Aqui garantimos que o Python nem passa histórico para a IA, eliminando qualquer chance de erro na direção
             resultado_web = pesquisar_solucao_web(sintoma)
             prompt_texto = f"""
 Você é o assistente técnico Mr. Halley da plataforma Up 2 Today.
-Veículo Analisado: {prefixo if prefixo else "Não informado"}
-Sintoma Relatado: "{sintoma}"
+Veículo: {prefixo if prefixo else "Não informado"}
+Sintoma: "{sintoma}"
 
 Dados da Web:
 {resultado_web[:350] if resultado_web else "Inspeção técnica padrão."}
