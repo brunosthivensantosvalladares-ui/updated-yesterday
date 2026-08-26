@@ -204,61 +204,54 @@ def buscar_historico_relevante(sintoma, emp_id, prefixo=None):
     except Exception as e:
         return [f"Erro ao buscar histórico: {str(e)}"]
 
-# --- TRIAGEM DO MR. HALLEY BASE ESTÁVEL CORRIGIDA ---
+# --- TRIAGEM DO MR. HALLEY 100% BLINDADA NO PYTHON ---
 def triagem_mr_halley(sintoma, emp_id, prefixo=None, incluir_saudacao=False):
     try:
         api_key = obter_llm()
-        historicos = buscar_historico_relevante(sintoma, emp_id, prefixo=prefixo)
-        
         if not api_key:
             return "Erro: Chave da API Groq não configurada."
 
-        tem_historico_real = (
-            len(historicos) > 0 
-            and not any("Nenhum histórico" in h or "Erro" in h for h in historicos)
-        )
+        historicos_brutos = buscar_historico_relevante(sintoma, emp_id, prefixo=prefixo)
         
-        palavras_sintoma = {p.lower() for p in sintoma.split() if len(p) > 3}
-        historico_realmente_compativel = False
-        
-        if tem_historico_real:
-            texto_total_hist = " ".join(historicos).lower()
-            historico_realmente_compativel = any(kw in texto_total_hist for kw in palavras_sintoma)
+        sintoma_lower = sintoma.lower()
+        palavras_sintoma = [p for p in sintoma_lower.split() if len(p) > 3]
 
-        if historico_realmente_compativel:
-            historico_formatado = "\n".join(historicos)
-            resultado_web = "PROIBIDO USAR DADOS DA INTERNET."
-            instrucao_obrigatoria = (
-                'Inicie OBRIGATORIAMENTE com: "Baseado no histórico local da frota, recomenda-se". '
-                'Se houver OSs concluídas com o serviço realizado (ex: limpeza de bicos), priorize-as como recomendação principal. '
-                'NUNCA recomende aguardar retorno de OS pendente se já existirem OSs concluídas com a solução aplicada na frota.'
-            )
-        else:
-            historico_formatado = "Nenhum histórico anterior correlato encontrado na frota."
-            resultado_web = pesquisar_solucao_web(sintoma)
-            # Texto exato ajustado para não gerar conflito de histórico em branco
-            instrucao_obrigatoria = (
-                'Inicie OBRIGATORIAMENTE com: "Não identificamos registros de falhas semelhantes. '
-                'Mas com base em pesquisas externas, recomenda‑se"'
-            )
+        # Filtro estrito em Python: só aceita o histórico se as palavras do sintoma baterem de verdade
+        historicos_reais = []
+        for h in historicos_brutos:
+            h_low = h.lower()
+            if any(kw in h_low for kw in palavras_sintoma):
+                historicos_reais.append(h)
 
-        prompt_texto = f"""
+        # Se encontrou histórico real e compatível (Ex: Fumaça preta)
+        if historicos_reais and not any("Nenhum histórico" in h for h in historicos_reais):
+            historico_formatado = "\n".join(historicos_reais[:3])
+            prompt_texto = f"""
 Você é o assistente técnico Mr. Halley da plataforma Up 2 Today.
-Analise a falha com base absoluta nos dados fornecidos do banco de dados.
+Veículo: {prefixo if prefixo else "Não informado"}
+Sintoma: "{sintoma}"
 
-Veículo Analisado: {prefixo if prefixo else "Não informado"}
-Sintoma Relatado: "{sintoma}"
-
-Histórico Geral Encontrado na Frota:
+Histórico Real Encontrado na Frota:
 {historico_formatado}
 
-Dados Externos (Web - USAR APENAS SE O HISTÓRICO COMPATÍVEL ESTIVER VAZIO):
-{resultado_web[:300] if not historico_realmente_compativel else "Nenhum."}
+REGRAS:
+1. Inicie OBRIGATORIAMENTE com a frase exata: "Baseado no histórico local da frota, recomenda-se"
+2. Descreva o procedimento com base estritamente no histórico acima (ex: limpeza de bicos). Máximo de 35 palavras.
+"""
+        # Se NÃO houver histórico compatível (Ex: Direção puxando) -> Zera o histórico e força a web com a frase exata
+        else:
+            resultado_web = pesquisar_solucao_web(sintoma)
+            prompt_texto = f"""
+Você é o assistente técnico Mr. Halley da plataforma Up 2 Today.
+Veículo: {prefixo if prefixo else "Não informado"}
+Sintoma: "{sintoma}"
 
-REGRAS DE RESPOSTA ABSOLUTAS:
-1. {instrucao_obrigatoria}
-2. Seja conciso, técnico e direto (máximo de 35 palavras). 
-3. Siga estritamente o formato de início exigido na instrução 1, sem alterar as palavras solicitadas.
+Dados da Web:
+{resultado_web[:350] if resultado_web else "Inspeção padrão de alinhamento e componentes."}
+
+REGRAS:
+1. Inicie OBRIGATORIAMENTE com a frase exata: "Não identificamos registros de falhas semelhantes. Mas com base em pesquisas externas, recomenda‑se"
+2. Forneça o diagnóstico técnico externo de forma limpa, direta e concisa (máximo de 35 palavras).
 """
 
         resposta = chamar_groq_direto(prompt_texto, api_key)
@@ -455,7 +448,7 @@ Se for fluxo de OS:
     except Exception:
         return None
         
-# --- RESPOSTAS GERAIS E HISTÓRICOS (ATUALIZADO COM CHAMADA DIRETA E MANUAL DO SISTEMA) ---
+# --- RESPOSTAS GERAIS E CONSULTAS DE HISTÓRICO NO CHAT ---
 def responder_chat_mr_halley(mensagem_usuario, emp_id):
     texto_baixo = mensagem_usuario.lower().strip()
 
@@ -481,31 +474,34 @@ def responder_chat_mr_halley(mensagem_usuario, emp_id):
         ultima = st.session_state.analises_halley[-1]
         prefixo_foco = ultima.get("veiculo")
         contexto_foco_atual = (
-            f"ÚLTIMA ANÁLISE REALIZADA (FOCO ATUAL):\n"
-            f"- Veículo em análise: {ultima['veiculo']}\n"
-            f"- Falha/Sintoma relatado: '{ultima['relato']}'\n"
-            f"- Diagnóstico emitido: {ultima['parecer']}"
+            f"ÚLTIMA ANÁLISE REALIZADA:\n"
+            f"- Veículo: {ultima['veiculo']}\n"
+            f"- Sintoma: '{ultima['relato']}'\n"
+            f"- Parecer: {ultima['parecer']}"
         )
 
-    # Busca o histórico garantindo que traga os dados do veículo em foco se houver
     historicos_banco = buscar_historico_relevante(mensagem_usuario, emp_id, prefixo=prefixo_foco)
-    contexto_banco = "REGISTROS E HISTÓRICOS DE MANUTENÇÃO NO BANCO:\n" + (
-        "\n".join(historicos_banco) if historicos_banco else "Nenhum registro anterior no banco."
+    
+    # Filtra o histórico para perguntas diretas também
+    palavras_user = [p for p in texto_baixo.split() if len(p) > 3]
+    historicos_filtrados = [h for h in historicos_banco if any(kw in h.lower() for kw in palavras_user)]
+    
+    contexto_banco = "REGISTROS REAIS NO BANCO DE DADOS DA FROTA:\n" + (
+        "\n".join(historicos_filtrados) if historicos_filtrados else "Nenhum registro anterior correspondente no banco."
     )
 
     manual_plataforma = """
 FUNCIONALIDADES E PASSO A PASSO DA PLATAFORMA UP 2 TODAY:
-1. Dashboard: Visão geral da operação, métricas de agendados, concluídos e pendentes, e filtros rápidos por período e setor.
-2. Agenda Principal: Centro operacional para controle de janelas de box, horários de disponibilidade (início/fim) e conclusão de serviços.
-3. Cadastro Direto: Utilizado para manutenções preventivas ou revisões periódicas que não vieram de chamados de motoristas.
-4. Chamados Oficina: Espaço onde o gestor visualiza os apontamentos da ponta, aprova chamados, aciona o Mr. Halley para triagem técnica automática e define executores.
-5. Chat Mr. Halley: Assistente virtual integrado para triagem de falhas, consulta de histórico e abertura conversacional de Ordens de Serviço (OS).
-6. OSs Pendentes e Concluídas: Gestão de Lead Time, relatórios exportáveis em Excel e PDF, e histórico completo de prontuários por veículo.
-7. Perfil Motorista: Versão simplificada para dispositivos móveis focada na abertura rápida de solicitações e acompanhamento de status.
+1. Dashboard: Visão geral da operação e indicadores.
+2. Agenda Principal: Controle de janelas de box e manutenções.
+3. Cadastro Direto: Agendamento de preventivas e revisões.
+4. Chamados Oficina: Triagem técnica e diagnósticos com o Mr. Halley.
+5. Chat Mr. Halley: Triagem de falhas e consulta de histórico.
+6. OSs Pendentes e Concluídas: Gestão de Lead Time e relatórios.
 """
 
     template_geral = f"""
-Você é o Mr. Halley, assistente técnico de manutenção, telemetria e suporte da plataforma Up 2 Today.
+Você é o Mr. Halley, assistente técnico e de suporte da plataforma Up 2 Today.
 
 {contexto_foco_atual}
 
@@ -516,10 +512,9 @@ Você é o Mr. Halley, assistente técnico de manutenção, telemetria e suporte
 Pergunta do Usuário: "{mensagem_usuario}"
 
 DIRETRIZES DE RESPOSTA:
-1. Responda de forma direta, clara e prestativa.
-2. Se o usuário perguntar sobre o sistema, funcionalidades ou como usar a plataforma, explique detalhadamente com base no manual acima.
-3. Se houver registros correlatos no histórico do banco, cite-os claramente.
-4. Mantenha um tom profissional e técnico.
+1. Se o usuário perguntar em qual carro ocorreu um problema anterior ou dados de histórico, responda diretamente com os registros reais acima. Se os registros disseram que não há correspondência, diga claramente que não há registros daquele problema na frota, sem inventar.
+2. Se perguntar sobre o sistema, use o manual.
+3. Seja direto e conciso (máximo de 3 frases).
 """
 
     try:
