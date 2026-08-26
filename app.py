@@ -379,13 +379,26 @@ Se for continuação do preenchimento da OS:
             if v and v not in ["...", "None", "null", "Não informado"]:
                 novo_rascunho[k] = v
 
+        # REGRA CORRIGIDA: Só reaproveita o veículo anterior se o usuário pedir explicitamente por termos como "mesmo veículo", "dele", etc.
+        texto_usuario_lower = texto_usuario.lower()
+        pede_mesmo_veiculo = any(termo in texto_usuario_lower for termo in ["mesmo veículo", "mesmo carro", "desse veículo", "desse carro", "dele", "mesmo"])
+        
         if not novo_rascunho.get("prefixo") or str(novo_rascunho.get("prefixo")).lower() in ["desse", "desse veículo", "último"]:
-            if veiculo_contexto != "Não informado":
+            if pede_mesmo_veiculo and veiculo_contexto != "Não informado":
                 novo_rascunho["prefixo"] = veiculo_contexto
+            else:
+                # Se não pediu explicitamente, limpa para forçar o usuário a digitar o prefixo correto
+                novo_rascunho["prefixo"] = None
                 
+        # REGRA CORRIGIDA: Só reaproveita o problema anterior se o usuário pedir explicitamente por "mesmo problema", etc.
+        pede_mesmo_problema = any(termo in texto_usuario_lower for termo in ["mesmo problema", "mesmo defeito", "igual", "mesma falha"])
+        
         if not novo_rascunho.get("descricao") or str(novo_rascunho.get("descricao")).lower() in ["mesmo problema", "problema"]:
-            if relato_contexto:
+            if pede_mesmo_problema and relato_contexto:
                 novo_rascunho["descricao"] = relato_contexto
+            else:
+                # Se não pediu explicitamente, limpa para exigir que o usuário informe o serviço atual
+                novo_rascunho["descricao"] = None
 
         if not novo_rascunho.get("turno"):
             novo_rascunho["turno"] = "Não definido"
