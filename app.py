@@ -218,7 +218,7 @@ def buscar_historico_relevante(sintoma, emp_id, prefixo=None):
     except Exception as e:
         return [f"Erro ao buscar histórico: {str(e)}"]
 
-# --- TRIAGEM DO MR. HALLEY PROFISSIONAL E FLUIDA ---
+# --- TRIAGEM DO MR. HALLEY COM LEITURA FIEL DO BANCO DE DADOS ---
 def triagem_mr_halley(sintoma, emp_id, prefixo=None, incluir_saudacao=False):
     try:
         api_key = obter_llm()
@@ -231,8 +231,8 @@ def triagem_mr_halley(sintoma, emp_id, prefixo=None, incluir_saudacao=False):
         
         if tem_historico_real:
             historico_formatado = "\n".join(historicos)
-            resultado_web = ""
-            instrucao_obrigatoria = 'Inicie OBRIGATORIAMENTE com: "Baseado no histórico local da frota, recomenda-se" e cite de forma natural a OS anterior encontrada, seguida da inspeção corretiva recomendada (ex: verificação do sistema de injeção e escape).'
+            resultado_web = "PROIBIDO USAR DADOS DA INTERNET."
+            instrucao_obrigatoria = 'Inicie OBRIGATORIAMENTE com: "Baseado no histórico local da frota, recomenda-se"'
         else:
             historico_formatado = "Nenhum histórico anterior para este veículo específico."
             resultado_web = pesquisar_solucao_web(sintoma)
@@ -240,7 +240,7 @@ def triagem_mr_halley(sintoma, emp_id, prefixo=None, incluir_saudacao=False):
 
         prompt_texto = f"""
 Você é o assistente técnico Mr. Halley da plataforma Up 2 Today.
-Analise a falha e dê um diagnóstico mecânico cirúrgico.
+Analise a falha com base absoluta nos dados fornecidos do banco de dados.
 
 Veículo: {prefixo if prefixo else "Não informado"}
 Sintoma: "{sintoma}"
@@ -248,12 +248,11 @@ Sintoma: "{sintoma}"
 Histórico do Veículo no Banco de Dados:
 {historico_formatado}
 
-Dados Externos:
-{resultado_web[:300] if resultado_web else "Nenhum."}
-
-REGRAS DE RESPOSTA PROFISSIONAL:
+REGRAS DE RESPOSTA ABSOLUTAS:
 1. {instrucao_obrigatoria}
-2. Escreva um texto fluído, técnico e corporativo (máximo de 30 palavras). Proibido termos robóticos como "verificar o caso OS". Diga de forma clara que o veículo já possui registro anterior e qual o procedimento indicado.
+2. Se o histórico contiver o que foi feito (ex: limpeza de bicos), cite explicitamente essa informação do banco.
+3. Se o histórico contiver apenas o relato do problema e não especificar o serviço executado (ou estiver pendente de retorno), relate claramente que o veículo já apresentou a ocorrência na OS anterior, mas que o prontuário não possui o registro do retorno do serviço realizado. NUNCA invente informações da internet.
+4. Seja conciso (máximo de 35 palavras).
 """
 
         resposta = chamar_groq_direto(prompt_texto, api_key)
