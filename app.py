@@ -239,9 +239,9 @@ INSTRUÇÕES DE ANÁLISE E RESPOSTA:
     except Exception as e:
         return f"⚠️ Erro interno na IA: {str(e)}"
         
-# --- PROCESSAMENTO INTELIGENTE DE OS COM SUPORTE A INTERRUPÇÃO DE DÚVIDAS ---
+# --- PROCESSAMENTO INTELIGENTE DE OS COM EXIGÊNCIA DE DESCRIÇÃO E INTERRUPÇÃO DE DÚVIDAS ---
 def processar_comando_os(texto_usuario, emp_id):
-    """Gerencia a coleta progressiva, mas cancela o fluxo se o usuário fizer uma pergunta geral ou dúvida."""
+    """Gerencia a coleta progressiva da OS, garantindo a cobrança da descrição e suporte a interrupções."""
     if "rascunho_os" not in st.session_state:
         st.session_state.rascunho_os = None
     if "aguardando_confirmacao_os" not in st.session_state:
@@ -336,18 +336,16 @@ Histórico Recente da Conversa no Chat:
 {ultimas_msgs if ultimas_msgs else "Nenhuma mensagem anterior."}
 
 Mensagem Atual do Usuário: "{texto_usuario}"
-Rascunho Existente: {json.dumps(rascunho, ensure_ascii=False)}
+Rascunho Existente de OS: {json.dumps(rascunho, ensure_ascii=False)}
 Em Fluxo de OS Ativo? {bool(rascunho or st.session_state.aguardando_confirmacao_os)}
-Veículo em Análise Recente na Tela: {veiculo_contexto}
-Relato da Análise Recente: "{relato_contexto}"
 
-DIRETRIZ CRÍTICA DE FLUXO:
-- Se o usuário disser frases como "para esse mesmo veículo", "mesmo carro", "dele", "mesmo problema", "quero abrir uma OS", ou fornecer dados da OS (como mecânico, data, descrição), isso É UM FLUXO DE OS ATIVO. Você DEVE retornar `em_fluxo_os: true`.
-- NUNCA trate um pedido de abertura de OS ou menção a veículo/problema anterior como uma dúvida geral do sistema. Só retorne `em_fluxo_os: false` se for uma pergunta explícita sobre o manual ou funcionalidades (ex: "como dou baixa?", "quais as abas?").
+DIRETRIZ CRÍTICA DE INTERRUPÇÃO:
+- Se a mensagem atual do usuário for uma **pergunta sobre o sistema, funcionalidades, dúvidas gerais ou qualquer assunto que mude de contexto** (mesmo que haja um rascunho de OS aberto), você DEVE cancelar o fluxo de OS imediatamente retornando `em_fluxo_os: false`.
+- Se o usuário estiver de fato fornecendo dados para continuar o preenchimento da OS, mantenha `em_fluxo_os: true` e preencha os campos.
 
 CAMPOS DA OS:
-- prefixo: Número/placa do veículo. Se o usuário disser "esse mesmo veículo" ou "dele", capture o Veículo em Análise Recente na Tela ({veiculo_contexto}).
-- descricao: Descrição do serviço. Se o usuário disser "mesmo problema", capture o Relato Recente ({relato_contexto}). Caso contrário, capture o que foi dito na frase atual ou deixe null se faltar.
+- prefixo: Número/placa do veículo.
+- descricao: Descrição detalhada do problema ou serviço a ser realizado.
 - executor: Mecânico ou responsável.
 - data: Data AAAA-MM-DD.
 - area: Mecânica, Elétrica, Borracharia, Chapeamento ou Limpeza.
@@ -357,10 +355,10 @@ CAMPOS DA OS:
 
 Responda EXCLUSIVAMENTE em formato JSON puro:
 
-Se NÃO for assunto de OS (pergunta real sobre o manual do sistema):
+Se for pergunta geral, dúvida ou interrupção:
 {{"em_fluxo_os": false}}
 
-Se for fluxo de OS (pedido de abertura, continuação ou uso de contexto anterior):
+Se for continuação do preenchimento da OS:
 {{"em_fluxo_os": true, "prefixo": "...", "descricao": "...", "executor": "...", "data": "...", "area": "...", "turno": "...", "inicio": "...", "fim": "..."}}
 """
 
@@ -370,10 +368,9 @@ Se for fluxo de OS (pedido de abertura, continuação ou uso de contexto anterio
         dados = json.loads(resultado_limpo)
 
         if not dados.get("em_fluxo_os"):
-            # O usuário interrompeu o fluxo com uma pergunta! Limpamos o rascunho.
             st.session_state.rascunho_os = None
             st.session_state.aguardando_confirmacao_os = False
-            return None  # Retorna None para deixar o chat responder normalmente à dúvida geral
+            return None
 
         novo_rascunho = rascunho.copy()
         for k in ["prefixo", "descricao", "executor", "data", "area", "turno", "inicio", "fim"]:
@@ -381,25 +378,30 @@ Se for fluxo de OS (pedido de abertura, continuação ou uso de contexto anterio
             if v and v not in ["...", "None", "null", "Não informado"]:
                 novo_rascunho[k] = v
 
-        # GARANTIA DE DESCRIÇÃO: Se o usuário mandou uma frase livre e o modelo deixou a descrição vazia,
-        # aproveitamos a frase do usuário como a descrição do problema!
-        if not novo_rascunho.get("descricao") or str(novo_rascunho.get("descricao")) in ["...", "None", "null", "Não informado"]:
-            # Se a mensagem atual não for apenas um comando curto de confirmação, ela vira a descrição
-            if texto_baixo not in ["ok", "sim", "certo", "confirmar"]:
-                novo_rascunho["descricao"] = texto_usuario
+        texto_usuario_lower = texto_usuario.lower()
         
-        # 1. VALIDAÇÃO DE PREFIXO: Só puxa se o usuário pediu explicitamente pelo mesmo veículo
+        # REGRA RIGOROSA: Só reaproveita o veículo anterior se houver pedido explícito
         pede_mesmo_veiculo = any(termo in texto_usuario_lower for termo in ["mesmo veículo", "mesmo carro", "desse veículo", "desse carro", "dele", "mesmo"])
-        if not pede_mesmo_veiculo and not rascunho.get("prefixo"):
-            # Se é uma conversa nova e ele não disse o prefixo na frase, limpamos para forçar a digitação
-            if not any(char.isdigit() for char in texto_usuario): # se não tem número de veículo na frase atual
+        if not novo_rascunho.get("prefixo") or str(novo_rascunho.get("prefixo")).lower() in ["desse", "desse veículo", "último"]:
+            if pede_mesmo_veiculo and veiculo_contexto != "Não informado":
+                novo_rascunho["prefixo"] = veiculo_contexto
+            else:
                 novo_rascunho["prefixo"] = None
-
-        # 2. VALIDAÇÃO DE DESCRIÇÃO: Só puxa o problema anterior se o usuário pediu explicitamente
+                
+        # REGRA RIGOROSA: Só reaproveita o problema anterior se houver pedido explícito
         pede_mesmo_problema = any(termo in texto_usuario_lower for termo in ["mesmo problema", "mesmo defeito", "igual", "mesma falha"])
-        if not pede_mesmo_problema:
-            # Se não pediu o mesmo problema, limpamos a descrição para obrigar o usuário a relatar o serviço atual
-            novo_rascunho["descricao"] = None
+        if not novo_rascunho.get("descricao") or str(novo_rascunho.get("descricao")).lower() in ["mesmo problema", "problema"]:
+            if pede_mesmo_problema and relato_contexto:
+                novo_rascunho["descricao"] = relato_contexto
+            else:
+                novo_rascunho["descricao"] = None
+
+        # GARANTIA DE CAPTURA DA DESCRIÇÃO: Se o modelo falhou mas o usuário digitou texto livre que não seja confirmação, assume como descrição
+        if not novo_rascunho.get("descricao") and texto_baixo not in ["ok", "sim", "certo", "confirmar"]:
+            if len(texto_usuario) > 3 and not any(char.isdigit() and len(texto_usuario) <= 6 for char in texto_usuario):
+                # Se não for apenas um número de veículo isolado, armazena como descrição
+                if not novo_rascunho.get("prefixo") or texto_usuario != str(novo_rascunho.get("prefixo")):
+                    novo_rascunho["descricao"] = texto_usuario
 
         if not novo_rascunho.get("turno"):
             novo_rascunho["turno"] = "Não definido"
@@ -410,16 +412,17 @@ Se for fluxo de OS (pedido de abertura, continuação ou uso de contexto anterio
 
         st.session_state.rascunho_os = novo_rascunho
 
+        # VALIDAÇÃO DOS CAMPOS OBRIGATÓRIOS (EXIGINDO DESCRIÇÃO E PREFIXO)
         campos_faltantes = []
-        if not novo_rascunho.get("prefixo"):
+        if not novo_rascunho.get("prefixo") or str(novo_rascunho.get("prefixo")) in ["...", "None", "null", "Não informado"]:
             campos_faltantes.append("Prefixo do Veículo")
-        if not novo_rascunho.get("descricao"):
+        if not novo_rascunho.get("descricao") or str(novo_rascunho.get("descricao")) in ["...", "None", "null", "Não informado"]:
             campos_faltantes.append("Descrição do Serviço")
-        if not novo_rascunho.get("executor"):
+        if not novo_rascunho.get("executor") or str(novo_rascunho.get("executor")) in ["...", "None", "null", "Não informado"]:
             campos_faltantes.append("Mecânico Responsável")
-        if not novo_rascunho.get("data"):
+        if not novo_rascunho.get("data") or str(novo_rascunho.get("data")) in ["...", "None", "null", "Não informado"]:
             campos_faltantes.append("Data de Agendamento")
-        if not novo_rascunho.get("area"):
+        if not novo_rascunho.get("area") or str(novo_rascunho.get("area")) in ["...", "None", "null", "Não informado"]:
             campos_faltantes.append("Área (Mecânica, Elétrica, Borracharia, Chapeamento ou Limpeza)")
 
         if campos_faltantes:
@@ -482,7 +485,6 @@ def responder_chat_mr_halley(mensagem_usuario, emp_id):
         "\n".join(historicos_banco) if historicos_banco else "Nenhum registro anterior no banco."
     )
 
-    # MANUAL ATUALIZADO COM OS LOCAIS EXATOS DE ABERTURA DE CHAMADOS
     manual_plataforma = """
 FUNCIONALIDADES E PASSO A PASSO DA PLATAFORMA UP 2 TODAY:
 1. Dashboard: Visão geral da operação e métricas principais.
