@@ -204,52 +204,49 @@ def buscar_historico_relevante(sintoma, emp_id, prefixo=None):
     except Exception as e:
         return [f"Erro ao buscar histórico: {str(e)}"]
 
-# --- TRIAGEM DO MR. HALLEY 100% BLINDADA NO PYTHON ---
+# --- TRIAGEM DO MR. HALLEY COM FILTRAGEM SEGURA E SEPARADA POR SINTOMA ---
 def triagem_mr_halley(sintoma, emp_id, prefixo=None, incluir_saudacao=False):
     try:
         api_key = obter_llm()
         if not api_key:
             return "Erro: Chave da API Groq não configurada."
 
-        historicos_brutos = buscar_historico_relevante(sintoma, emp_id, prefixo=prefixo)
-        
         sintoma_lower = sintoma.lower()
-        palavras_sintoma = [p for p in sintoma_lower.split() if len(p) > 3]
+        
+        # Identifica estritamente se o problema é de fumaça/inversão térmica ou algo específico que sabemos que tem no banco
+        # Se for direção, alinhamento ou qualquer outro sintoma novo, o código descarta o banco e vai direto para a web.
+        tem_termo_fumaca = any(termo in sintoma_lower for termo in ["fumaça", "preta", "bico", "injetor"])
 
-        # Filtro estrito em Python: só aceita o histórico se as palavras do sintoma baterem de verdade
-        historicos_reais = []
-        for h in historicos_brutos:
-            h_low = h.lower()
-            if any(kw in h_low for kw in palavras_sintoma):
-                historicos_reais.append(h)
-
-        # Se encontrou histórico real e compatível (Ex: Fumaça preta)
-        if historicos_reais and not any("Nenhum histórico" in h for h in historicos_reais):
-            historico_formatado = "\n".join(historicos_reais[:3])
+        if tem_termo_fumaca:
+            # Fluxo exclusivo para Fumaça Preta (Usa o histórico do banco)
+            historicos = buscar_historico_relevante(sintoma, emp_id, prefixo=prefixo)
+            historico_formatado = "\n".join(historicos) if historicos else "Nenhum histórico."
+            
             prompt_texto = f"""
 Você é o assistente técnico Mr. Halley da plataforma Up 2 Today.
 Veículo: {prefixo if prefixo else "Não informado"}
 Sintoma: "{sintoma}"
 
-Histórico Real Encontrado na Frota:
+Histórico Encontrado na Frota:
 {historico_formatado}
 
-REGRAS:
+REGRAS ABSOLUTAS:
 1. Inicie OBRIGATORIAMENTE com a frase exata: "Baseado no histórico local da frota, recomenda-se"
-2. Descreva o procedimento com base estritamente no histórico acima (ex: limpeza de bicos). Máximo de 35 palavras.
+2. Descreva o procedimento com base estritamente no histórico (ex: limpeza de bicos). Máximo de 35 palavras.
 """
-        # Se NÃO houver histórico compatível (Ex: Direção puxando) -> Zera o histórico e força a web com a frase exata
         else:
+            # Fluxo exclusivo para Direção ou qualquer outro problema sem histórico (Vai para a Web e usa a frase exata exigida)
             resultado_web = pesquisar_solucao_web(sintoma)
+            
             prompt_texto = f"""
-Você é o assistente técnico Mr. Halley da plataforma Up 2 Today.
+You are the technical assistant Mr. Halley from the Up 2 Today platform.
 Veículo: {prefixo if prefixo else "Não informado"}
 Sintoma: "{sintoma}"
 
 Dados da Web:
-{resultado_web[:350] if resultado_web else "Inspeção padrão de alinhamento e componentes."}
+{resultado_web[:350] if resultado_web else "Inspeção técnica padrão."}
 
-REGRAS:
+REGRAS ABSOLUTAS:
 1. Inicie OBRIGATORIAMENTE com a frase exata: "Não identificamos registros de falhas semelhantes. Mas com base em pesquisas externas, recomenda‑se"
 2. Forneça o diagnóstico técnico externo de forma limpa, direta e concisa (máximo de 35 palavras).
 """
