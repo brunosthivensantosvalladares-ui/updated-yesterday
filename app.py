@@ -362,43 +362,49 @@ Se for continuação do preenchimento da OS:
 """
 
     try:
-        resultado = chamar_groq_direto(template_fluxo, api_key)
-        resultado_limpo = resultado.replace("```json", "").replace("```", "").strip()
-        dados = json.loads(resultado_limpo)
+            resultado = chamar_groq_direto(template_fluxo, api_key)
+            resultado_limpo = resultado.replace("```json", "").replace("```", "").strip()
+            dados = json.loads(resultado_limpo)
 
-        if not dados.get("em_fluxo_os"):
-            st.session_state.rascunho_os = None
-            st.session_state.aguardando_confirmacao_os = False
-            return None
+            if not dados.get("em_fluxo_os"):
+                st.session_state.rascunho_os = None
+                st.session_state.aguardando_confirmacao_os = False
+                return None
 
-        novo_rascunho = rascunho.copy()
-        for k in ["prefixo", "descricao", "executor", "data", "area", "turno", "inicio", "fim"]:
-            v = dados.get(k)
-            if v and v not in ["...", "None", "null", "Não informado"]:
-                novo_rascunho[k] = v
+            novo_rascunho = rascunho.copy()
+            for k in ["prefixo", "descricao", "executor", "data", "area", "turno", "inicio", "fim"]:
+                v = dados.get(k)
+                if v and v not in ["...", "None", "null", "Não informado"]:
+                    novo_rascunho[k] = v
 
-        texto_usuario_lower = texto_usuario.lower()
-        
-        # Reaproveita o veículo apenas se pedido explicitamente
-        pede_mesmo_veiculo = any(termo in texto_usuario_lower for termo in ["mesmo veículo", "mesmo carro", "desse veículo", "desse carro", "dele", "mesmo"])
-        if not novo_rascunho.get("prefixo") or str(novo_rascunho.get("prefixo")).lower() in ["desse", "desse veículo", "último"]:
-            if pede_mesmo_veiculo and veiculo_contexto != "Não informado":
-                novo_rascunho["prefixo"] = veiculo_contexto
-            else:
-                novo_rascunho["prefixo"] = None
-                
-        # CORREÇÃO CRUCIAL: Só reaproveita o problema anterior se o usuário disser explicitamente "mesmo problema". 
-        # Se ele disse apenas "para este mesmo veículo", limpamos a descrição para OBRIGAR o pedido do novo problema!
-        pede_mesmo_problema = any(termo in texto_usuario_lower for termo in ["mesmo problema", "mesmo defeito", "igual", "mesma falha"])
-        if not pede_mesmo_problema:
-            novo_rascunho["descricao"] = None
+            texto_usuario_lower = texto_usuario.lower()
+            
+            # Reaproveita o veículo apenas se pedido explicitamente
+            pede_mesmo_veiculo = any(termo in texto_usuario_lower for termo in ["mesmo veículo", "mesmo carro", "desse veículo", "desse carro", "dele", "mesmo"])
+            if not novo_rascunho.get("prefixo") or str(novo_rascunho.get("prefixo")).lower() in ["desse", "desse veículo", "último"]:
+                if pede_mesmo_veiculo and veiculo_contexto != "Não informado":
+                    novo_rascunho["prefixo"] = veiculo_contexto
+                else:
+                    novo_rascunho["prefixo"] = None
+                    
+            # Só reaproveita o problema anterior se o usuário disser explicitamente "mesmo problema". 
+            pede_mesmo_problema = any(termo in texto_usuario_lower for termo in ["mesmo problema", "mesmo defeito", "igual", "mesma falha"])
+            if not pede_mesmo_problema:
+                novo_rascunho["descricao"] = None
 
-        if not novo_rascunho.get("turno"):
-            novo_rascunho["turno"] = "Não definido"
-        if not novo_rascunho.get("inicio"):
-            novo_rascunho["inicio"] = "00:00"
-        if not novo_rascunho.get("fim"):
-            novo_rascunho["fim"] = "00:00"
+            # --- REDE DE SEGURANÇA DEFINITIVA PARA A DESCRIÇÃO ---
+            # Se a descrição estiver vazia e a mensagem atual não for um comando de confirmação ou cancelamento,
+            # o texto digitado pelo usuário vira obrigatoriamente a descrição do serviço.
+            if not novo_rascunho.get("descricao") or str(novo_rascunho.get("descricao")) in ["...", "None", "null", "Não informado"]:
+                if texto_baixo not in ["ok", "sim", "certo", "confirmar", "cancelar"]:
+                    novo_rascunho["descricao"] = texto_usuario
+
+            if not novo_rascunho.get("turno"):
+                novo_rascunho["turno"] = "Não definido"
+            if not novo_rascunho.get("inicio"):
+                novo_rascunho["inicio"] = "00:00"
+            if not novo_rascunho.get("fim"):
+                novo_rascunho["fim"] = "00:00"
 
         st.session_state.rascunho_os = novo_rascunho
 
