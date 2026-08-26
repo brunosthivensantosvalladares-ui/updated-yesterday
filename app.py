@@ -218,8 +218,8 @@ def buscar_historico_relevante(sintoma, emp_id, prefixo=None):
     except Exception as e:
         return [f"Erro ao buscar histórico: {str(e)}"]
 
-# --- TRIAGEM DO MR. HALLEY COM DIAGNÓSTICO DIRETO E LIMPO ---
-def triagem_mr_halley(sintoma, emp_id, prefixo=nullptr if 'nullptr' in locals() else None, incluir_saudacao=False):
+# --- TRIAGEM DO MR. HALLEY PROFISSIONAL E FLUIDA ---
+def triagem_mr_halley(sintoma, emp_id, prefixo=None, incluir_saudacao=False):
     try:
         api_key = obter_llm()
         historicos = buscar_historico_relevante(sintoma, emp_id, prefixo=prefixo)
@@ -232,7 +232,7 @@ def triagem_mr_halley(sintoma, emp_id, prefixo=nullptr if 'nullptr' in locals() 
         if tem_historico_real:
             historico_formatado = "\n".join(historicos)
             resultado_web = ""
-            instrucao_obrigatoria = 'Inicie OBRIGATORIAMENTE com: "Baseado no histórico local da frota, recomenda-se" e cite o registro anterior encontrado, indicando a necessidade de inspecionar os componentes de injeção e escape relacionados à falha.'
+            instrucao_obrigatoria = 'Inicie OBRIGATORIAMENTE com: "Baseado no histórico local da frota, recomenda-se" e cite de forma natural a OS anterior encontrada, seguida da inspeção corretiva recomendada (ex: verificação do sistema de injeção e escape).'
         else:
             historico_formatado = "Nenhum histórico anterior para este veículo específico."
             resultado_web = pesquisar_solucao_web(sintoma)
@@ -251,9 +251,9 @@ Histórico do Veículo no Banco de Dados:
 Dados Externos:
 {resultado_web[:300] if resultado_web else "Nenhum."}
 
-REGRAS DE RESPOSTA RIGOROSAS:
+REGRAS DE RESPOSTA PROFISSIONAL:
 1. {instrucao_obrigatoria}
-2. Seja direto e conciso (máximo de 25 palavras no total). Proibido listar dezenas de peças. Apenas a recomendação principal baseada no histórico.
+2. Escreva um texto fluído, técnico e corporativo (máximo de 30 palavras). Proibido termos robóticos como "verificar o caso OS". Diga de forma clara que o veículo já possui registro anterior e qual o procedimento indicado.
 """
 
         resposta = chamar_groq_direto(prompt_texto, api_key)
