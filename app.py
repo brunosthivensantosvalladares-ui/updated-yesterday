@@ -546,9 +546,6 @@ DIRETRIZES DE RESPOSTA:
         return resposta
     except Exception as e:
         return f"Erro ao processar consulta: {str(e)}"
-```[cite: 2]
-
-Com esses ajustes aplicados e salvos no arquivo, os cenários de histórico concluído, pendente com base externa e consultas sobre o sistema voltam a rodar de maneira isolada e precisa[cite: 2].
         
 # --- CHAT FLUTUANTE EM CSS/HTML + PYTHON COM SCROLL AUTOMÁTICO PARA O TOPO DA RESPOSTA ---
 def renderizar_chat_flutuante(emp_id):
