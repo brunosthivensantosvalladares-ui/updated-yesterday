@@ -239,9 +239,8 @@ INSTRUÇÕES DE ANÁLISE E RESPOSTA:
     except Exception as e:
         return f"⚠️ Erro interno na IA: {str(e)}"
         
-# --- PROCESSAMENTO INTELIGENTE DE OS COM EXIGÊNCIA DE DESCRIÇÃO E INTERRUPÇÃO DE DÚVIDAS ---
+# --- PROCESSAMENTO INTELIGENTE DE OS COM COBRANÇA OBRIGATÓRIA DE DESCRIÇÃO QUANDO HOUVER TROCA DE PROBLEMA ---
 def processar_comando_os(texto_usuario, emp_id):
-    """Gerencia a coleta progressiva da OS, garantindo a cobrança da descrição e suporte a interrupções."""
     if "rascunho_os" not in st.session_state:
         st.session_state.rascunho_os = None
     if "aguardando_confirmacao_os" not in st.session_state:
@@ -380,7 +379,7 @@ Se for continuação do preenchimento da OS:
 
         texto_usuario_lower = texto_usuario.lower()
         
-        # REGRA RIGOROSA: Só reaproveita o veículo anterior se houver pedido explícito
+        # Reaproveita o veículo apenas se pedido explicitamente
         pede_mesmo_veiculo = any(termo in texto_usuario_lower for termo in ["mesmo veículo", "mesmo carro", "desse veículo", "desse carro", "dele", "mesmo"])
         if not novo_rascunho.get("prefixo") or str(novo_rascunho.get("prefixo")).lower() in ["desse", "desse veículo", "último"]:
             if pede_mesmo_veiculo and veiculo_contexto != "Não informado":
@@ -388,20 +387,11 @@ Se for continuação do preenchimento da OS:
             else:
                 novo_rascunho["prefixo"] = None
                 
-        # REGRA RIGOROSA: Só reaproveita o problema anterior se houver pedido explícito
+        # CORREÇÃO CRUCIAL: Só reaproveita o problema anterior se o usuário disser explicitamente "mesmo problema". 
+        # Se ele disse apenas "para este mesmo veículo", limpamos a descrição para OBRIGAR o pedido do novo problema!
         pede_mesmo_problema = any(termo in texto_usuario_lower for termo in ["mesmo problema", "mesmo defeito", "igual", "mesma falha"])
-        if not novo_rascunho.get("descricao") or str(novo_rascunho.get("descricao")).lower() in ["mesmo problema", "problema"]:
-            if pede_mesmo_problema and relato_contexto:
-                novo_rascunho["descricao"] = relato_contexto
-            else:
-                novo_rascunho["descricao"] = None
-
-        # GARANTIA DE CAPTURA DA DESCRIÇÃO: Se o modelo falhou mas o usuário digitou texto livre que não seja confirmação, assume como descrição
-        if not novo_rascunho.get("descricao") and texto_baixo not in ["ok", "sim", "certo", "confirmar"]:
-            if len(texto_usuario) > 3 and not any(char.isdigit() and len(texto_usuario) <= 6 for char in texto_usuario):
-                # Se não for apenas um número de veículo isolado, armazena como descrição
-                if not novo_rascunho.get("prefixo") or texto_usuario != str(novo_rascunho.get("prefixo")):
-                    novo_rascunho["descricao"] = texto_usuario
+        if not pede_mesmo_problema:
+            novo_rascunho["descricao"] = None
 
         if not novo_rascunho.get("turno"):
             novo_rascunho["turno"] = "Não definido"
