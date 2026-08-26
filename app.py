@@ -204,7 +204,7 @@ def buscar_historico_relevante(sintoma, emp_id, prefixo=None):
     except Exception as e:
         return [f"Erro ao buscar histórico: {str(e)}"]
 
-# --- TRIAGEM DO MR. HALLEY COM ANÁLISE GERAL DA FROTA E TRATAMENTO DE RETORNO ---
+# --- TRIAGEM DO MR. HALLEY COM VALIDAÇÃO RIGOROSA DE RELEVÂNCIA DE HISTÓRICO ---
 def triagem_mr_halley(sintoma, emp_id, prefixo=None, incluir_saudacao=False):
     try:
         api_key = obter_llm()
@@ -213,32 +213,48 @@ def triagem_mr_halley(sintoma, emp_id, prefixo=None, incluir_saudacao=False):
         if not api_key:
             return "Erro: Chave da API Groq não configurada."
 
-        tem_historico = len(historicos) > 0 and not any("Nenhum histórico" in h or "Erro" in h for h in historicos)
+        # Verifica se realmente encontrou histórico relevante (descartando mensagens de vazio ou erro)
+        tem_historico_real = (
+            len(historicos) > 0 
+            and not any("Nenhum histórico" in h or "Erro" in h for h in historicos)
+        )
         
-        if tem_historico:
+        # Palavras-chave do sintoma atual para conferir se o histórico encontrado realmente fala do mesmo problema
+        palavras_sintoma = {p.lower() for p in sintoma.split() if len(p) > 3}
+        
+        # Confere se há interseção real de termos entre o histórico retornado e o sintoma atual
+        historico_realmente_compativel = False
+        if tem_historico_real:
+            texto_total_hist = " ".join(historicos).lower()
+            historico_realmente_compativel = any(kw in texto_total_hist for kw in palavras_sintoma)
+
+        if historico_realmente_compativel:
             historico_formatado = "\n".join(historicos)
             resultado_web = "PROIBIDO USAR DADOS DA INTERNET."
             instrucao_obrigatoria = 'Inicie OBRIGATORIAMENTE com: "Baseado no histórico local da frota, recomenda-se"'
         else:
-            historico_formatado = "Nenhum histórico anterior encontrado na frota."
+            historico_formatado = "Nenhum histórico anterior correlato encontrado na frota."
             resultado_web = pesquisar_solucao_web(sintoma)
             instrucao_obrigatoria = 'Inicie OBRIGATORIAMENTE com: "Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se"'
 
         prompt_texto = f"""
 Você é o assistente técnico Mr. Halley da plataforma Up 2 Today.
-Analise a falha cruzando os dados de toda a frota com base absoluta no banco de dados.
+Analise a falha com base absoluta nos dados fornecidos do banco de dados.
 
 Veículo Analisado: {prefixo if prefixo else "Não informado"}
 Sintoma Relatado: "{sintoma}"
 
-Histórico Geral Encontrado na Frota (Outros ou o mesmo veículo):
+Histórico Geral Encontrado na Frota:
 {historico_formatado}
+
+Dados Externos (Web - USAR APENAS SE O HISTÓRICO COMPATÍVEL ESTIVER VAZIO):
+{resultado_web[:300] if not historico_realmente_compativel else "Nenhum."}
 
 REGRAS DE RESPOSTA ABSOLUTAS:
 1. {instrucao_obrigatoria}
-2. Se o histórico encontrado contiver o que foi feito para sanar o problema (serviço concluído com execução descrita), cite explicitamente o procedimento realizado.
-3. Se o histórico mostrar que ocorreu em outro veículo (ou no mesmo) mas a OS está pendente ou foi concluída sem o serviço detalhado/realizado, relate exatamente: que ocorreu no carro [prefixo] no dia [data], mas a OS não teve retorno do serviço realizado ainda.
-4. NUNCA invente informações da internet quando houver histórico na frota.
+2. Se houver histórico compatível com o sintoma, cite explicitamente o procedimento realizado ou relate se a OS está pendente de retorno, conforme o caso.
+3. Se NÃO houver histórico compatível (caso em que a frase obrigatória inicia com "Não identificamos registros..."), utilize os Dados Externos para orientar o diagnóstico técnico correto de forma limpa.
+4. NUNCA misture os dois cenários e nunca diga que há histórico se ele não for compatível com o problema.
 5. Seja conciso (máximo de 40 palavras).
 """
 
