@@ -218,8 +218,8 @@ def buscar_historico_relevante(sintoma, emp_id, prefixo=None):
     except Exception as e:
         return [f"Erro ao buscar histórico: {str(e)}"]
 
-# --- TRIAGEM DO MR. HALLEY COM TRAVA RIGOROSA CONTRA CONTRADIÇÕES ---
-def triagem_mr_halley(sintoma, emp_id, prefixo=None, incluir_saudacao=False):
+# --- TRIAGEM DO MR. HALLEY COM DIAGNÓSTICO DIRETO E LIMPO ---
+def triagem_mr_halley(sintoma, emp_id, prefixo=nullptr if 'nullptr' in locals() else None, incluir_saudacao=False):
     try:
         api_key = obter_llm()
         historicos = buscar_historico_relevante(sintoma, emp_id, prefixo=prefixo)
@@ -227,13 +227,12 @@ def triagem_mr_halley(sintoma, emp_id, prefixo=None, incluir_saudacao=False):
         if not api_key:
             return "Erro: Chave da API Groq não configurada."
 
-        # Filtra para ver se temos dados reais do veículo
         tem_historico_real = any(f"VEÍCULO {prefixo}" in h.upper() for h in historicos) if prefixo else False
         
         if tem_historico_real:
             historico_formatado = "\n".join(historicos)
-            resultado_web = "PESQUISA WEB DESLIGADA (EXISTE HISTÓRICO LOCAL)."
-            instrucao_obrigatoria = 'Inicie OBRIGATORIAMENTE com: "Baseado no histórico local da frota, recomenda-se" e cite o serviço anterior realizado.'
+            resultado_web = ""
+            instrucao_obrigatoria = 'Inicie OBRIGATORIAMENTE com: "Baseado no histórico local da frota, recomenda-se" e cite o registro anterior encontrado, indicando a necessidade de inspecionar os componentes de injeção e escape relacionados à falha.'
         else:
             historico_formatado = "Nenhum histórico anterior para este veículo específico."
             resultado_web = pesquisar_solucao_web(sintoma)
@@ -250,12 +249,11 @@ Histórico do Veículo no Banco de Dados:
 {historico_formatado}
 
 Dados Externos:
-{resultado_web[:400]}
+{resultado_web[:300] if resultado_web else "Nenhum."}
 
 REGRAS DE RESPOSTA RIGOROSAS:
 1. {instrucao_obrigatoria}
-2. Proibido saudações ou misturar mensagens de que "não há registro" quando houver histórico.
-3. Descreva a ação corretiva exata no infinitivo citando componentes específicos em até 35 palavras.
+2. Seja direto e conciso (máximo de 25 palavras no total). Proibido listar dezenas de peças. Apenas a recomendação principal baseada no histórico.
 """
 
         resposta = chamar_groq_direto(prompt_texto, api_key)
