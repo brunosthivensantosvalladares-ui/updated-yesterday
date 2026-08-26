@@ -204,7 +204,7 @@ def buscar_historico_relevante(sintoma, emp_id, prefixo=None):
     except Exception as e:
         return [f"Erro ao buscar histórico: {str(e)}"]
 
-# --- TRIAGEM DO MR. HALLEY COM HIERARQUIA DE HISTÓRICO E TEXTO EXTERNO EXATO ---
+# --- TRIAGEM DO MR. HALLEY COM VERIFICAÇÃO RIGOROSA DE RELEVÂNCIA DO SINTOMA ---
 def triagem_mr_halley(sintoma, emp_id, prefixo=None, incluir_saudacao=False):
     try:
         api_key = obter_llm()
@@ -218,17 +218,19 @@ def triagem_mr_halley(sintoma, emp_id, prefixo=None, incluir_saudacao=False):
             and not any("Nenhum histórico" in h or "Erro" in h for h in historicos)
         )
         
-        palavras_sintoma = {p.lower() for p in sintoma.split() if len(p) > 3}
-        historico_realmente_compativel = False
+        # Filtro cirúrgico: verifica se o histórico encontrado realmente fala sobre o problema pesquisado
+        sintoma_lower = sintoma.lower()
+        palavras_relevantes = [p for p in sintoma_lower.split() if len(p) > 3]
         
+        historico_realmente_compativel = False
         if tem_historico_real:
             texto_total_hist = " ".join(historicos).lower()
-            historico_realmente_compativel = any(kw in texto_total_hist for kw in palavras_sintoma)
+            # O histórico só é válido se contiver pelo menos uma palavra-chave forte do sintoma atual
+            historico_realmente_compativel = any(kw in texto_total_hist for kw in palavras_relevantes)
 
         if historico_realmente_compativel:
             historico_formatado = "\n".join(historicos)
             resultado_web = "PROIBIDO USAR DADOS DA INTERNET."
-            # Instrução focada em priorizar soluções concluídas e evitar mandar esperar OS pendente se houver resolvidas
             instrucao_obrigatoria = (
                 'Inicie OBRIGATORIAMENTE com: "Baseado no histórico local da frota, recomenda-se". '
                 'Se houver OSs concluídas com o serviço realizado (ex: limpeza de bicos), priorize-as como recomendação principal. '
@@ -237,10 +239,10 @@ def triagem_mr_halley(sintoma, emp_id, prefixo=None, incluir_saudacao=False):
         else:
             historico_formatado = "Nenhum histórico anterior correlato encontrado na frota."
             resultado_web = pesquisar_solucao_web(sintoma)
-            # Instrução com o texto exato exigido por você para o caso sem histórico
+            # O texto exato exigido por você para quando não houver histórico real compatível
             instrucao_obrigatoria = (
                 'Inicie OBRIGATORIAMENTE com: "Não identificamos registros de falhas semelhantes. '
-                'Mas com base em pesquisas externas, recomenda‑se"'
+                'Mas com base em pesquisas externas, recomenda‑res..." (substitua por recomenda-se).'
             )
 
         prompt_texto = f"""
