@@ -379,7 +379,12 @@ Se for continuação do preenchimento da OS:
             if v and v not in ["...", "None", "null", "Não informado"]:
                 novo_rascunho[k] = v
 
-        texto_usuario_lower = texto_usuario.lower()
+        # GARANTIA DE DESCRIÇÃO: Se o usuário mandou uma frase livre e o modelo deixou a descrição vazia,
+        # aproveitamos a frase do usuário como a descrição do problema!
+        if not novo_rascunho.get("descricao") or str(novo_rascunho.get("descricao")) in ["...", "None", "null", "Não informado"]:
+            # Se a mensagem atual não for apenas um comando curto de confirmação, ela vira a descrição
+            if texto_baixo not in ["ok", "sim", "certo", "confirmar"]:
+                novo_rascunho["descricao"] = texto_usuario
         
         # 1. VALIDAÇÃO DE PREFIXO: Só puxa se o usuário pediu explicitamente pelo mesmo veículo
         pede_mesmo_veiculo = any(termo in texto_usuario_lower for termo in ["mesmo veículo", "mesmo carro", "desse veículo", "desse carro", "dele", "mesmo"])
