@@ -204,52 +204,63 @@ def buscar_historico_relevante(sintoma, emp_id, prefixo=None):
     except Exception as e:
         return [f"Erro ao buscar histórico: {str(e)}"]
 
-# --- TRIAGEM DO MR. HALLEY COM SEPARAÇÃO ESTRITA DE FLUXO (HISTÓRICO VS WEB) ---
+# --- TRIAGEM DO MR. HALLEY COM VERIFICAÇÃO DINÂMICA DE HISTÓRICO REAL ---
 def triagem_mr_halley(sintoma, emp_id, prefixo=None, incluir_saudacao=False):
     try:
         api_key = obter_llm()
         if not api_key:
             return "Erro: Chave da API Groq não configurada."
 
-        sintoma_lower = sintoma.lower()
+        # Puxa o histórico real da frota para o sintoma digitado
+        historicos = buscar_historico_relevante(sintoma, emp_id, prefixo=prefixo)
         
-        # Palavras-chave fortes que indicam se existe histórico relevante na frota (ex: fumaça, injeção, motor, etc.)
-        # Se o sintoma for direção, alinhamento, suspensão, etc., ele NENHUMA VEZ vai olhar o histórico de fumaça.
-        termos_fumaça = ["fumaça", "preta", "bico", "injetor", "injeção"]
-        eh_caso_fumaça = any(t in sintoma_lower for t in termos_fumaça)
+        # Verifica se a busca retornou algo válido (ignorando mensagens de vazio ou erro)
+        tem_registros_brutos = (
+            len(historicos) > 0 
+            and not any("Nenhum histórico" in h or "Erro" in h for h in historicos)
+        )
 
-        if eh_caso_fumaça:
-            # Puxa o histórico real apenas se for o caso de fumaça
-            historicos = buscar_historico_relevante(sintoma, emp_id, prefixo=prefixo)
-            historico_formatado = "\n".join(historicos) if historicos else "Nenhum histórico."
-            
+        # Validação inteligente: o histórico só é considerado válido se houver correspondência de termos com o sintoma
+        sintoma_lower = sintoma.lower()
+        palavras_sintoma = [p for p in sintoma_lower.split() if len(p) > 3]
+        
+        possui_historico_valido = False
+        if tem_registros_brutos:
+            texto_unificado = " ".join(historicos).lower()
+            # Se pelo menos uma palavra relevante do sintoma estiver presente no histórico do banco, é um caso real!
+            possui_historico_valido = any(kw in texto_unificado for kw in palavras_sintoma)
+
+        # CENÁRIO 1: Existe histórico real e compatível na frota (Ex: Fumaça preta)
+        if possui_historico_valido:
+            historico_formatado = "\n".join(historicos[:3])
             prompt_texto = f"""
 Você é o assistente técnico Mr. Halley da plataforma Up 2 Today.
-Veículo: {prefixo if prefixo else "Não informado"}
-Sintoma: "{sintoma}"
+Veículo Analisado: {prefixo if prefixo else "Não informado"}
+Sintoma Relatado: "{sintoma}"
 
-Histórico Encontrado na Frota:
+Histórico Encontrado no Banco de Dados da Frota:
 {historico_formatado}
 
 REGRAS ABSOLUTAS:
 1. Inicie OBRIGATORIAMENTE com a frase exata: "Baseado no histórico local da frota, recomenda-se"
-2. Descreva o procedimento com base estritamente no histórico (ex: limpeza de bicos). Máximo de 35 palavras.
+2. Descreva o procedimento corretivo estritamente com base no histórico acima (ex: limpeza de bicos). Proibido inventar peças ou adicionar listas longas da internet. 
+3. Seja conciso (máximo de 30 palavras).
 """
+
+        # CENÁRIO 2: Não há histórico compatível (Ex: Direção puxando) -> Vai para a Web com a frase exata
         else:
-            # Para QUALQUER OUTRO CASO (como direção puxando), ignoramos o banco 100% e vamos direto para a web
             resultado_web = pesquisar_solucao_web(sintoma)
-            
             prompt_texto = f"""
 Você é o assistente técnico Mr. Halley da plataforma Up 2 Today.
-Veículo: {prefixo if prefixo else "Não informado"}
-Sintoma: "{sintoma}"
+Veículo Analisado: {prefixo if prefixo else "Não informado"}
+Sintoma Relatado: "{sintoma}"
 
 Dados da Web:
-{resultado_web[:350] if resultado_web else "Inspeção padrão de alinhamento, suspensão e calibragem de pneus."}
+{resultado_web[:350] if resultado_web else "Inspeção técnica padrão."}
 
 REGRAS ABSOLUTAS:
 1. Inicie OBRIGATORIAMENTE com a frase exata: "Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se"
-2. Forneça o diagnóstico técnico externo de forma limpa, direta e concisa (máximo de 35 palavras).
+2. Forneça o diagnóstico técnico externo de forma limpa, direta e concisa (máximo de 30 palavras).
 """
 
         resposta = chamar_groq_direto(prompt_texto, api_key)
