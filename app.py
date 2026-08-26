@@ -239,9 +239,9 @@ INSTRUÇÕES DE ANÁLISE E RESPOSTA:
     except Exception as e:
         return f"⚠️ Erro interno na IA: {str(e)}"
         
-# --- PROCESSAMENTO DETERMINÍSTICO DE ABERTURA DE OS VIA CHAT (ATUALIZADO SEM LANGCHAIN) ---
+# --- PROCESSAMENTO INTELIGENTE DE OS COM SUPORTE A INTERRUPÇÃO DE DÚVIDAS ---
 def processar_comando_os(texto_usuario, emp_id):
-    """Gerencia a coleta progressiva exigindo Prefixo, Descrição, Mecânico, Data e Área com suporte a contexto da última OS."""
+    """Gerencia a coleta progressiva, mas cancela o fluxo se o usuário fizer uma pergunta geral ou dúvida."""
     if "rascunho_os" not in st.session_state:
         st.session_state.rascunho_os = None
     if "aguardando_confirmacao_os" not in st.session_state:
@@ -336,28 +336,29 @@ Histórico Recente da Conversa no Chat:
 {ultimas_msgs if ultimas_msgs else "Nenhuma mensagem anterior."}
 
 Mensagem Atual do Usuário: "{texto_usuario}"
-Rascunho Existente: {json.dumps(rascunho, ensure_ascii=False)}
+Rascunho Existente de OS: {json.dumps(rascunho, ensure_ascii=False)}
 Em Fluxo de OS Ativo? {bool(rascunho or st.session_state.aguardando_confirmacao_os)}
-Veículo em Análise Recente na Tela (Última OS / Foco): {veiculo_contexto}
-Relato da Análise Recente: "{relato_contexto}"
-Referência da Data Atual do Sistema: {hoje_str}
+
+DIRETRIZ CRÍTICA DE INTERRUPÇÃO:
+- Se a mensagem atual do usuário for uma **pergunta sobre o sistema, funcionalidades, dúvidas gerais ou qualquer assunto que mude de contexto** (mesmo que haja um rascunho de OS aberto), você DEVE cancelar o fluxo de OS imediatamente retornando `em_fluxo_os: false`.
+- Se o usuário estiver de fato fornecendo dados para continuar o preenchimento da OS, mantenha `em_fluxo_os: true` e preencha os campos.
 
 CAMPOS DA OS:
-- prefixo: Número/placa do veículo. REGRA CRÍTICA: Se o usuário disser "desse veículo", "desse", "último", "dele" ou similar, capture obrigatoriamente o Veículo em Análise Recente na Tela ({veiculo_contexto}).
-- descricao: Descrição do problema/serviço. Se o usuário disser "mesmo problema" ou similar, capture o Relato da Análise Recente ({relato_contexto}).
-- executor: Mecânico ou responsável
-- data: Data no formato AAAA-MM-DD. Deixe nulo se não informada.
-- area: APENAS UMA DAS 5 OPÇÕES: Mecânica, Elétrica, Borracharia, Chapeamento ou Limpeza. Deixe nulo se não informada.
-- turno: Não definido, Dia ou Noite
-- inicio: Horário inicial HH:MM
-- fim: Horário final HH:MM
+- prefixo: Número/placa do veículo.
+- descricao: Descrição do problema/serviço.
+- executor: Mecânico ou responsável.
+- data: Data AAAA-MM-DD.
+- area: Mecânica, Elétrica, Borracharia, Chapeamento ou Limpeza.
+- turno: Não definido, Dia ou Noite.
+- inicio: HH:MM
+- fim: HH:MM
 
 Responda EXCLUSIVAMENTE em formato JSON puro:
 
-Se NÃO for assunto de OS e NÃO houver fluxo em andamento:
+Se for pergunta geral, dúvida ou interrupção:
 {{"em_fluxo_os": false}}
 
-Se for fluxo de OS:
+Se for continuação do preenchimento da OS:
 {{"em_fluxo_os": true, "prefixo": "...", "descricao": "...", "executor": "...", "data": "...", "area": "...", "turno": "...", "inicio": "...", "fim": "..."}}
 """
 
@@ -367,7 +368,10 @@ Se for fluxo de OS:
         dados = json.loads(resultado_limpo)
 
         if not dados.get("em_fluxo_os"):
-            return None
+            # O usuário interrompeu o fluxo com uma pergunta! Limpamos o rascunho.
+            st.session_state.rascunho_os = None
+            st.session_state.aguardando_confirmacao_os = False
+            return None  # Retorna None para deixar o chat responder normalmente à dúvida geral
 
         novo_rascunho = rascunho.copy()
         for k in ["prefixo", "descricao", "executor", "data", "area", "turno", "inicio", "fim"]:
