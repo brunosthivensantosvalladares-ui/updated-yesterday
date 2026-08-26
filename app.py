@@ -204,7 +204,7 @@ def buscar_historico_relevante(sintoma, emp_id, prefixo=None):
     except Exception as e:
         return [f"Erro ao buscar histórico: {str(e)}"]
 
-# --- TRIAGEM DO MR. HALLEY COM FILTRAGEM SEGURA E SEPARADA POR SINTOMA ---
+# --- TRIAGEM DO MR. HALLEY COM TRAVA ESTRITA DE CONTEÚDO PARA O HISTÓRICO ---
 def triagem_mr_halley(sintoma, emp_id, prefixo=None, incluir_saudacao=False):
     try:
         api_key = obter_llm()
@@ -212,13 +212,9 @@ def triagem_mr_halley(sintoma, emp_id, prefixo=None, incluir_saudacao=False):
             return "Erro: Chave da API Groq não configurada."
 
         sintoma_lower = sintoma.lower()
-        
-        # Identifica estritamente se o problema é de fumaça/inversão térmica ou algo específico que sabemos que tem no banco
-        # Se for direção, alinhamento ou qualquer outro sintoma novo, o código descarta o banco e vai direto para a web.
         tem_termo_fumaca = any(termo in sintoma_lower for termo in ["fumaça", "preta", "bico", "injetor"])
 
         if tem_termo_fumaca:
-            # Fluxo exclusivo para Fumaça Preta (Usa o histórico do banco)
             historicos = buscar_historico_relevante(sintoma, emp_id, prefixo=prefixo)
             historico_formatado = "\n".join(historicos) if historicos else "Nenhum histórico."
             
@@ -232,10 +228,10 @@ Histórico Encontrado na Frota:
 
 REGRAS ABSOLUTAS:
 1. Inicie OBRIGATORIAMENTE com a frase exata: "Baseado no histórico local da frota, recomenda-se"
-2. Descreva o procedimento com base estritamente no histórico (ex: limpeza de bicos). Máximo de 35 palavras.
+2. Baseie sua resposta EXCLUSIVA E UNICAMENTE no que está escrito explicitamente no Histórico acima. É ESTRITAMENTE PROIBIDO adicionar peças, filtros ou procedimentos que não estejam descritos no histórico do banco (como filtro de ar ou teste de emissões).
+3. Seja direto e conciso (máximo de 25 palavras).
 """
         else:
-            # Fluxo exclusivo para Direção ou qualquer outro problema sem histórico (Vai para a Web e usa a frase exata exigida)
             resultado_web = pesquisar_solucao_web(sintoma)
             
             prompt_texto = f"""
