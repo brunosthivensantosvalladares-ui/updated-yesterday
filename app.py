@@ -157,68 +157,54 @@ def chamar_groq_direto(prompt_texto, api_key):
     except Exception as e:
         return f"Erro de conexão: {str(e)}"
 
-# --- BUSCA DE HISTÓRICO COMPLETA (100% DAS OSs DO VEÍCULO) ---
+# --- BUSCA DE HISTÓRICO GERAL NA FROTA POR SIMILARIDADE DE SINTOMA ---
 def buscar_historico_relevante(sintoma, emp_id, prefixo=None):
-    """Busca todas as ordens de serviço históricas do veículo específico sem limite de paginação."""
+    """Busca ordens de serviço em toda a frota que contenham relação com o sintoma relatado."""
     engine = get_engine()
     
-    # Se o prefixo não veio explícito, tentamos capturar o último veículo da análise recente na tela
-    if (not prefixo or prefixo == "Não informado") and "analises_halley" in st.session_state and st.session_state.analises_halley:
-        prefixo = st.session_state.analises_halley[-1].get("veiculo")
-
-    query_todos_veiculo = text("""
-        SELECT data, prefixo, descricao, COALESCE(executor, 'Não informado') as executor, numero_os 
-        FROM tarefas 
-        WHERE empresa_id = :eid AND LOWER(prefixo) = LOWER(:pref)
-        ORDER BY id DESC
-    """)
-    
-    query_frota_recente = text("""
-        SELECT data, prefixo, descricao, COALESCE(executor, 'Não informado') as executor, numero_os 
+    # Busca global na frota filtrando por palavras-chave do sintoma para achar ocorrências em qualquer veículo
+    query_geral_frota = text("""
+        SELECT data, prefixo, descricao, COALESCE(executor, 'Não informado') as executor, numero_os, realizado 
         FROM tarefas 
         WHERE empresa_id = :eid
-        ORDER BY id DESC LIMIT 20
+        ORDER BY id DESC LIMIT 50
     """)
     
     try:
         historico_formatado = []
         vistos = set()
         
+        # Limpa palavras irrelevantes e pega termos-chave do sintoma para cruzar
+        palavras_chave = [p.lower() for p in sintoma.split() if len(p) > 3]
+        
         with engine.connect() as conn:
-            if prefixo and prefixo != "Não informado":
-                res_veiculo = conn.execute(query_todos_veiculo, {"eid": str(emp_id), "pref": str(prefixo)}).fetchall()
-                for r in res_veiculo:
-                    dt = str(r[0]) if r[0] else "Data S/N"
-                    pref = str(r[1]) if r[1] else "S/P"
-                    desc = str(r[2]).strip() if r[2] else ""
-                    execut = str(r[3]) if r[3] else "Não informado"
-                    num_os = f"OS {r[4]}" if r[4] else "Sem Nº"
-                    
-                    linha = f"[HISTÓRICO COMPLETO DO VEÍCULO {pref}] Data: {dt} | {num_os} | Serviço: {desc} | Mecânico: {execut}"
-                    chave = (dt, pref, desc.lower())
-                    if chave not in vistos:
-                        vistos.add(chave)
-                        historico_formatado.append(linha)
-
-            res_frota = conn.execute(query_frota_recente, {"eid": str(emp_id)}).fetchall()
-            for r in res_frota:
+            resultados = conn.execute(query_geral_frota, {"eid": str(emp_id)}).fetchall()
+            
+            for r in resultados:
                 dt = str(r[0]) if r[0] else "Data S/N"
                 pref = str(r[1]) if r[1] else "S/P"
                 desc = str(r[2]).strip() if r[2] else ""
                 execut = str(r[3]) if r[3] else "Não informado"
                 num_os = f"OS {r[4]}" if r[4] else "Sem Nº"
+                realizado = r[5]
                 
-                linha = f"[Frota Geral] Data: {dt} | Veículo {pref} | {num_os} | Serviço: {desc} | Mecânico: {execut}"
-                chave = (dt, pref, desc.lower())
-                if chave not in vistos:
-                    vistos.add(chave)
-                    historico_formatado.append(linha)
+                desc_lower = desc.lower()
+                # Verifica se há relevância com o sintoma ou se é o mesmo veículo
+                relevante = (prefixo and str(pref).lower() == str(prefixo).lower()) or any(kw in desc_lower for kw in palavras_chave)
+                
+                if relevante:
+                    status_os = "Concluída" if realizado else "Pendente / Sem retorno de execução"
+                    linha = f"[Veículo {pref}] Data: {dt} | {num_os} | Status: {status_os} | Descrição/Serviço: {desc} | Mecânico: {execut}"
+                    chave = (dt, pref, desc_lower)
+                    if chave not in vistos:
+                        vistos.add(chave)
+                        historico_formatado.append(linha)
 
-        return historico_formatado[:50]
+        return historico_formatado[:20] if historico_formatado else ["Nenhum histórico correlato na frota."]
     except Exception as e:
         return [f"Erro ao buscar histórico: {str(e)}"]
 
-# --- TRIAGEM DO MR. HALLEY COM LEITURA FIEL DO BANCO DE DADOS ---
+# --- TRIAGEM DO MR. HALLEY COM ANÁLISE GERAL DA FROTA E TRATAMENTO DE RETORNO ---
 def triagem_mr_halley(sintoma, emp_id, prefixo=None, incluir_saudacao=False):
     try:
         api_key = obter_llm()
@@ -227,32 +213,33 @@ def triagem_mr_halley(sintoma, emp_id, prefixo=None, incluir_saudacao=False):
         if not api_key:
             return "Erro: Chave da API Groq não configurada."
 
-        tem_historico_real = any(f"VEÍCULO {prefixo}" in h.upper() for h in historicos) if prefixo else False
+        tem_historico = len(historicos) > 0 and not any("Nenhum histórico" in h or "Erro" in h for h in historicos)
         
-        if tem_historico_real:
+        if tem_historico:
             historico_formatado = "\n".join(historicos)
             resultado_web = "PROIBIDO USAR DADOS DA INTERNET."
             instrucao_obrigatoria = 'Inicie OBRIGATORIAMENTE com: "Baseado no histórico local da frota, recomenda-se"'
         else:
-            historico_formatado = "Nenhum histórico anterior para este veículo específico."
+            historico_formatado = "Nenhum histórico anterior encontrado na frota."
             resultado_web = pesquisar_solucao_web(sintoma)
             instrucao_obrigatoria = 'Inicie OBRIGATORIAMENTE com: "Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se"'
 
         prompt_texto = f"""
 Você é o assistente técnico Mr. Halley da plataforma Up 2 Today.
-Analise a falha com base absoluta nos dados fornecidos do banco de dados.
+Analise a falha cruzando os dados de toda a frota com base absoluta no banco de dados.
 
-Veículo: {prefixo if prefixo else "Não informado"}
-Sintoma: "{sintoma}"
+Veículo Analisado: {prefixo if prefixo else "Não informado"}
+Sintoma Relatado: "{sintoma}"
 
-Histórico do Veículo no Banco de Dados:
+Histórico Geral Encontrado na Frota (Outros ou o mesmo veículo):
 {historico_formatado}
 
 REGRAS DE RESPOSTA ABSOLUTAS:
 1. {instrucao_obrigatoria}
-2. Se o histórico contiver o que foi feito (ex: limpeza de bicos), cite explicitamente essa informação do banco.
-3. Se o histórico contiver apenas o relato do problema e não especificar o serviço executado (ou estiver pendente de retorno), relate claramente que o veículo já apresentou a ocorrência na OS anterior, mas que o prontuário não possui o registro do retorno do serviço realizado. NUNCA invente informações da internet.
-4. Seja conciso (máximo de 35 palavras).
+2. Se o histórico encontrado contiver o que foi feito para sanar o problema (serviço concluído com execução descrita), cite explicitamente o procedimento realizado.
+3. Se o histórico mostrar que ocorreu em outro veículo (ou no mesmo) mas a OS está pendente ou foi concluída sem o serviço detalhado/realizado, relate exatamente: que ocorreu no carro [prefixo] no dia [data], mas a OS não teve retorno do serviço realizado ainda.
+4. NUNCA invente informações da internet quando houver histórico na frota.
+5. Seja conciso (máximo de 40 palavras).
 """
 
         resposta = chamar_groq_direto(prompt_texto, api_key)
