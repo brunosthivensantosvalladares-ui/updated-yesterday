@@ -336,16 +336,18 @@ Histórico Recente da Conversa no Chat:
 {ultimas_msgs if ultimas_msgs else "Nenhuma mensagem anterior."}
 
 Mensagem Atual do Usuário: "{texto_usuario}"
-Rascunho Existente de OS: {json.dumps(rascunho, ensure_ascii=False)}
+Rascunho Existente: {json.dumps(rascunho, ensure_ascii=False)}
 Em Fluxo de OS Ativo? {bool(rascunho or st.session_state.aguardando_confirmacao_os)}
+Veículo em Análise Recente na Tela: {veiculo_contexto}
+Relato da Análise Recente: "{relato_contexto}"
 
-DIRETRIZ CRÍTICA DE INTERRUPÇÃO:
-- Se a mensagem atual do usuário for uma **pergunta sobre o sistema, funcionalidades, dúvidas gerais ou qualquer assunto que mude de contexto** (mesmo que haja um rascunho de OS aberto), você DEVE cancelar o fluxo de OS imediatamente retornando `em_fluxo_os: false`.
-- Se o usuário estiver de fato fornecendo dados para continuar o preenchimento da OS, mantenha `em_fluxo_os: true` e preencha os campos.
+DIRETRIZ CRÍTICA DE FLUXO:
+- Se o usuário disser frases como "para esse mesmo veículo", "mesmo carro", "dele", "mesmo problema", "quero abrir uma OS", ou fornecer dados da OS (como mecânico, data, descrição), isso É UM FLUXO DE OS ATIVO. Você DEVE retornar `em_fluxo_os: true`.
+- NUNCA trate um pedido de abertura de OS ou menção a veículo/problema anterior como uma dúvida geral do sistema. Só retorne `em_fluxo_os: false` se for uma pergunta explícita sobre o manual ou funcionalidades (ex: "como dou baixa?", "quais as abas?").
 
 CAMPOS DA OS:
-- prefixo: Número/placa do veículo.
-- descricao: Descrição do problema/serviço.
+- prefixo: Número/placa do veículo. Se o usuário disser "esse mesmo veículo" ou "dele", capture o Veículo em Análise Recente na Tela ({veiculo_contexto}).
+- descricao: Descrição do serviço. Se o usuário disser "mesmo problema", capture o Relato Recente ({relato_contexto}). Caso contrário, capture o que foi dito na frase atual ou deixe null se faltar.
 - executor: Mecânico ou responsável.
 - data: Data AAAA-MM-DD.
 - area: Mecânica, Elétrica, Borracharia, Chapeamento ou Limpeza.
@@ -355,10 +357,10 @@ CAMPOS DA OS:
 
 Responda EXCLUSIVAMENTE em formato JSON puro:
 
-Se for pergunta geral, dúvida ou interrupção:
+Se NÃO for assunto de OS (pergunta real sobre o manual do sistema):
 {{"em_fluxo_os": false}}
 
-Se for continuação do preenchimento da OS:
+Se for fluxo de OS (pedido de abertura, continuação ou uso de contexto anterior):
 {{"em_fluxo_os": true, "prefixo": "...", "descricao": "...", "executor": "...", "data": "...", "area": "...", "turno": "...", "inicio": "...", "fim": "..."}}
 """
 
