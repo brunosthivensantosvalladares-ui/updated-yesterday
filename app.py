@@ -218,7 +218,7 @@ def buscar_historico_relevante(sintoma, emp_id, prefixo=None):
     except Exception as e:
         return [f"Erro ao buscar histórico: {str(e)}"]
 
-# --- TRIAGEM DO MR. HALLEY COMPLETA ---
+# --- TRIAGEM DO MR. HALLEY COM FOCO ESTRITO NO HISTÓRICO LOCAL ---
 def triagem_mr_halley(sintoma, emp_id, prefixo=None, incluir_saudacao=False):
     try:
         api_key = obter_llm()
@@ -228,7 +228,10 @@ def triagem_mr_halley(sintoma, emp_id, prefixo=None, incluir_saudacao=False):
             return "Erro: Chave da API Groq não configurada."
 
         historico_formatado = "\n".join(historicos) if historicos else "Nenhum histórico anterior."
-        resultado_web = pesquisar_solucao_web(sintoma)
+        
+        # Só pesquisa na web se REALMENTE não houver nenhum histórico cadastrado
+        tem_historico_valido = len(historicos) > 0 and not any("Nenhum registro" in h or "Erro" in h for h in historicos)
+        resultado_web = "" if tem_historico_valido else pesquisar_solucao_web(sintoma)
 
         prompt_texto = f"""
 Você é o assistente técnico Mr. Halley da plataforma Up 2 Today.
@@ -237,17 +240,17 @@ Analise a falha e dê um diagnóstico mecânico cirúrgico.
 Veículo: {prefixo if prefixo else "Não informado"}
 Sintoma: "{sintoma}"
 
-Histórico da Frota:
+Histórico da Frota (Banco de Dados Local):
 {historico_formatado}
 
-Dados da Web:
-{resultado_web[:400] if resultado_web else "Inspeção padrão."}
+Dados Técnicos Externos (Web - USAR APENAS SE O HISTÓRICO ESTIVER VAZIO):
+{resultado_web[:400] if resultado_web else "Nenhum dado externo necessário."}
 
-REGRAS DE RESPOSTA:
-1. Se houver OS anterior correlata no histórico, inicie obrigatoriamente com: "Baseado no histórico local da frota, recomenda-se"
-2. Se não houver, inicie obrigatoriamente com: "Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se"
-3. Proibido saudações.
-4. Descreva a ação técnica exata no infinitivo citando componentes específicos em até 35 palavras. NUNCA repita o sintoma de forma genérica.
+REGRAS RIGOROSAS DE RESPOSTA:
+1. SE houver registro correspondente no histórico local da frota acima, baseie sua resposta EXCLUSIVA E ESTRITAMENTE nas informações locais daquele histórico (indique o que foi feito no veículo correspondente) e inicie obrigatoriamente com: "Baseado no histórico local da frota, recomenda-se"
+2. SE o histórico local estiver totalmente vazio ou não tiver relação com o problema, inicie obrigatoriamente com: "Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se"
+3. Proibido saudações ou misturar dados externos quando houver histórico local.
+4. Descreva a ação técnica exata no infinitivo citando componentes específicos em até 35 palavras.
 """
 
         resposta = chamar_groq_direto(prompt_texto, api_key)
@@ -517,7 +520,7 @@ DIRETRIZES DE RESPOSTA:
     except Exception as e:
         return f"Erro ao processar consulta: {str(e)}"
         
-# --- CHAT FLUTUANTE EM CSS/HTML + PYTHON COM ESTADO PERSISTENTE ---
+# --- CHAT FLUTUANTE EM CSS/HTML + PYTHON COM SCROLL AUTOMÁTICO PARA O TOPO DA RESPOSTA ---
 def renderizar_chat_flutuante(emp_id):
     URL_AVATAR_HALLEY = "https://i.postimg.cc/5tBtrL6C/Whats-App-Image-2026-07-23-at-22-35-53.png"
     
@@ -585,6 +588,19 @@ def renderizar_chat_flutuante(emp_id):
                         resp = responder_chat_mr_halley(prompt, emp_id)
                         st.markdown(resp)
             st.session_state.mensagens_chat_halley.append({"role": "assistant", "content": resp})
+            
+            # Script JS para rolar o container para o início da última mensagem do assistente
+            components.html("""
+                <script>
+                    const doc = window.parent.document;
+                    const chatContainers = doc.querySelectorAll('div[data-testid="stVerticalBlock"]');
+                    chatContainers.forEach(container => {
+                        if (container.scrollTop !== undefined) {
+                            container.scrollTop = container.scrollHeight;
+                        }
+                    });
+                </script>
+            """, height=0)
             st.rerun()
             
 def gerar_pdf_manual_oficial_pro():
