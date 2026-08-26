@@ -204,38 +204,33 @@ def buscar_historico_relevante(sintoma, emp_id, prefixo=None):
     except Exception as e:
         return [f"Erro ao buscar histórico: {str(e)}"]
 
-# --- TRIAGEM DO MR. HALLEY COM ANÁLISE SEMÂNTICA E CONTEXTUAL ---
+# --- TRIAGEM DO MR. HALLEY COM ISOLAMENTO ABSOLUTO DO HISTÓRICO ---
 def triagem_mr_halley(sintoma, emp_id, prefixo=None, incluir_saudacao=False):
     try:
         api_key = obter_llm()
         if not api_key:
             return "Erro: Chave da API Groq não configurada."
 
-        # Puxa o histórico de toda a frota
         historicos = buscar_historico_relevante(sintoma, emp_id, prefixo=prefixo)
         historico_formatado = "\n".join(historicos) if historicos else "Nenhum registro anterior na frota."
 
-        # Deixamos a IA analisar semanticamente se o histórico do banco realmente se aplica ao sintoma atual
         prompt_decisao_e_resposta = f"""
-Você é o Mr. Halley, o assistente técnico especialista em manutenção de frotas da plataforma Up 2 Today.
-Analise o sintoma relatado pelo usuário considerando o sentido real, o contexto mecânico e possíveis sinônimos.
-
-Veículo Analisado: {prefixo if prefixo else "Não informado"}
+Você é o Mr. Halley, assistente técnico de manutenção da plataforma Up 2 Today.
+Veículo: {prefixo if prefixo else "Não informado"}
 Sintoma Relatado: "{sintoma}"
 
 Histórico Disponível no Banco de Dados da Frota:
 {historico_formatado}
 
 INSTRUÇÕES DE ANÁLISE E RESPOSTA:
-1. Verifique se o histórico acima contém registros com o **mesmo sentido ou contexto técnico** do sintoma relatado (por exemplo, sinônimos ou falhas equivalentes).
-2. CASO EXISTA histórico real com o mesmo sentido na frota:
-   - Você DEVE iniciar a resposta OBRIGATORIAMENTE com a frase exata: "Baseado no histórico local da frota, recomenda-se"
-   - Descreva o procedimento corretivo correspondente de forma direta com base no histórico encontrado.
-3. CASO NÃO EXISTA nenhum histórico com o mesmo sentido na frota (ou se os registros forem sobre problemas totalmente diferentes, como fumaça preta para um problema de direção ou limpador):
-   - Ignore o histórico do banco.
-   - Você DEVE iniciar a resposta OBRIGATORIAMENTE com a frase exata: "Não identificamos registros de falhas semelhantes. Mas com base em pesquisas externas, recomenda‑res..." (ajuste para recomenda-se).
-   - Traga um diagnóstico técnico externo limpo, direto e coerente.
-4. Mantenha a resposta concisa (máximo de 35 palavras). NUNCA misture os cenários.
+1. Avalie se o histórico acima possui um registro com o mesmo sentido ou contexto técnico do sintoma relatado.
+2. SE HOUVER HISTÓRICO COMPATÍVEL:
+   - Inicie OBRIGATORIAMENTE com a frase exata: "Baseado no histórico local da frota, recomenda-se"
+   - É ESTRITAMENTE PROIBIDO usar conhecimentos externos da internet, inventar peças, adicionar cilindros, ajustes ou componentes que não estejam explicitamente escritos no texto do histórico do banco. Siga estritamente o que foi feito ou registrado na OS anterior.
+3. SE NÃO HOUVER HISTÓRICO COMPATÍVEL:
+   - Inicie OBRIGATORIAMENTE com a frase exata: "Não identificamos registros de falhas semelhantes. Mas com base em pesquisas externas, recomenda‑se"
+   - Traga o diagnóstico técnico externo de forma limpa.
+4. Mantenha a resposta concisa (máximo de 30 palavras).
 """
 
         resposta = chamar_groq_direto(prompt_texto_modelo := prompt_decisao_e_resposta, api_key)
