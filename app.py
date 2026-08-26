@@ -218,7 +218,7 @@ def buscar_historico_relevante(sintoma, emp_id, prefixo=None):
     except Exception as e:
         return [f"Erro ao buscar histórico: {str(e)}"]
 
-# --- TRIAGEM DO MR. HALLEY COM FOCO ESTRITO NO HISTÓRICO LOCAL ---
+# --- TRIAGEM DO MR. HALLEY COM TRAVA RIGOROSA CONTRA CONTRADIÇÕES ---
 def triagem_mr_halley(sintoma, emp_id, prefixo=None, incluir_saudacao=False):
     try:
         api_key = obter_llm()
@@ -227,11 +227,17 @@ def triagem_mr_halley(sintoma, emp_id, prefixo=None, incluir_saudacao=False):
         if not api_key:
             return "Erro: Chave da API Groq não configurada."
 
-        historico_formatado = "\n".join(historicos) if historicos else "Nenhum histórico anterior."
+        # Filtra para ver se temos dados reais do veículo
+        tem_historico_real = any(f"VEÍCULO {prefixo}" in h.upper() for h in historicos) if prefixo else False
         
-        # Só pesquisa na web se REALMENTE não houver nenhum histórico cadastrado
-        tem_historico_valido = len(historicos) > 0 and not any("Nenhum registro" in h or "Erro" in h for h in historicos)
-        resultado_web = "" if tem_historico_valido else pesquisar_solucao_web(sintoma)
+        if tem_historico_real:
+            historico_formatado = "\n".join(historicos)
+            resultado_web = "PESQUISA WEB DESLIGADA (EXISTE HISTÓRICO LOCAL)."
+            instrucao_obrigatoria = 'Inicie OBRIGATORIAMENTE com: "Baseado no histórico local da frota, recomenda-se" e cite o serviço anterior realizado.'
+        else:
+            historico_formatado = "Nenhum histórico anterior para este veículo específico."
+            resultado_web = pesquisar_solucao_web(sintoma)
+            instrucao_obrigatoria = 'Inicie OBRIGATORIAMENTE com: "Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se"'
 
         prompt_texto = f"""
 Você é o assistente técnico Mr. Halley da plataforma Up 2 Today.
@@ -240,17 +246,16 @@ Analise a falha e dê um diagnóstico mecânico cirúrgico.
 Veículo: {prefixo if prefixo else "Não informado"}
 Sintoma: "{sintoma}"
 
-Histórico da Frota (Banco de Dados Local):
+Histórico do Veículo no Banco de Dados:
 {historico_formatado}
 
-Dados Técnicos Externos (Web - USAR APENAS SE O HISTÓRICO ESTIVER VAZIO):
-{resultado_web[:400] if resultado_web else "Nenhum dado externo necessário."}
+Dados Externos:
+{resultado_web[:400]}
 
-REGRAS RIGOROSAS DE RESPOSTA:
-1. SE houver registro correspondente no histórico local da frota acima, baseie sua resposta EXCLUSIVA E ESTRITAMENTE nas informações locais daquele histórico (indique o que foi feito no veículo correspondente) e inicie obrigatoriamente com: "Baseado no histórico local da frota, recomenda-se"
-2. SE o histórico local estiver totalmente vazio ou não tiver relação com o problema, inicie obrigatoriamente com: "Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se"
-3. Proibido saudações ou misturar dados externos quando houver histórico local.
-4. Descreva a ação técnica exata no infinitivo citando componentes específicos em até 35 palavras.
+REGRAS DE RESPOSTA RIGOROSAS:
+1. {instrucao_obrigatoria}
+2. Proibido saudações ou misturar mensagens de que "não há registro" quando houver histórico.
+3. Descreva a ação corretiva exata no infinitivo citando componentes específicos em até 35 palavras.
 """
 
         resposta = chamar_groq_direto(prompt_texto, api_key)
