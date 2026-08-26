@@ -204,47 +204,49 @@ def buscar_historico_relevante(sintoma, emp_id, prefixo=None):
     except Exception as e:
         return [f"Erro ao buscar histórico: {str(e)}"]
 
-# --- TRIAGEM DO MR. HALLEY COM TRAVA ESTRITA DE CONTEÚDO PARA O HISTÓRICO ---
+# --- TRIAGEM DO MR. HALLEY 100% DINÂMICA E SEM TRAVAS DE PALAVRAS ---
 def triagem_mr_halley(sintoma, emp_id, prefixo=None, incluir_saudacao=False):
     try:
         api_key = obter_llm()
         if not api_key:
             return "Erro: Chave da API Groq não configurada."
 
-        sintoma_lower = sintoma.lower()
-        tem_termo_fumaca = any(termo in sintoma_lower for termo in ["fumaça", "preta", "bico", "injetor"])
+        # Puxa o histórico genérico da frota para o sintoma relatado
+        historicos = buscar_historico_relevante(sintoma, emp_id, prefixo=prefixo)
+        
+        # Verifica de forma ampla se a função de busca trouxe algum registro válido
+        tem_historico = (
+            len(historicos) > 0 
+            and not any("Nenhum histórico" in h or "Erro" in h for h in historicos)
+        )
 
-        if tem_termo_fumaca:
-            historicos = buscar_historico_relevante(sintoma, emp_id, prefixo=prefixo)
-            historico_formatado = "\n".join(historicos) if historicos else "Nenhum histórico."
-            
+        if tem_historico:
+            historico_formatado = "\n".join(historicos[:3])
             prompt_texto = f"""
 Você é o assistente técnico Mr. Halley da plataforma Up 2 Today.
 Veículo: {prefixo if prefixo else "Não informado"}
-Sintoma: "{sintoma}"
+Sintoma Relatado: "{sintoma}"
 
 Histórico Encontrado na Frota:
 {historico_formatado}
 
-REGRAS ABSOLUTAS:
+REGRAS:
 1. Inicie OBRIGATORIAMENTE com a frase exata: "Baseado no histórico local da frota, recomenda-se"
-2. Baseie sua resposta EXCLUSIVA E UNICAMENTE no que está escrito explicitamente no Histórico acima. É ESTRITAMENTE PROIBIDO adicionar peças, filtros ou procedimentos que não estejam descritos no histórico do banco (como filtro de ar ou teste de emissões).
-3. Seja direto e conciso (máximo de 25 palavras).
+2. Analise o histórico acima e descreva o procedimento corretivo correspondente de forma direta (máximo de 30 palavras).
 """
         else:
             resultado_web = pesquisar_solucao_web(sintoma)
-            
             prompt_texto = f"""
 You are the technical assistant Mr. Halley from the Up 2 Today platform.
 Veículo: {prefixo if prefixo else "Não informado"}
-Sintoma: "{sintoma}"
+Sintoma Relatado: "{sintoma}"
 
 Dados da Web:
 {resultado_web[:350] if resultado_web else "Inspeção técnica padrão."}
 
-REGRAS ABSOLUTAS:
+REGRAS:
 1. Inicie OBRIGATORIAMENTE com a frase exata: "Não identificamos registros de falhas semelhantes. Mas com base em pesquisas externas, recomenda‑se"
-2. Forneça o diagnóstico técnico externo de forma limpa, direta e concisa (máximo de 35 palavras).
+2. Forneça o diagnóstico técnico externo de forma limpa, direta e concisa (máximo de 30 palavras).
 """
 
         resposta = chamar_groq_direto(prompt_texto, api_key)
