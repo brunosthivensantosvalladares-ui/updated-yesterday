@@ -204,82 +204,62 @@ def buscar_historico_relevante(sintoma, emp_id, prefixo=None):
     except Exception as e:
         return [f"Erro ao buscar histórico: {str(e)}"]
 
-# --- TRIAGEM DO MR. HALLEY COM CONTROLE HÍBRIDO E DETERMINÍSTICO ---
+# --- TRIAGEM DO MR. HALLEY COM HIERARQUIA DE HISTÓRICO E TEXTO EXTERNO EXATO ---
 def triagem_mr_halley(sintoma, emp_id, prefixo=None, incluir_saudacao=False):
     try:
         api_key = obter_llm()
+        historicos = buscar_historico_relevante(sintoma, emp_id, prefixo=prefixo)
+        
         if not api_key:
             return "Erro: Chave da API Groq não configurada."
 
-        historicos = buscar_historico_relevante(sintoma, emp_id, prefixo=prefixo)
+        tem_historico_real = (
+            len(historicos) > 0 
+            and not any("Nenhum histórico" in h or "Erro" in h for h in historicos)
+        )
         
-        sintoma_lower = sintoma.lower()
-        palavras_sintoma = [p for p in sintoma_lower.split() if len(p) > 3]
+        palavras_sintoma = {p.lower() for p in sintoma.split() if len(p) > 3}
+        historico_realmente_compativel = False
+        
+        if tem_historico_real:
+            texto_total_hist = " ".join(historicos).lower()
+            historico_realmente_compativel = any(kw in texto_total_hist for kw in palavras_sintoma)
 
-        # Classificação estrita dos registros encontrados
-        tem_concluido = False
-        tem_pendente = False
-        historicos_validos = []
-
-        for h in historicos:
-            h_low = h.lower()
-            if any(kw in h_low for kw in palavras_sintoma):
-                historicos_validos.append(h)
-                if "concluída" in h_low or "realizado" in h_low or "limpeza" in h_low or "troca" in h_low:
-                    tem_concluido = True
-                elif "pendente" in h_low or "sem retorno" in h_low:
-                    tem_pendente = True
-
-        # CENÁRIO 1: Existe histórico concluído com serviço realizado na frota
-        if tem_concluido and historicos_validos:
-            hist_texto = "\n".join(historicos_validos[:2])
-            prompt_texto = f"""
-Você é o assistente técnico Mr. Halley da plataforma Up 2 Today.
-Veículo: {prefixo if prefixo else "Não informado"}
-Sintoma: "{sintoma}"
-
-Histórico Concluído na Frota:
-{hist_texto}
-
-REGRAS:
-1. Inicie OBRIGATORIAMENTE com a frase exata: "Baseado no histórico local da frota, recomenda-se"
-2. Descreva o procedimento corretivo com base estritamente no histórico acima (máximo de 30 palavras).
-"""
-
-        # CENÁRIO 2: Existe apenas histórico pendente (sem retorno) -> Informa a pendência E complementa com a Web
-        elif tem_pendente and historicos_validos:
-            hist_texto = "\n".join(historicos_validos[:2])
-            resultado_web = pesquisar_solucao_web(sintoma)
-            prompt_texto = f"""
-Você é o assistente técnico Mr. Halley da plataforma Up 2 Today.
-Veículo: {prefixo if prefixo else "Não informado"}
-Sintoma: "{sintoma}"
-
-Histórico Pendente na Frota:
-{hist_texto}
-
-Diagnóstico Externo (Web):
-{resultado_web[:300] if resultado_web else "Inspeção técnica padrão."}
-
-REGRAS:
-1. Inicie OBRIGATORIAMENTE informando a existência da OS pendente sem retorno e complemente imediatamente com sugestões de diagnóstico externo, começando com: "Identificamos registro anterior pendente para este sintoma. Como ainda não há retorno do serviço realizado, com base em pesquisas externas, recomenda-se"
-2. Seja direto e conciso (máximo de 45 palavras).
-"""
-
-        # CENÁRIO 3: Nenhum histórico compatível -> Vai direto para a Web com a frase exata exigida
+        if historico_realmente_compativel:
+            historico_formatado = "\n".join(historicos)
+            resultado_web = "PROIBIDO USAR DADOS DA INTERNET."
+            # Instrução focada em priorizar soluções concluídas e evitar mandar esperar OS pendente se houver resolvidas
+            instrucao_obrigatoria = (
+                'Inicie OBRIGATORIAMENTE com: "Baseado no histórico local da frota, recomenda-se". '
+                'Se houver OSs concluídas com o serviço realizado (ex: limpeza de bicos), priorize-as como recomendação principal. '
+                'NUNCA recomende aguardar retorno de OS pendente se já existirem OSs concluídas com a solução aplicada na frota.'
+            )
         else:
+            historico_formatado = "Nenhum histórico anterior correlato encontrado na frota."
             resultado_web = pesquisar_solucao_web(sintoma)
-            prompt_texto = f"""
-You are the technical assistant Mr. Halley from the Up 2 Today platform.
-Veículo: {prefixo if prefixo else "Não informado"}
-Sintoma: "{sintoma}"
+            # Instrução com o texto exato exigido por você para o caso sem histórico
+            instrucao_obrigatoria = (
+                'Inicie OBRIGATORIAMENTE com: "Não identificamos registros de falhas semelhantes. '
+                'Mas com base em pesquisas externas, recomenda‑se"'
+            )
 
-Dados da Web:
-{resultado_web[:350] if resultado_web else "Inspeção padrão de componentes."}
+        prompt_texto = f"""
+Você é o assistente técnico Mr. Halley da plataforma Up 2 Today.
+Analise a falha com base absoluta nos dados fornecidos do banco de dados.
 
-REGRAS:
-1. Inicie OBRIGATORIAMENTE com a frase exata: "Não identificamos registros de falhas semelhantes. Mas com base em pesquisas externas, recomenda‑se"
-2. Forneça o diagnóstico técnico externo de forma limpa, direta e concisa (máximo de 35 palavras).
+Veículo Analisado: {prefixo if prefixo else "Não informado"}
+Sintoma Relatado: "{sintoma}"
+
+Histórico Geral Encontrado na Frota:
+{historico_formatado}
+
+Dados Externos (Web - USAR APENAS SE O HISTÓRICO COMPATÍVEL ESTIVER VAZIO):
+{resultado_web[:300] if not historico_realmente_compativel else "Nenhum."}
+
+REGRAS DE RESPOSTA ABSOLUTAS:
+1. {instrucao_obrigatoria}
+2. Seja conciso, técnico e direto (máximo de 35 palavras). 
+3. Siga estritamente o formato de início exigido na instrução 1, sem alterar as palavras solicitadas.
 """
 
         resposta = chamar_groq_direto(prompt_texto, api_key)
@@ -476,7 +456,7 @@ Se for fluxo de OS:
     except Exception:
         return None
         
-# --- RESPOSTAS GERAIS, CONSULTAS DE OS E MANUAL DA PLATAFORMA ---
+# --- RESPOSTAS GERAIS E HISTÓRICOS (ATUALIZADO COM CHAMADA DIRETA E MANUAL DO SISTEMA) ---
 def responder_chat_mr_halley(mensagem_usuario, emp_id):
     texto_baixo = mensagem_usuario.lower().strip()
 
@@ -502,14 +482,15 @@ def responder_chat_mr_halley(mensagem_usuario, emp_id):
         ultima = st.session_state.analises_halley[-1]
         prefixo_foco = ultima.get("veiculo")
         contexto_foco_atual = (
-            f"ÚLTIMA ANÁLISE REALIZADA:\n"
-            f"- Veículo: {ultima['veiculo']}\n"
-            f"- Sintoma: '{ultima['relato']}'\n"
-            f"- Parecer: {ultima['parecer']}"
+            f"ÚLTIMA ANÁLISE REALIZADA (FOCO ATUAL):\n"
+            f"- Veículo em análise: {ultima['veiculo']}\n"
+            f"- Falha/Sintoma relatado: '{ultima['relato']}'\n"
+            f"- Diagnóstico emitido: {ultima['parecer']}"
         )
 
+    # Busca o histórico garantindo que traga os dados do veículo em foco se houver
     historicos_banco = buscar_historico_relevante(mensagem_usuario, emp_id, prefixo=prefixo_foco)
-    contexto_banco = "REGISTROS REAIS NO BANCO DE DADOS DA FROTA:\n" + (
+    contexto_banco = "REGISTROS E HISTÓRICOS DE MANUTENÇÃO NO BANCO:\n" + (
         "\n".join(historicos_banco) if historicos_banco else "Nenhum registro anterior no banco."
     )
 
@@ -524,8 +505,8 @@ FUNCIONALIDADES E PASSO A PASSO DA PLATAFORMA UP 2 TODAY:
 7. Perfil Motorista: Versão simplificada para dispositivos móveis focada na abertura rápida de solicitações e acompanhamento de status.
 """
 
-    template_geral_completo = f"""
-Você é o Mr. Halley, assistente técnico, especialista de suporte e telemetria da plataforma Up 2 Today.
+    template_geral = f"""
+Você é o Mr. Halley, assistente técnico de manutenção, telemetria e suporte da plataforma Up 2 Today.
 
 {contexto_foco_atual}
 
@@ -533,16 +514,17 @@ Você é o Mr. Halley, assistente técnico, especialista de suporte e telemetria
 
 {manual_plataforma}
 
-Pergunta Exata do Usuário: "{mensagem_usuario}"
+Pergunta do Usuário: "{mensagem_usuario}"
 
 DIRETRIZES DE RESPOSTA:
-1. Se a pergunta for sobre dados do banco (número de OS, histórico, qual carro ocorreu falha), responda diretamente com os dados reais informados acima, sem dar tutoriais genéricos.
-2. Se a pergunta for sobre as funcionalidades do sistema, como usar a plataforma ou o que cada aba faz, explique detalhadamente com base no manual da plataforma acima.
-3. Seja claro, objetivo e prestativo.
+1. Responda de forma direta, clara e prestativa.
+2. Se o usuário perguntar sobre o sistema, funcionalidades ou como usar a plataforma, explique detalhadamente com base no manual acima.
+3. Se houver registros correlatos no histórico do banco, cite-os claramente.
+4. Mantenha um tom profissional e técnico.
 """
 
     try:
-        resposta = chamar_groq_direto(template_geral_completo, api_key)
+        resposta = chamar_groq_direto(template_geral, api_key)
         return resposta
     except Exception as e:
         return f"Erro ao processar consulta: {str(e)}"
