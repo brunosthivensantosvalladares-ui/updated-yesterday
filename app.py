@@ -379,26 +379,20 @@ Se for continuação do preenchimento da OS:
             if v and v not in ["...", "None", "null", "Não informado"]:
                 novo_rascunho[k] = v
 
-        # REGRA CORRIGIDA: Só reaproveita o veículo anterior se o usuário pedir explicitamente por termos como "mesmo veículo", "dele", etc.
         texto_usuario_lower = texto_usuario.lower()
+        
+        # 1. VALIDAÇÃO DE PREFIXO: Só puxa se o usuário pediu explicitamente pelo mesmo veículo
         pede_mesmo_veiculo = any(termo in texto_usuario_lower for termo in ["mesmo veículo", "mesmo carro", "desse veículo", "desse carro", "dele", "mesmo"])
-        
-        if not novo_rascunho.get("prefixo") or str(novo_rascunho.get("prefixo")).lower() in ["desse", "desse veículo", "último"]:
-            if pede_mesmo_veiculo and veiculo_contexto != "Não informado":
-                novo_rascunho["prefixo"] = veiculo_contexto
-            else:
-                # Se não pediu explicitamente, limpa para forçar o usuário a digitar o prefixo correto
+        if not pede_mesmo_veiculo and not rascunho.get("prefixo"):
+            # Se é uma conversa nova e ele não disse o prefixo na frase, limpamos para forçar a digitação
+            if not any(char.isdigit() for char in texto_usuario): # se não tem número de veículo na frase atual
                 novo_rascunho["prefixo"] = None
-                
-        # REGRA CORRIGIDA: Só reaproveita o problema anterior se o usuário pedir explicitamente por "mesmo problema", etc.
+
+        # 2. VALIDAÇÃO DE DESCRIÇÃO: Só puxa o problema anterior se o usuário pediu explicitamente
         pede_mesmo_problema = any(termo in texto_usuario_lower for termo in ["mesmo problema", "mesmo defeito", "igual", "mesma falha"])
-        
-        if not novo_rascunho.get("descricao") or str(novo_rascunho.get("descricao")).lower() in ["mesmo problema", "problema"]:
-            if pede_mesmo_problema and relato_contexto:
-                novo_rascunho["descricao"] = relato_contexto
-            else:
-                # Se não pediu explicitamente, limpa para exigir que o usuário informe o serviço atual
-                novo_rascunho["descricao"] = None
+        if not pede_mesmo_problema:
+            # Se não pediu o mesmo problema, limpamos a descrição para obrigar o usuário a relatar o serviço atual
+            novo_rascunho["descricao"] = None
 
         if not novo_rascunho.get("turno"):
             novo_rascunho["turno"] = "Não definido"
