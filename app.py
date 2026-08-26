@@ -204,7 +204,7 @@ def buscar_historico_relevante(sintoma, emp_id, prefixo=None):
     except Exception as e:
         return [f"Erro ao buscar histórico: {str(e)}"]
 
-# --- TRIAGEM DO MR. HALLEY COM BUSCA AMPLA NA FROTA E FILTRO DE SIMILARIDADE REAL ---
+# --- TRIAGEM DO MR. HALLEY HÍBRIDA (HISTÓRICO PENDENTE + DIAGNÓSTICO EXTERNO) ---
 def triagem_mr_halley(sintoma, emp_id, prefixo=None, incluir_saudacao=False):
     try:
         api_key = obter_llm()
@@ -213,34 +213,39 @@ def triagem_mr_halley(sintoma, emp_id, prefixo=None, incluir_saudacao=False):
         if not api_key:
             return "Erro: Chave da API Groq não configurada."
 
-        tem_registros_brutos = (
+        tem_registros = (
             len(historicos) > 0 
             and not any("Nenhum histórico" in h or "Erro" in h for h in historicos)
         )
         
-        # Extrai os termos principais do sintoma atual do usuário para validar se o histórico da frota é realmente correlato
         sintoma_lower = sintoma.lower()
         palavras_sintoma = [p for p in sintoma_lower.split() if len(p) > 3]
         
-        # Confere se os registros encontrados na frota contêm alguma palavra-chave correspondente ao problema atual
-        possui_historico_correlato = False
-        if tem_registros_brutos:
-            texto_banco_unificado = " ".join(historicos).lower()
-            # Verifica se há match de pelo menos uma palavra relevante (ex: fumaça, direção, puxando, etc.)
-            possui_historico_correlato = any(kw in texto_banco_unificado for kw in palavras_sintoma)
+        # Filtra histórico compatível com o sintoma
+        historico_compativel = []
+        if tem_registros:
+            for h in historicos:
+                if any(kw in h.lower() for kw in palavras_sintoma):
+                    historico_compativel.append(h)
 
-        if possui_historico_correlato:
-            historico_formatado = "\n".join(historicos)
+        tem_solucao_concluida = any("concluída" in h.lower() or "realizado" in h.lower() or "limpeza" in h.lower() for h in historico_compativel)
+        tem_apenas_pendente = len(historico_compativel) > 0 and not tem_solucao_concluida
+
+        if tem_solucao_concluida:
+            historico_formatado = "\n".join(historico_compativel)
             resultado_web = "PROIBIDO USAR DADOS DA INTERNET."
+            instrucao_obrigatoria = 'Inicie OBRIGATORIAMENTE com: "Baseado no histórico local da frota, recomenda-se" e cite o procedimento técnico solucionado.'
+        elif tem_apenas_pendente:
+            # Híbrido: Informa a OS pendente e busca o diagnóstico externo para complementar!
+            historico_formatado = "\n".join(historico_compativel)
+            resultado_web = pesquisar_solucao_web(sintoma)
             instrucao_obrigatoria = (
-                'Inicie OBRIGATORIAMENTE com: "Baseado no histórico local da frota, recomenda-se". '
-                'Se houver OSs concluídas com o serviço realizado, priorize-as. '
-                'Se houver apenas ocorrências pendentes ou sem retorno, relate que o problema ocorreu em outro veículo, mas a OS ainda não teve retorno do serviço.'
+                'Inicie OBRIGATORIAMENTE com o seguinte formato exato: '
+                '"Identificamos registro anterior pendente para este sintoma (ex: cite a OS e o veículo). Como ainda não há retorno do serviço realizado, com base em pesquisas externas, recomenda-se"'
             )
         else:
-            historico_formatado = "Nenhum histórico anterior correlato na frota."
+            historico_formatado = "Nenhum histórico anterior correlato."
             resultado_web = pesquisar_solucao_web(sintoma)
-            # A frase exata que você pediu para quando não houver histórico na frota
             instrucao_obrigatoria = (
                 'Inicie OBRIGATORIAMENTE com: "Não identificamos registros de falhas semelhantes. '
                 'Mas com base em pesquisas externas, recomenda‑se"'
@@ -248,21 +253,20 @@ def triagem_mr_halley(sintoma, emp_id, prefixo=None, incluir_saudacao=False):
 
         prompt_texto = f"""
 Você é o assistente técnico Mr. Halley da plataforma Up 2 Today.
-Analise a falha cruzando os dados de toda a frota com base absoluta no banco de dados.
+Analise a falha cruzando os dados do banco.
 
 Veículo Analisado: {prefixo if prefixo else "Não informado"}
 Sintoma Relatado: "{sintoma}"
 
-Histórico Geral Encontrado na Frota (Qualquer veículo):
+Histórico Encontrado na Frota:
 {historico_formatado}
 
-Dados Externos (Web - USAR APENAS SE O HISTÓRICO CORRELATO ESTIVER VAZIO):
-{resultado_web[:300] if not possui_historico_correlato else "Nenhum."}
+Dados Externos (Web):
+{resultado_web[:300]}
 
 REGRAS DE RESPOSTA ABSOLUTAS:
 1. {instrucao_obrigatoria}
-2. Seja conciso, técnico e direto (máximo de 40 palavras). 
-3. Siga estritamente o formato de início exigido na instrução 1, sem misturar conceitos.
+2. Seja técnico, direto e conciso (máximo de 45 palavras).
 """
 
         resposta = chamar_groq_direto(prompt_texto, api_key)
@@ -459,7 +463,7 @@ Se for fluxo de OS:
     except Exception:
         return None
         
-# --- RESPOSTAS GERAIS E HISTÓRICOS (ATUALIZADO COM CHAMADA DIRETA E MANUAL DO SISTEMA) ---
+# --- RESPOSTAS GERAIS, CONSULTAS DE OS E MANUAL DA PLATAFORMA ---
 def responder_chat_mr_halley(mensagem_usuario, emp_id):
     texto_baixo = mensagem_usuario.lower().strip()
 
@@ -485,15 +489,14 @@ def responder_chat_mr_halley(mensagem_usuario, emp_id):
         ultima = st.session_state.analises_halley[-1]
         prefixo_foco = ultima.get("veiculo")
         contexto_foco_atual = (
-            f"ÚLTIMA ANÁLISE REALIZADA (FOCO ATUAL):\n"
-            f"- Veículo em análise: {ultima['veiculo']}\n"
-            f"- Falha/Sintoma relatado: '{ultima['relato']}'\n"
-            f"- Diagnóstico emitido: {ultima['parecer']}"
+            f"ÚLTIMA ANÁLISE REALIZADA:\n"
+            f"- Veículo: {ultima['veiculo']}\n"
+            f"- Sintoma: '{ultima['relato']}'\n"
+            f"- Parecer: {ultima['parecer']}"
         )
 
-    # Busca o histórico garantindo que traga os dados do veículo em foco se houver
     historicos_banco = buscar_historico_relevante(mensagem_usuario, emp_id, prefixo=prefixo_foco)
-    contexto_banco = "REGISTROS E HISTÓRICOS DE MANUTENÇÃO NO BANCO:\n" + (
+    contexto_banco = "REGISTROS REAIS NO BANCO DE DADOS DA FROTA:\n" + (
         "\n".join(historicos_banco) if historicos_banco else "Nenhum registro anterior no banco."
     )
 
@@ -508,8 +511,8 @@ FUNCIONALIDADES E PASSO A PASSO DA PLATAFORMA UP 2 TODAY:
 7. Perfil Motorista: Versão simplificada para dispositivos móveis focada na abertura rápida de solicitações e acompanhamento de status.
 """
 
-    template_geral = f"""
-Você é o Mr. Halley, assistente técnico de manutenção, telemetria e suporte da plataforma Up 2 Today.
+    template_geral_completo = f"""
+Você é o Mr. Halley, assistente técnico, especialista de suporte e telemetria da plataforma Up 2 Today.
 
 {contexto_foco_atual}
 
@@ -517,17 +520,16 @@ Você é o Mr. Halley, assistente técnico de manutenção, telemetria e suporte
 
 {manual_plataforma}
 
-Pergunta do Usuário: "{mensagem_usuario}"
+Pergunta Exata do Usuário: "{mensagem_usuario}"
 
 DIRETRIZES DE RESPOSTA:
-1. Responda de forma direta, clara e prestativa.
-2. Se o usuário perguntar sobre o sistema, funcionalidades ou como usar a plataforma, explique detalhadamente com base no manual acima.
-3. Se houver registros correlatos no histórico do banco, cite-os claramente.
-4. Mantenha um tom profissional e técnico.
+1. Se a pergunta for sobre dados do banco (número de OS, histórico, qual carro ocorreu falha), responda diretamente com os dados reais informados acima.
+2. Se a pergunta for sobre as funcionalidades do sistema, como usar a plataforma ou o que cada aba faz, explique detalhadamente com base no manual da plataforma acima.
+3. Seja claro, objetivo e prestativo.
 """
 
     try:
-        resposta = chamar_groq_direto(template_geral, api_key)
+        resposta = chamar_groq_direto(template_geral_completo, api_key)
         return resposta
     except Exception as e:
         return f"Erro ao processar consulta: {str(e)}"
