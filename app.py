@@ -204,7 +204,7 @@ def buscar_historico_relevante(sintoma, emp_id, prefixo=None):
     except Exception as e:
         return [f"Erro ao buscar histórico: {str(e)}"]
 
-# --- TRIAGEM DO MR. HALLEY COM VALIDAÇÃO RIGOROSA DE RELEVÂNCIA DE HISTÓRICO ---
+# --- TRIAGEM DO MR. HALLEY COM HIERARQUIA DE HISTÓRICO E TEXTO EXTERNO EXATO ---
 def triagem_mr_halley(sintoma, emp_id, prefixo=None, incluir_saudacao=False):
     try:
         api_key = obter_llm()
@@ -213,17 +213,14 @@ def triagem_mr_halley(sintoma, emp_id, prefixo=None, incluir_saudacao=False):
         if not api_key:
             return "Erro: Chave da API Groq não configurada."
 
-        # Verifica se realmente encontrou histórico relevante (descartando mensagens de vazio ou erro)
         tem_historico_real = (
             len(historicos) > 0 
             and not any("Nenhum histórico" in h or "Erro" in h for h in historicos)
         )
         
-        # Palavras-chave do sintoma atual para conferir se o histórico encontrado realmente fala do mesmo problema
         palavras_sintoma = {p.lower() for p in sintoma.split() if len(p) > 3}
-        
-        # Confere se há interseção real de termos entre o histórico retornado e o sintoma atual
         historico_realmente_compativel = False
+        
         if tem_historico_real:
             texto_total_hist = " ".join(historicos).lower()
             historico_realmente_compativel = any(kw in texto_total_hist for kw in palavras_sintoma)
@@ -231,11 +228,20 @@ def triagem_mr_halley(sintoma, emp_id, prefixo=None, incluir_saudacao=False):
         if historico_realmente_compativel:
             historico_formatado = "\n".join(historicos)
             resultado_web = "PROIBIDO USAR DADOS DA INTERNET."
-            instrucao_obrigatoria = 'Inicie OBRIGATORIAMENTE com: "Baseado no histórico local da frota, recomenda-se"'
+            # Instrução focada em priorizar soluções concluídas e evitar mandar esperar OS pendente se houver resolvidas
+            instrucao_obrigatoria = (
+                'Inicie OBRIGATORIAMENTE com: "Baseado no histórico local da frota, recomenda-se". '
+                'Se houver OSs concluídas com o serviço realizado (ex: limpeza de bicos), priorize-as como recomendação principal. '
+                'NUNCA recomende aguardar retorno de OS pendente se já existirem OSs concluídas com a solução aplicada na frota.'
+            )
         else:
             historico_formatado = "Nenhum histórico anterior correlato encontrado na frota."
             resultado_web = pesquisar_solucao_web(sintoma)
-            instrucao_obrigatoria = 'Inicie OBRIGATORIAMENTE com: "Não identificamos registros no histórico local da frota, porém, em análises técnicas externas, recomenda-se"'
+            # Instrução com o texto exato exigido por você para o caso sem histórico
+            instrucao_obrigatoria = (
+                'Inicie OBRIGATORIAMENTE com: "Não identificamos registros de falhas semelhantes. '
+                'Mas com base em pesquisas externas, recomenda‑se"'
+            )
 
         prompt_texto = f"""
 Você é o assistente técnico Mr. Halley da plataforma Up 2 Today.
@@ -252,10 +258,8 @@ Dados Externos (Web - USAR APENAS SE O HISTÓRICO COMPATÍVEL ESTIVER VAZIO):
 
 REGRAS DE RESPOSTA ABSOLUTAS:
 1. {instrucao_obrigatoria}
-2. Se houver histórico compatível com o sintoma, cite explicitamente o procedimento realizado ou relate se a OS está pendente de retorno, conforme o caso.
-3. Se NÃO houver histórico compatível (caso em que a frase obrigatória inicia com "Não identificamos registros..."), utilize os Dados Externos para orientar o diagnóstico técnico correto de forma limpa.
-4. NUNCA misture os dois cenários e nunca diga que há histórico se ele não for compatível com o problema.
-5. Seja conciso (máximo de 40 palavras).
+2. Seja conciso, técnico e direto (máximo de 35 palavras). 
+3. Siga estritamente o formato de início exigido na instrução 1, sem alterar as palavras solicitadas.
 """
 
         resposta = chamar_groq_direto(prompt_texto, api_key)
