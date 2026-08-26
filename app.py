@@ -431,7 +431,7 @@ Se for continuação do preenchimento da OS:
     except Exception:
         return None
         
-# --- RESPOSTAS GERAIS E CONSULTAS DE HISTÓRICO NO CHAT ---
+# --- RESPOSTAS GERAIS, CONSULTAS DE OS E MANUAL DA PLATAFORMA ---
 def responder_chat_mr_halley(mensagem_usuario, emp_id):
     texto_baixo = mensagem_usuario.lower().strip()
 
@@ -457,34 +457,32 @@ def responder_chat_mr_halley(mensagem_usuario, emp_id):
         ultima = st.session_state.analises_halley[-1]
         prefixo_foco = ultima.get("veiculo")
         contexto_foco_atual = (
-            f"ÚLTIMA ANÁLISE REALIZADA:\n"
-            f"- Veículo: {ultima['veiculo']}\n"
-            f"- Sintoma: '{ultima['relato']}'\n"
-            f"- Parecer: {ultima['parecer']}"
+            f"ÚLTIMA ANÁLISE REALIZADA (FOCO ATUAL):\n"
+            f"- Veículo em análise: {ultima['veiculo']}\n"
+            f"- Falha/Sintoma relatado: '{ultima['relato']}'\n"
+            f"- Diagnóstico emitido: {ultima['parecer']}"
         )
 
     historicos_banco = buscar_historico_relevante(mensagem_usuario, emp_id, prefixo=prefixo_foco)
-    
-    # Filtra o histórico para perguntas diretas também
-    palavras_user = [p for p in texto_baixo.split() if len(p) > 3]
-    historicos_filtrados = [h for h in historicos_banco if any(kw in h.lower() for kw in palavras_user)]
-    
-    contexto_banco = "REGISTROS REAIS NO BANCO DE DADOS DA FROTA:\n" + (
-        "\n".join(historicos_filtrados) if historicos_filtrados else "Nenhum registro anterior correspondente no banco."
+    contexto_banco = "REGISTROS E HISTÓRICOS DE MANUTENÇÃO NO BANCO:\n" + (
+        "\n".join(historicos_banco) if historicos_banco else "Nenhum registro anterior no banco."
     )
 
+    # MANUAL ATUALIZADO COM OS LOCAIS EXATOS DE ABERTURA DE CHAMADOS
     manual_plataforma = """
 FUNCIONALIDADES E PASSO A PASSO DA PLATAFORMA UP 2 TODAY:
-1. Dashboard: Visão geral da operação e indicadores.
-2. Agenda Principal: Controle de janelas de box e manutenções.
-3. Cadastro Direto: Agendamento de preventivas e revisões.
-4. Chamados Oficina: Triagem técnica e diagnósticos com o Mr. Halley.
-5. Chat Mr. Halley: Triagem de falhas e consulta de histórico.
-6. OSs Pendentes e Concluídas: Gestão de Lead Time e relatórios.
+1. Dashboard: Visão geral da operação e métricas principais.
+2. Agenda Principal: Centro operacional para controle de janelas de box e manutenções.
+3. Cadastro Direto: Agendamento direto de preventivas e revisões periódicas pelo gestor.
+4. Chamados Oficina: Espaço do administrador para visualizar, avaliar, aprovar e processar os chamados enviados pela ponta.
+5. OSs Pendentes (Baixa Técnica): Aba onde o gestor clica na linha da OS para preencher a execução e dar a baixa técnica.
+6. OSs Concluídas: Histórico e relatórios exportáveis de serviços finalizados.
+7. Perfil Motorista / Abrir Solicitação: Aba onde o motorista preenche o prefixo e a descrição para **abrir novos chamados** de manutenção de forma remota.
+8. Chat Mr. Halley: Assistente virtual integrado para triagem de falhas, consulta de histórico e abertura conversacional de Ordens de Serviço (OS).
 """
 
     template_geral = f"""
-Você é o Mr. Halley, assistente técnico e de suporte da plataforma Up 2 Today.
+Você é o Mr. Halley, assistente técnico de manutenção, telemetria e suporte da plataforma Up 2 Today.
 
 {contexto_foco_atual}
 
@@ -495,9 +493,10 @@ Você é o Mr. Halley, assistente técnico e de suporte da plataforma Up 2 Today
 Pergunta do Usuário: "{mensagem_usuario}"
 
 DIRETRIZES DE RESPOSTA:
-1. Se o usuário perguntar em qual carro ocorreu um problema anterior ou dados de histórico, responda diretamente com os registros reais acima. Se os registros disseram que não há correspondência, diga claramente que não há registros daquele problema na frota, sem inventar.
-2. Se perguntar sobre o sistema, use o manual.
-3. Seja direto e conciso (máximo de 3 frases).
+1. Responda de forma direta, clara e baseada estritamente no manual da plataforma acima.
+2. Se o usuário perguntar onde abrir chamados, explique que os motoristas abrem na aba **Abrir Solicitação** (no perfil de motorista), e o gestor gerencia e aprova esses chamados na aba **Chamados Oficina**.
+3. Se o usuário perguntar sobre baixa de OS, indique a aba **OSs Pendentes**.
+4. Mantenha um tom profissional e técnico (máximo de 4 frases).
 """
 
     try:
