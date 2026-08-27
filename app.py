@@ -144,7 +144,7 @@ def chamar_groq_direto(prompt_texto, api_key):
         "Content-Type": "application/json"
     }
     payload = {
-        "model": "openai/gpt-oss-120b",  # Modelo atualizado e ativo na Groq
+        "model": "openai/gpt-oss-120b",
         "messages": [{"role": "user", "content": prompt_texto}],
         "temperature": 0.0
     }
@@ -162,7 +162,6 @@ def buscar_historico_relevante(sintoma, emp_id, prefixo=None):
     """Busca ordens de serviço em toda a frota que contenham relação com o sintoma relatado."""
     engine = get_engine()
     
-    # Busca global na frota filtrando por palavras-chave do sintoma para achar ocorrências em qualquer veículo
     query_geral_frota = text("""
         SELECT data, prefixo, descricao, COALESCE(executor, 'Não informado') as executor, numero_os, realizado 
         FROM tarefas 
@@ -174,7 +173,6 @@ def buscar_historico_relevante(sintoma, emp_id, prefixo=None):
         historico_formatado = []
         vistos = set()
         
-        # Limpa palavras irrelevantes e pega termos-chave do sintoma para cruzar
         palavras_chave = [p.lower() for p in sintoma.split() if len(p) > 3]
         
         with engine.connect() as conn:
@@ -189,7 +187,6 @@ def buscar_historico_relevante(sintoma, emp_id, prefixo=None):
                 realizado = r[5]
                 
                 desc_lower = desc.lower()
-                # Verifica se há relevância com o sintoma ou se é o mesmo veículo
                 relevante = (prefixo and str(pref).lower() == str(prefixo).lower()) or any(kw in desc_lower for kw in palavras_chave)
                 
                 if relevante:
@@ -239,9 +236,9 @@ INSTRUÇÕES DE ANÁLISE E RESPOSTA:
     except Exception as e:
         return f"⚠️ Erro interno na IA: {str(e)}"
         
-# --- PROCESSAMENTO DE OS ESTÁVEL COM ETAPAS LÓGICAS E CAPTURA BLINDADA DE DESCRIÇÃO ---
+# --- PROCESSAMENTO INTELIGENTE DE OS (ESTÁVEL E SEGURO) ---
 def processar_comando_os(texto_usuario, emp_id):
-    """Gerencia o fluxo conversacional de OS de forma estável, exigindo veículo/descrição primeiro."""
+    """Gerencia a coleta progressiva, cancelando o fluxo se houver pergunta geral."""
     if "rascunho_os" not in st.session_state:
         st.session_state.rascunho_os = None
     if "aguardando_confirmacao_os" not in st.session_state:
@@ -255,16 +252,6 @@ def processar_comando_os(texto_usuario, emp_id):
         st.session_state.rascunho_os = None
         st.session_state.aguardando_confirmacao_os = False
         return "❌ Agendamento de Ordem de Serviço cancelado."
-
-    tem_rascunho_ativo = bool(rascunho or st.session_state.aguardando_confirmacao_os)
-    pediu_abertura = any(termo in texto_baixo for termo in ["abrir os", "criar os", "agendar os", "abrir uma os", "mesmo veículo", "mesmo carro", "desse veículo", "desse carro", "este mesmo veículo"])
-
-    if not tem_rascunho_ativo and not pediu_abertura:
-        return None
-
-    if not rascunho:
-        rascunho = {"prefixo": None, "descricao": None, "executor": None, "data": None, "area": "Mecânica", "turno": "Não definido", "inicio": "00:00", "fim": "00:00"}
-        st.session_state.rascunho_os = rascunho
 
     palavras_confirmacao = ["ok", "sim", "tudo certo", "pode agendar", "confirmo", "confirmar", "fechar", "gerar", "certo", "ok."]
     eh_confirmacao = (
@@ -293,9 +280,16 @@ def processar_comando_os(texto_usuario, emp_id):
                         VALUES (:dt, :ex, :pr, :ti, :tf, :ds, :ar, :tu, 'Chat Mr. Halley', :eid, :nos)
                     """),
                     {
-                        "dt": str(data_final), "ex": str(exec_final), "pr": str(pref_final),
-                        "ti": str(inicio_final), "tf": str(fim_final), "ds": str(desc_final),
-                        "ar": str(area_final), "tu": str(turno_final), "eid": str(emp_id), "nos": int(nova_os)
+                        "dt": str(data_final),
+                        "ex": str(exec_final),
+                        "pr": str(pref_final),
+                        "ti": str(inicio_final),
+                        "tf": str(fim_final),
+                        "ds": str(desc_final),
+                        "ar": str(area_final),
+                        "tu": str(turno_final),
+                        "eid": str(emp_id),
+                        "nos": int(nova_os)
                     }
                 )
                 conn.commit()
@@ -305,9 +299,14 @@ def processar_comando_os(texto_usuario, emp_id):
 
             return (
                 f"✅ **Ordem de Serviço Nº {nova_os} gerada com sucesso!**\n\n"
-                f"- **Veículo:** {pref_final}\n- **Serviço:** {desc_final}\n"
-                f"- **Área:** {area_final}\n- **Data:** {data_final}\n"
-                f"- **Executor:** {exec_final}\n\n*A OS foi enviada para a Agenda Principal.*"
+                f"- **Veículo:** {pref_final}\n"
+                f"- **Serviço:** {desc_final}\n"
+                f"- **Área:** {area_final}\n"
+                f"- **Data:** {data_final}\n"
+                f"- **Turno:** {turno_final}\n"
+                f"- **Horário:** {inicio_final} às {fim_final}\n"
+                f"- **Executor:** {exec_final}\n\n"
+                f"*A OS já foi enviada diretamente para a Agenda Principal.*"
             )
         except Exception as e:
             return f"❌ Ocorreu um erro ao salvar a OS no banco: {str(e)}"
@@ -317,80 +316,123 @@ def processar_comando_os(texto_usuario, emp_id):
         return None
 
     veiculo_contexto = "Não informado"
+    relato_contexto = ""
     if "analises_halley" in st.session_state and st.session_state.analises_halley:
         veiculo_contexto = str(st.session_state.analises_halley[-1].get("veiculo", "Não informado"))
+        relato_contexto = str(st.session_state.analises_halley[-1].get("relato", ""))
+
+    ultimas_msgs = ""
+    if "mensagens_chat_halley" in st.session_state and st.session_state.mensagens_chat_halley:
+        mensagens_recentes = st.session_state.mensagens_chat_halley[-6:]
+        ultimas_msgs = "\n".join([f"{m['role'].upper()}: {m['content']}" for m in mensagens_recentes])
+
+    template_fluxo = f"""
+Você é o assistente Mr. Halley da plataforma Up 2 Today, especialista em agendamento de OS.
+
+Histórico Recente da Conversa no Chat:
+{ultimas_msgs if ultimas_msgs else "Nenhuma mensagem anterior."}
+
+Mensagem Atual do Usuário: "{texto_usuario}"
+Rascunho Existente de OS: {json.dumps(rascunho, ensure_ascii=False)}
+Em Fluxo de OS Ativo? {bool(rascunho or st.session_state.aguardando_confirmacao_os)}
+
+DIRETRIZ CRÍTICA DE INTERRUPÇÃO:
+- Se a mensagem atual do usuário for uma **pergunta sobre o sistema, funcionalidades, dúvidas gerais ou qualquer assunto que mude de contexto** (mesmo que haja um rascunho de OS aberto), você DEVE cancelar o fluxo de OS imediatamente retornando `em_fluxo_os: false`.
+- Se o usuário estiver de fato fornecendo dados para continuar o preenchimento da OS, mantenha `em_fluxo_os: true` e preencha os campos.
+
+CAMPOS DA OS:
+- prefixo: Número/placa do veículo.
+- descricao: Descrição do problema/serviço.
+- executor: Mecânico ou responsável.
+- data: Data AAAA-MM-DD.
+- area: Mecânica, Elétrica, Borracharia, Chapeamento ou Limpeza.
+- turno: Não definido, Dia ou Noite.
+- inicio: HH:MM
+- fim: HH:MM
+
+Responda EXCLUSIVAMENTE em formato JSON puro:
+
+Se for pergunta geral, dúvida ou interrupção:
+{{"em_fluxo_os": false}}
+
+Se for continuação do preenchimento da OS:
+{{"em_fluxo_os": true, "prefixo": "...", "descricao": "...", "executor": "...", "data": "...", "area": "...", "turno": "...", "inicio": "...", "fim": "..."}}
+"""
 
     try:
-        prompt_extracao = f"""
-Extraia os dados da OS da mensagem do usuário: "{texto_usuario}"
-Retorne EXCLUSIVAMENTE em JSON puro com as chaves: prefixo, descricao, executor, data, area.
-Se um campo não foi mencionado, retorne null.
-"""
-        res_json = chamar_groq_direto(prompt_extracao, api_key)
-        dados = json.loads(res_json.replace("```json", "").replace("```", "").strip())
-        
-        for k in ["prefixo", "descricao", "executor", "data", "area"]:
+        resultado = chamar_groq_direto(template_fluxo, api_key)
+        resultado_limpo = resultado.replace("```json", "").replace("```", "").strip()
+        dados = json.loads(resultado_limpo)
+
+        if not dados.get("em_fluxo_os"):
+            st.session_state.rascunho_os = None
+            st.session_state.aguardando_confirmacao_os = False
+            return None
+
+        novo_rascunho = rascunho.copy()
+        for k in ["prefixo", "descricao", "executor", "data", "area", "turno", "inicio", "fim"]:
             v = dados.get(k)
             if v and v not in ["...", "None", "null", "Não informado"]:
-                rascunho[k] = v
-    except Exception:
-        pass
+                novo_rascunho[k] = v
 
-    pede_mesmo_veiculo = any(t in texto_baixo for t in ["mesmo veículo", "mesmo carro", "desse veículo", "desse carro", "dele", "mesmo", "este mesmo veículo"])
-    if not rascunho.get("prefixo") or str(rascunho.get("prefixo")).lower() in ["desse", "último"]:
-        if pede_mesmo_veiculo and veiculo_contexto != "Não informado":
-            rascunho["prefixo"] = veiculo_contexto
+        texto_usuario_lower = texto_usuario.lower()
+        pede_mesmo_veiculo = any(termo in texto_usuario_lower for termo in ["mesmo veículo", "mesmo carro", "desse veículo", "desse carro", "dele", "mesmo"])
+        
+        if not novo_rascunho.get("prefixo") or str(novo_rascunho.get("prefixo")).lower() in ["desse", "desse veículo", "último"]:
+            if pede_mesmo_veiculo and veiculo_contexto != "Não informado":
+                novo_rascunho["prefixo"] = veiculo_contexto
+            else:
+                novo_rascunho["prefixo"] = None
+                
+        pede_mesmo_problema = any(termo in texto_usuario_lower for termo in ["mesmo problema", "mesmo defeito", "igual", "mesma falha"])
+        
+        if not novo_rascunho.get("descricao") or str(novo_rascunho.get("descricao")).lower() in ["mesmo problema", "problema"]:
+            if pede_mesmo_problema and relato_contexto:
+                novo_rascunho["descricao"] = relato_contexto
+            else:
+                novo_rascunho["descricao"] = None
 
-    # ETAPA 1: Se falta Prefixo ou Descrição, o texto enviado preenche obrigatoriamente a descrição
-    if not rascunho.get("prefixo") or not rascunho.get("descricao"):
-        if not rascunho.get("descricao") and not pediu_abertura and texto_baixo not in ["ok", "sim"]:
-            rascunho["descricao"] = texto_usuario
-    else:
-        # ETAPA 2: Se Veículo e Descrição já estão preenchidos, preenche o executor se o texto não for data/número
-        if not rascunho.get("executor") and not any(char.isdigit() for char in texto_usuario):
-            rascunho["executor"] = texto_usuario
+        if not novo_rascunho.get("turno"):
+            novo_rascunho["turno"] = "Não definido"
+        if not novo_rascunho.get("inicio"):
+            novo_rascunho["inicio"] = "00:00"
+        if not novo_rascunho.get("fim"):
+            novo_rascunho["fim"] = "00:00"
 
-    if not rascunho.get("turno"): rascunho["turno"] = "Não definido"
-    if not rascunho.get("inicio"): rascunho["inicio"] = "00:00"
-    if not rascunho.get("fim"): rascunho["fim"] = "00:00"
-    if not rascunho.get("area"): rascunho["area"] = "Mecânica"
+        st.session_state.rascunho_os = novo_rascunho
 
-    st.session_state.rascunho_os = rascunho
+        campos_faltantes = []
+        if not novo_rascunho.get("prefixo"):
+            campos_faltantes.append("Prefixo do Veículo")
+        if not novo_rascunho.get("descricao"):
+            campos_faltantes.append("Descrição do Serviço")
+        if not novo_rascunho.get("executor"):
+            campos_faltantes.append("Mecânico Responsável")
+        if not novo_rascunho.get("data"):
+            campos_faltantes.append("Data de Agendamento")
+        if not novo_rascunho.get("area"):
+            campos_faltantes.append("Área (Mecânica, Elétrica, Borracharia, Chapeamento ou Limpeza)")
 
-    # BLOCO 1: Exige obrigatoriamente Veículo e Descrição primeiro
-    campos_faltantes_bloco1 = []
-    if not rascunho.get("prefixo"):
-        campos_faltantes_bloco1.append("Prefixo do Veículo")
-    if not rascunho.get("descricao"):
-        campos_faltantes_bloco1.append("Descrição do Serviço")
+        if campos_faltantes:
+            st.session_state.aguardando_confirmacao_os = False
+            return (
+                f"Para prosseguir com a abertura da OS, por favor informe:\n\n"
+                f"- **{', '.join(campos_faltantes)}**\n\n"
+                f"*(Horários e Turno são opcionais)*"
+            )
 
-    if campos_faltantes_bloco1:
-        st.session_state.aguardando_confirmacao_os = False
-        return f"Para prosseguir com a abertura da OS, por favor informe:\n\n- **{', '.join(campos_faltantes_bloco1)}**"
-
-    # BLOCO 2: Com Veículo e Descrição preenchidos, exige Mecânico e Data
-    campos_faltantes_bloco2 = []
-    if not rascunho.get("executor"):
-        campos_faltantes_bloco2.append("Mecânico Responsável")
-    if not rascunho.get("data"):
-        campos_faltantes_bloco2.append("Data de Agendamento")
-
-    if campos_faltantes_bloco2:
-        st.session_state.aguardando_confirmacao_os = False
-        return f"Perfeito! Agora, por favor informe:\n\n- **{', '.join(campos_faltantes_bloco2)}**\n\n*(Horários e Turno são opcionais)*"
-
-    st.session_state.aguardando_confirmacao_os = True
-    return (
-        f"📋 **Resumo da Ordem de Serviço:**\n\n"
-        f"- **Veículo:** {rascunho.get('prefixo')}\n"
-        f"- **Serviço:** {rascunho.get('descricao')}\n"
-        f"- **Área:** {rascunho.get('area')}\n"
-        f"- **Data:** {rascunho.get('data')}\n"
-        f"- **Turno:** {rascunho.get('turno')}\n"
-        f"- **Horário:** {rascunho.get('inicio')} às {rascunho.get('fim')}\n"
-        f"- **Executor:** {rascunho.get('executor')}\n\n"
-        f"👉 Digite **Ok** para confirmar ou informe ajustes."
-    )
+        st.session_state.aguardando_confirmacao_os = True
+        return (
+            f"📋 **Resumo da Ordem de Serviço:**\n\n"
+            f"- **Veículo:** {novo_rascunho.get('prefixo')}\n"
+            f"- **Serviço:** {novo_rascunho.get('descricao')}\n"
+            f"- **Área:** {novo_rascunho.get('area')}\n"
+            f"- **Data:** {novo_rascunho.get('data')}\n"
+            f"- **Turno:** {novo_rascunho.get('turno')}\n"
+            f"- **Horário:** {novo_rascunho.get('inicio')} às {novo_rascunho.get('fim')}\n"
+            f"- **Executor:** {novo_rascunho.get('executor')}\n\n"
+            f"👉 Digite **Ok** para confirmar ou informe ajustes."
+        )
     except Exception:
         return None
         
@@ -536,7 +578,6 @@ def renderizar_chat_flutuante(emp_id):
                         st.markdown(resp)
             st.session_state.mensagens_chat_halley.append({"role": "assistant", "content": resp})
             
-            # Script JS para rolar o container para o início da última mensagem do assistente
             components.html("""
                 <script>
                     const doc = window.parent.document;
@@ -699,7 +740,6 @@ def gerar_pdf_manual_oficial_pro():
     texto_pdf = pdf.output(dest='S')
     return texto_pdf.encode('latin-1', 'replace')
 
-# --- LÓGICA DE GERAÇÃO DE OS SEQUENCIAL ---
 def obter_proxima_os(engine, emp_id):
     try:
         with engine.connect() as conn:
@@ -716,24 +756,18 @@ COR_OURO = "#C5A059"
 COR_CHAPA = "#F7F5F0"   
 COR_TEXTO = "#231F20"   
 
-# --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title=f"{NOME_SISTEMA} - Painel de Controle", layout="wide", page_icon="⚙️")
-
-# --- CHAMADA DO SCRIPT JS PARA PUXAR O TOPO EXATAMENTE ---
 puxar_topo_para_cima()
 
-# --- DESIGN SYSTEM LUXO & SIDEBAR MODERNA COM CABEÇALHO 100% FIXO E SEM EXcesso ---
 st.markdown(f"""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&display=swap');
 
-    /* Fundo Geral da Aplicação */
     html, body, [data-testid="stAppViewContainer"], .stApp {{ 
         background-color: {COR_CHAPA} !important; 
         font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif !important;
     }}
 
-    /* RESTAURA O CABEÇALHO NATIVO COM ALTURA ADEQUADA PARA O BOTÃO COMPARTILHAR */
     header[data-testid="stHeader"] {{
         background: transparent !important;
         visibility: visible !important;
@@ -741,15 +775,11 @@ st.markdown(f"""
         height: 3rem !important;
     }}
     
-    /* ZERA O ESPAÇAMENTO NATIVO DO STREAMLIT NO TOPO SEM CORTAR O LOGO */
     .main, .main .block-container, div[data-testid="stMainBlockContainer"], div[data-testid="stAppViewBlockContainer"] {{
         padding-top: 0rem !important;
         margin-top: 0rem !important; 
     }}
     
-    /* ========================================================= */
-    /* 1. CONTROLE E FIXAÇÃO DA SIDEBAR (SEM ROLAGEM)            */
-    /* ========================================================= */
     section[data-testid="stSidebar"] {{ 
         background: linear-gradient(180deg, #2A211B 0%, #1D1612 100%) !important; 
         border-right: 1px solid #3D3128 !important;
@@ -769,7 +799,6 @@ st.markdown(f"""
         color: #F0EDE6 !important;
     }}
 
-    /* Espaçamentos verticais compactados */
     section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] {{
         gap: 0 !important;
     }}
@@ -778,7 +807,6 @@ st.markdown(f"""
         border-color: rgba(197, 160, 89, 0.25) !important;
     }}
 
-    /* Container do Brasão Circular (90px) */
     .logo-container-circular {{
         margin: 0 auto !important;
         border-radius: 50%;
@@ -796,7 +824,6 @@ st.markdown(f"""
         border-radius: 50%;
     }}
     
-    /* Tipografia Dourada Cinzel Unificada */
     .brand-title-gold, .login-brand-title {{
         font-family: 'Cinzel', serif !important;
         font-weight: 800 !important;
@@ -821,7 +848,6 @@ st.markdown(f"""
         color: #F0EDE6 !important;
     }}
 
-    /* Navegação feita com botões; o item ativo é indicado pelo fundo dourado. */
     section[data-testid="stSidebar"] button[kind="secondary"],
     section[data-testid="stSidebar"] button[data-testid="stBaseButton-secondary"],
     section[data-testid="stSidebar"] div[data-testid="stButton"] button[kind="secondary"] {{
@@ -902,7 +928,6 @@ st.markdown(f"""
         font-size: 0.84rem !important;
     }}
 
-    /* Botões Padrão */
     button, 
     button[kind="primary"], 
     button[kind="secondary"], 
@@ -933,7 +958,6 @@ st.markdown(f"""
         -webkit-text-fill-color: {COR_TEXTO} !important;
     }}
 
-   /* ANCORAGEM PERFEITA LOGO ABAIXO DA BARRA SUPERIOR */
     .top-fixed-section {{
         position: -webkit-sticky !important;
         position: sticky !important;
@@ -952,7 +976,6 @@ st.markdown(f"""
         transform: translateY(-115px) !important; 
     }}
     
-    /* Compactação dos Inputs e Botões do Header */
     .top-fixed-section div[data-testid="stTextInput"] {{
         margin-top: -2px !important;
     }}
@@ -962,60 +985,6 @@ st.markdown(f"""
         font-size: 0.85rem !important;
     }}
 
-    /* Cartões Modernos de Dashboard */
-    .quick-card {{
-        background: #FFFFFF;
-        border: 1.5px solid #EDE8DF;
-        border-radius: 18px;
-        padding: 20px;
-        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.03);
-        display: flex;
-        align-items: center;
-        gap: 16px;
-        transition: all 0.25s ease;
-        cursor: pointer;
-        min-height: 110px;
-    }}
-    .quick-card.active {{
-        border: 2px solid #C5A059;
-        box-shadow: 0 6px 20px rgba(197, 160, 89, 0.18);
-    }}
-    .quick-card-icon-dark {{
-        background: #3B2E25;
-        color: #C5A059;
-        border-radius: 14px;
-        width: 56px;
-        height: 56px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.8rem;
-    }}
-    .quick-card-icon-light {{
-        background: #FBF8F3;
-        color: #8C7355;
-        border: 1px solid #EAE3D5;
-        border-radius: 14px;
-        width: 56px;
-        height: 56px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.8rem;
-    }}
-    .quick-card-title {{
-        font-size: 1.1rem;
-        font-weight: 700;
-        color: #2D241E;
-        margin: 0;
-    }}
-    .quick-card-sub {{
-        font-size: 0.82rem;
-        color: #8A7E75;
-        margin: 2px 0 0 0;
-    }}
-    
-    /* Cartões de Métricas */
     .metric-card {{
         background: #FFFFFF;
         border-radius: 18px;
@@ -1047,13 +1016,6 @@ st.markdown(f"""
         color: #8F847B;
         font-weight: 600;
     }}
-    </style>
-""", unsafe_allow_html=True)
-
-st.markdown("""
-    <style>
-    .logo-u { color: #4A3C31 !important; font-weight: bold; }
-    .logo-y { color: #C5A059 !important; font-weight: bold; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -1177,7 +1139,6 @@ def gerar_pdf_periodo(df_periodo, data_inicio, data_fim):
                 
     return bytes(pdf.output())
 
-# --- INICIALIZAÇÃO DE ESTADOS DE SESSÃO ---
 if "logado" not in st.session_state:
     st.session_state["logado"] = False
 
@@ -1187,9 +1148,6 @@ if "perfil" not in st.session_state:
 if "usuario_ativo" not in st.session_state:
     st.session_state["usuario_ativo"] = ""
 
-# ==================================================
-# 1. TELA DE ACESSO (Se o usuário NÃO estiver logado)
-# ==================================================
 if not st.session_state["logado"]:
     _, col_login, _ = st.columns([1.2, 1, 1.2])
     with col_login:
@@ -1215,7 +1173,6 @@ if not st.session_state["logado"]:
                         engine = get_engine()
                         inicializar_banco()
                         
-                        # Provisionamento / atualização do Admin Master
                         if user_input == "bruno":
                             try:
                                 with engine.connect() as conn:
@@ -1232,7 +1189,6 @@ if not st.session_state["logado"]:
                             except Exception:
                                 pass
 
-                        # 1. Autenticação na tabela empresa
                         with engine.connect() as conn:
                             empresa = conn.execute(
                                 text("""
@@ -1260,7 +1216,6 @@ if not st.session_state["logado"]:
                             st.rerun()
                         
                         else:
-                            # 2. Autenticação na tabela usuarios
                             with engine.connect() as conn:
                                 usuario = conn.execute(
                                     text("""
@@ -1314,9 +1269,6 @@ if not st.session_state["logado"]:
                     else:
                         st.warning("Preencha todos os campos.")
 
-# ==================================================
-# 2. AMBIENTE LOGADO
-# ==================================================
 else:
     engine = get_engine()
     inicializar_banco()
@@ -1337,7 +1289,6 @@ else:
                     if st.session_state.get("show_pay_banner"):
                         exibir_painel_pagamento_pro("banner")
     
-    # --- ÍCONES BRANCOS LINEARES / MINIMALISTAS ---
     if st.session_state["perfil"] == "motorista":
         opcoes = ["✍  Abrir Solicitação", "📋  Status"]
     else:
@@ -1372,7 +1323,6 @@ else:
             st.session_state.opcao_selecionada = target
         st.session_state.radio_key += 1
 
-    # --- PROCESSA NAVEGAÇÃO DISPARADA PELO CARROSSEL VIA QUERY PARAMS ---
     if "nav" in st.query_params:
         nav_req = st.query_params.get("nav")
         if nav_req:
@@ -1380,7 +1330,6 @@ else:
             del st.query_params["nav"]
             st.rerun()
 
-    # --- TRADUÇÃO BÁSICA DA INTERFACE E CONTADORES DO CABEÇALHO ---
     IDIOMAS_DISPONIVEIS = ["Português", "English", "Español"]
     TRADUCOES_INTERFACE = {
         "Português": {
@@ -1451,7 +1400,6 @@ else:
             pass
         return int(qtd_atrasadas), int(qtd_chamados)
 
-    # --- MONTAGEM DA SIDEBAR COM ESPAÇAMENTOS REFINADOS ---
     with st.sidebar:
         st.markdown(f"""
             <div style='text-align: center; margin-top: -1.2rem; padding: 0 0 2px 0;'>
@@ -1476,7 +1424,6 @@ else:
                 args=(opcao,)
             )
         
-        # Bloco do Mr. Halley
         st.markdown("""
             <div style='margin-top: 3px; background: rgba(197, 160, 89, 0.08); border: 1px solid #C5A059; border-radius: 8px; padding: 8px 10px; margin-bottom: 4px;'>
                 <p style='margin:0; font-weight:700; color:#C5A059; font-size:0.82rem;'>💬 Chat com Mr. Halley</p>
@@ -1484,7 +1431,6 @@ else:
             </div>
         """, unsafe_allow_html=True)
 
-        # Bloco de Rodapé: Espaço aumentado antes de Usuário e Botão de Logout
         st.markdown(f"""
             <div style='margin-top: 20px; padding-top: 4px; border-top: 1px solid rgba(197, 160, 89, 0.2);'>
                 <p style='margin: 0 0 25px 0; font-size: 0.8rem; line-height: 1.15;'>
@@ -1497,12 +1443,8 @@ else:
             st.session_state["logado"] = False
             st.rerun()
 
-    # =========================================================================
-    # SEÇÃO SUPERIOR COMPLETA E 100% FIXA NO TOPO (STICKY INTEGRADO TOTAL)
-    # ==================================================
     st.markdown("<div class='top-fixed-section'>", unsafe_allow_html=True)
     
-    # 1. Cabeçalho de Busca, Ajuda, Idioma e Notificações
     qtd_atrasadas_header, qtd_chamados_header = obter_notificacoes_header()
     total_notificacoes_header = qtd_atrasadas_header + qtd_chamados_header
     
@@ -1557,7 +1499,6 @@ else:
             if not total_notificacoes_header:
                 st.success(tr("Nenhuma notificação nova."))
 
-    # 2. Carrossel Compacto com Descrições Completas Restauradas
     cards_acesso = [
         {"alvo": "Dashboard", "icone": "⌂", "titulo": "Dashboard", "descricao": "Visão geral da operação e dos principais indicadores."},
         {"alvo": "Agenda Principal", "icone": "◰", "titulo": "Agenda Principal", "descricao": "Controle de janelas de box e manutenções programadas."},
@@ -1795,9 +1736,6 @@ else:
 
     aba_ativa = st.session_state.opcao_selecionada
 
-    # ==================================================
-    # CONTEÚDO DAS ABAS DO SISTEMA
-    # ==================================================
     if "Dashboard" in aba_ativa:
         st.markdown("<h4 style='color: #2D241E; font-weight: 700; margin-bottom: 16px;'>Cronograma Geral de Manutenção</h4>", unsafe_allow_html=True)
         
@@ -2653,7 +2591,6 @@ else:
                     conn.commit()
                 st.rerun()
 
-# --- ATIVAÇÃO GLOBAL DO CHAT FLUTUANTE (EXCETO NA ABA DO CHAT PRINCIPAL) ---
 if st.session_state.get("logado") and "empresa" in st.session_state:
     if "Chat Mr. Halley" not in st.session_state.get("opcao_selecionada", ""):
         renderizar_chat_flutuante(st.session_state["empresa"])
