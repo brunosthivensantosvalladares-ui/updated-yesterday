@@ -239,9 +239,9 @@ INSTRUÇÕES DE ANÁLISE E RESPOSTA:
     except Exception as e:
         return f"⚠️ Erro interno na IA: {str(e)}"
         
-# --- PROCESSAMENTO DE OS EM ETAPAS LÓGICAS (VEÍCULO/DESCRIÇÃO -> MECÂNICO/DATA) ---
+# --- PROCESSAMENTO DE OS ESTÁVEL COM ETAPAS LÓGICAS E CAPTURA BLINDADA DE DESCRIÇÃO ---
 def processar_comando_os(texto_usuario, emp_id):
-    """Gerencia a coleta progressiva dividida em etapas lógicas e ordenadas."""
+    """Gerencia o fluxo conversacional de OS de forma estável, exigindo veículo/descrição primeiro."""
     if "rascunho_os" not in st.session_state:
         st.session_state.rascunho_os = None
     if "aguardando_confirmacao_os" not in st.session_state:
@@ -255,6 +255,17 @@ def processar_comando_os(texto_usuario, emp_id):
         st.session_state.rascunho_os = None
         st.session_state.aguardando_confirmacao_os = False
         return "❌ Agendamento de Ordem de Serviço cancelado."
+
+    # Interceptação Python: Garante que frases de abertura ou menção a veículo INICIAM o fluxo imediatamente
+    tem_rascunho_ativo = bool(rascunho or st.session_state.aguardando_confirmacao_os)
+    pediu_abertura = any(termo in texto_baixo for termo in ["abrir os", "criar os", "agendar os", "abrir uma os", "mesmo veículo", "mesmo carro", "desse veículo", "desse carro", "este mesmo veículo"])
+
+    if not tem_rascunho_ativo and not pediu_abertura:
+        return None
+
+    if not rascunho:
+        rascunho = {"prefixo": None, "descricao": None, "executor": None, "data": None, "area": "Mecânica", "turno": "Não definido", "inicio": "00:00", "fim": "00:00"}
+        st.session_state.rascunho_os = rascunho
 
     palavras_confirmacao = ["ok", "sim", "tudo certo", "pode agendar", "confirmo", "confirmar", "fechar", "gerar", "certo", "ok."]
     eh_confirmacao = (
@@ -307,122 +318,87 @@ def processar_comando_os(texto_usuario, emp_id):
         return None
 
     veiculo_contexto = "Não informado"
-    relato_contexto = ""
     if "analises_halley" in st.session_state and st.session_state.analises_halley:
         veiculo_contexto = str(st.session_state.analises_halley[-1].get("veiculo", "Não informado"))
-        relato_contexto = str(st.session_state.analises_halley[-1].get("relato", ""))
 
-    ultimas_msgs = ""
-    if "mensagens_chat_halley" in st.session_state and st.session_state.mensagens_chat_halley:
-        mensagens_recentes = st.session_state.mensagens_chat_halley[-6:]
-        ultimas_msgs = "\n".join([f"{m['role'].upper()}: {m['content']}" for m in mensagens_recentes])
-
-    template_fluxo = f"""
-Você é o assistente Mr. Halley da plataforma Up 2 Today, especialista em agendamento de OS.
-Histórico Recente:
-{ultimas_msgs if ultimas_msgs else "Nenhuma mensagem anterior."}
-
-Mensagem Atual do Usuário: "{texto_usuario}"
-Rascunho Atual: {json.dumps(rascunho, ensure_ascii=False)}
-Em Fluxo Ativo? {bool(rascunho or st.session_state.aguardando_confirmacao_os)}
-
-ETAPA 1: O assistente deve obter primeiro o **prefixo** (veículo) e a **descricao** (problema).
-ETAPA 2: Somente se veículo e descrição já estiverem preenchidos, o assistente coleta o **executor** (mecânico) e a **data**.
-
-Extraia os campos mencionados na mensagem atual:
-- prefixo: Número/placa.
-- descricao: O problema ou serviço relatado.
-- executor: Mecânico responsável.
-- data: AAAA-MM-DD.
-- area: Mecânica, Elétrica, Borracharia, Chapeamento ou Limpeza (padrão: Mecânica).
-- turno, inicio, fim: Opcionais.
-
-Retorne EXCLUSIVAMENTE em JSON puro:
-{{"em_fluxo_os": true, "prefixo": "...", "descricao": "...", "executor": "...", "data": "...", "area": "...", "turno": "...", "inicio": "...", "fim": "..."}}
-"""
-
+    # Extração via LLM para preencher o rascunho
     try:
-        resultado = chamar_groq_direto(template_fluxo, api_key)
-        dados = json.loads(resultado.replace("```json", "").replace("```", "").strip())
-
-        if not dados.get("em_fluxo_os"):
-            st.session_state.rascunho_os = None
-            st.session_state.aguardando_confirmacao_os = False
-            return None
-
-        novo_rascunho = rascunho.copy()
-        for k in ["prefixo", "descricao", "executor", "data", "area", "turno", "inicio", "fim"]:
+        prompt_extracao = f"""
+Extraia os dados da OS da mensagem do usuário: "{texto_usuario}"
+Retorne EXCLUSIVAMENTE em JSON puro com as chaves: prefixo, descricao, executor, data, area.
+Se um campo não foi mencionado, retorne null.
+"""
+        res_json = chamar_groq_direto(prompt_extracao, api_key)
+        dados = json.loads(res_json.replace("```json", "").replace("```", "").strip())
+        
+        for k in ["prefixo", "descricao", "executor", "data", "area"]:
             v = dados.get(k)
             if v and v not in ["...", "None", "null", "Não informado"]:
-                novo_rascunho[k] = v
+                rascunho[k] = v
+    except Exception:
+        pass
 
-        texto_usuario_lower = texto_usuario.lower()
-        
-        # Validações de contexto anterior
-        pede_mesmo_veiculo = any(t in texto_usuario_lower for t in ["mesmo veículo", "mesmo carro", "desse veículo", "desse carro", "dele", "mesmo"])
-        if not novo_rascunho.get("prefixo") or str(novo_rascunho.get("prefixo")).lower() in ["desse", "último"]:
-            if pede_mesmo_veiculo and veiculo_contexto != "Não informado":
-                novo_rascunho["prefixo"] = veiculo_contexto
-            else:
-                novo_rascunho["prefixo"] = None
+    # Tratamento de contexto anterior para o veículo
+    pede_mesmo_veiculo = any(t in texto_baixo for t in ["mesmo veículo", "mesmo carro", "desse veículo", "desse carro", "dele", "mesmo", "este mesmo veículo"])
+    if not rascunho.get("prefixo") or str(rascunho.get("prefixo")).lower() in ["desse", "último"]:
+        if pede_mesmo_veiculo and veiculo_contexto != "Não informado":
+            rascunho["prefixo"] = veiculo_contexto
 
-        pede_mesmo_problema = any(t in texto_usuario_lower for t in ["mesmo problema", "mesmo defeito", "igual"])
-        if not pede_mesmo_problema and not novo_rascunho.get("prefixo") and not rascunho.get("prefixo"):
+    # RECURSO BLINDADO DE ETAPAS:
+    # Etapa 1: Se ainda falta Veículo ou Descrição, o texto enviado (se não for comando de abertura) é a Descrição!
+    if not rascunho.get("prefixo") or not rascunho.get("descricao"):
+        if not rascunho.get("descricao") and not pediu_abertura and texto_baixo not in ["ok", "sim"]:
+            rascunho["descricao"] = texto_usuario
+    else:
+        # Etapa 2: Se Veículo e Descrição já estão preenchidos, o texto atual responde ao Executor (se não tiver número/data)
+        if not rascunho.get("executor") and not any(char.isdigit() for char in texto_usuario):
+            rascunho["executor"] = texto_usuario
+        elif not rascunho.get("data"):
+            # Se tem números, tenta capturar como data ou deixa o usuário informar
             pass
 
-        # REDE DE SEGURANÇA POR ETAPAS:
-        # Se falta Veículo ou Descrição, impede que o texto vire Executor ou Data
-        if not novo_rascunho.get("prefixo") or not novo_rascunho.get("descricao"):
-            if not novo_rascunho.get("descricao") and texto_baixo not in ["ok", "sim", "certo"]:
-                novo_rascunho["descricao"] = texto_usuario
-        else:
-            # Se Veículo e Descrição já estão preenchidos, o texto atual responde à Etapa 2 (Executor/Data)
-            if not novo_rascunho.get("executor") and not any(char.isdigit() for char in texto_usuario):
-                novo_rascunho["executor"] = texto_usuario
+    if not rascunho.get("turno"): rascunho["turno"] = "Não definido"
+    if not rascunho.get("inicio"): rascunho["inicio"] = "00:00"
+    if not rascunho.get("fim"): rascunho["fim"] = "00:00"
+    if not rascunho.get("area"): rascunho["area"] = "Mecânica"
 
-        if not novo_rascunho.get("turno"): novo_rascunho["turno"] = "Não definido"
-        if not novo_rascunho.get("inicio"): novo_rascunho["inicio"] = "00:00"
-        if not novo_rascunho.get("fim"): novo_rascunho["fim"] = "00:00"
-        if not novo_rascunho.get("area"): novo_rascunho["area"] = "Mecânica"
+    st.session_state.rascunho_os = rascunho
 
-        st.session_state.rascunho_os = novo_rascunho
+    # BLOCO 1 DE COBRANÇA: Exige primeiro Prefixo e Descrição
+    campos_faltantes_bloco1 = []
+    if not rascunho.get("prefixo"):
+        campos_faltantes_bloco1.append("Prefixo do Veículo")
+    if not rascunho.get("descricao"):
+        campos_faltantes_bloco1.append("Descrição do Serviço")
 
-        # ORDEM DE COBRANÇA EM 2 BLOCOS LÓGICOS:
-        # Bloco 1: Primeiro exige Veículo e Descrição do Serviço
-        campos_faltantes_etapa1 = []
-        if not novo_rascunho.get("prefixo") or str(novo_rascunho.get("prefixo")) in ["...", "None", "null", "Não informado"]:
-            campos_faltantes_etapa1.append("Prefixo do Veículo")
-        if not novo_rascunho.get("descricao") or str(novo_rascunho.get("descricao")) in ["...", "None", "null", "Não informado"]:
-            campos_faltantes_etapa1.append("Descrição do Serviço")
+    if campos_faltantes_bloco1:
+        st.session_state.aguardando_confirmacao_os = False
+        return f"Para prosseguir com a abertura da OS, por favor informe:\n\n- **{', '.join(campos_faltantes_bloco1)}**"
 
-        if campos_faltantes_etapa1:
-            st.session_state.aguardando_confirmacao_os = False
-            return f"Para prosseguir com a abertura da OS, por favor informe:\n\n- **{', '.join(campos_faltantes_etapa1)}**"
+    # BLOCO 2 DE COBRANÇA: Com veículo e descrição prontos, exige Executor e Data
+    campos_faltantes_bloco2 = []
+    if not rascunho.get("executor"):
+        campos_faltantes_bloco2.append("Mecânico Responsável")
+    if not rascunho.get("data"):
+        campos_faltantes_bloco2.append("Data de Agendamento")
 
-        # Bloco 2: Com Veículo e Descrição garantidos, exige Mecânico e Data
-        campos_faltantes_etapa2 = []
-        if not novo_rascunho.get("executor") or str(novo_rascunho.get("executor")) in ["...", "None", "null", "Não informado"]:
-            campos_faltantes_etapa2.append("Mecânico Responsável")
-        if not novo_rascunho.get("data") or str(novo_rascunho.get("data")) in ["...", "None", "null", "Não informado"]:
-            campos_faltantes_etapa2.append("Data de Agendamento")
+    if campos_faltantes_bloco2:
+        st.session_state.aguardando_confirmacao_os = False
+        return f"Perfeito! Agora, por favor informe:\n\n- **{', '.join(campos_faltantes_bloco2)}**\n\n*(Horários e Turno são opcionais)*"
 
-        if campos_faltantes_etapa2:
-            st.session_state.aguardando_confirmacao_os = False
-            return f"Perfeito! Agora, para finalizar, por favor informe:\n\n- **{', '.join(campos_faltantes_etapa2)}**\n\n*(Horários, Área e Turno são opcionais)*"
-
-        # Tudo preenchido! Mostra o resumo para confirmação
-        st.session_state.aguardando_confirmacao_os = True
-        return (
-            f"📋 **Resumo da Ordem de Serviço:**\n\n"
-            f"- **Veículo:** {novo_rascunho.get('prefixo')}\n"
-            f"- **Serviço:** {novo_rascunho.get('descricao')}\n"
-            f"- **Área:** {novo_rascunho.get('area')}\n"
-            f"- **Data:** {novo_rascunho.get('data')}\n"
-            f"- **Turno:** {novo_rascunho.get('turno')}\n"
-            f"- **Horário:** {novo_rascunho.get('inicio')} às {novo_rascunho.get('fim')}\n"
-            f"- **Executor:** {novo_rascunho.get('executor')}\n\n"
-            f"👉 Digite **Ok** para confirmar ou informe ajustes."
-        )
+    # Tudo pronto para confirmação
+    st.session_state.aguardando_confirmacao_os = True
+    return (
+        f"📋 **Resumo da Ordem de Serviço:**\n\n"
+        f"- **Veículo:** {rascunho.get('prefixo')}\n"
+        f"- **Serviço:** {rascunho.get('descricao')}\n"
+        f"- **Área:** {rascunho.get('area')}\n"
+        f"- **Data:** {rascunho.get('data')}\n"
+        f"- **Turno:** {rascunho.get('turno')}\n"
+        f"- **Horário:** {rascunho.get('inicio')} às {rascunho.get('fim')}\n"
+        f"- **Executor:** {rascunho.get('executor')}\n\n"
+        f"👉 Digite **Ok** para confirmar ou informe ajustes."
+    )
     except Exception:
         return None
         
