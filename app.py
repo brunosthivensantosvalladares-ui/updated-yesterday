@@ -253,6 +253,16 @@ def processar_comando_os(texto_usuario, emp_id):
         st.session_state.aguardando_confirmacao_os = False
         return "❌ Agendamento de Ordem de Serviço cancelado."
 
+    tem_rascunho_ativo = bool(rascunho or st.session_state.aguardando_confirmacao_os)
+    pediu_abertura = any(termo in texto_baixo for termo in ["abrir os", "criar os", "agendar os", "abrir uma os", "mesmo veículo", "mesmo carro", "desse veículo", "desse carro", "este mesmo veículo"])
+
+    if not tem_rascunho_ativo and not pediu_abertura:
+        return None
+
+    if not rascunho:
+        rascunho = {"prefixo": None, "descricao": None, "executor": None, "data": None, "area": "Mecânica", "turno": "Não definido", "inicio": "00:00", "fim": "00:00"}
+        st.session_state.rascunho_os = rascunho
+
     palavras_confirmacao = ["ok", "sim", "tudo certo", "pode agendar", "confirmo", "confirmar", "fechar", "gerar", "certo", "ok."]
     eh_confirmacao = (
         st.session_state.aguardando_confirmacao_os 
@@ -376,7 +386,7 @@ Se for continuação do preenchimento da OS:
                 novo_rascunho[k] = v
 
         texto_usuario_lower = texto_usuario.lower()
-        pede_mesmo_veiculo = any(termo in texto_usuario_lower for termo in ["mesmo veículo", "mesmo carro", "desse veículo", "desse carro", "dele", "mesmo"])
+        pede_mesmo_veiculo = any(termo in texto_usuario_lower for termo in ["mesmo veículo", "mesmo carro", "desse veículo", "desse carro", "dele", "mesmo", "este mesmo veículo"])
         
         if not novo_rascunho.get("prefixo") or str(novo_rascunho.get("prefixo")).lower() in ["desse", "desse veículo", "último"]:
             if pede_mesmo_veiculo and veiculo_contexto != "Não informado":
