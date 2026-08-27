@@ -341,10 +341,12 @@ Se um campo não foi mencionado, retorne null.
         if pede_mesmo_veiculo and veiculo_contexto != "Não informado":
             rascunho["prefixo"] = veiculo_contexto
 
+    # ETAPA 1: Se falta Prefixo ou Descrição, o texto enviado preenche obrigatoriamente a descrição
     if not rascunho.get("prefixo") or not rascunho.get("descricao"):
         if not rascunho.get("descricao") and not pediu_abertura and texto_baixo not in ["ok", "sim"]:
             rascunho["descricao"] = texto_usuario
     else:
+        # ETAPA 2: Se Veículo e Descrição já estão preenchidos, preenche o executor se o texto não for data/número
         if not rascunho.get("executor") and not any(char.isdigit() for char in texto_usuario):
             rascunho["executor"] = texto_usuario
 
@@ -355,6 +357,7 @@ Se um campo não foi mencionado, retorne null.
 
     st.session_state.rascunho_os = rascunho
 
+    # BLOCO 1: Exige obrigatoriamente Veículo e Descrição primeiro
     campos_faltantes_bloco1 = []
     if not rascunho.get("prefixo"):
         campos_faltantes_bloco1.append("Prefixo do Veículo")
@@ -365,6 +368,7 @@ Se um campo não foi mencionado, retorne null.
         st.session_state.aguardando_confirmacao_os = False
         return f"Para prosseguir com a abertura da OS, por favor informe:\n\n- **{', '.join(campos_faltantes_bloco1)}**"
 
+    # BLOCO 2: Com Veículo e Descrição preenchidos, exige Mecânico e Data
     campos_faltantes_bloco2 = []
     if not rascunho.get("executor"):
         campos_faltantes_bloco2.append("Mecânico Responsável")
