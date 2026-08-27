@@ -239,9 +239,9 @@ INSTRUÇÕES DE ANÁLISE E RESPOSTA:
     except Exception as e:
         return f"⚠️ Erro interno na IA: {str(e)}"
         
-# --- PROCESSAMENTO INTELIGENTE DE OS COM EXIGÊNCIA DE DESCRIÇÃO E INTERRUPÇÃO DE DÚVIDAS ---
+# --- PROCESSAMENTO DE OS EM ETAPAS LÓGICAS (VEÍCULO/DESCRIÇÃO -> MECÂNICO/DATA) ---
 def processar_comando_os(texto_usuario, emp_id):
-    """Gerencia a coleta progressiva da OS, garantindo a cobrança da descrição e suporte a interrupções."""
+    """Gerencia a coleta progressiva dividida em etapas lógicas e ordenadas."""
     if "rascunho_os" not in st.session_state:
         st.session_state.rascunho_os = None
     if "aguardando_confirmacao_os" not in st.session_state:
@@ -283,16 +283,9 @@ def processar_comando_os(texto_usuario, emp_id):
                         VALUES (:dt, :ex, :pr, :ti, :tf, :ds, :ar, :tu, 'Chat Mr. Halley', :eid, :nos)
                     """),
                     {
-                        "dt": str(data_final),
-                        "ex": str(exec_final),
-                        "pr": str(pref_final),
-                        "ti": str(inicio_final),
-                        "tf": str(fim_final),
-                        "ds": str(desc_final),
-                        "ar": str(area_final),
-                        "tu": str(turno_final),
-                        "eid": str(emp_id),
-                        "nos": int(nova_os)
+                        "dt": str(data_final), "ex": str(exec_final), "pr": str(pref_final),
+                        "ti": str(inicio_final), "tf": str(fim_final), "ds": str(desc_final),
+                        "ar": str(area_final), "tu": str(turno_final), "eid": str(emp_id), "nos": int(nova_os)
                     }
                 )
                 conn.commit()
@@ -302,14 +295,9 @@ def processar_comando_os(texto_usuario, emp_id):
 
             return (
                 f"✅ **Ordem de Serviço Nº {nova_os} gerada com sucesso!**\n\n"
-                f"- **Veículo:** {pref_final}\n"
-                f"- **Serviço:** {desc_final}\n"
-                f"- **Área:** {area_final}\n"
-                f"- **Data:** {data_final}\n"
-                f"- **Turno:** {turno_final}\n"
-                f"- **Horário:** {inicio_final} às {fim_final}\n"
-                f"- **Executor:** {exec_final}\n\n"
-                f"*A OS já foi enviada diretamente para a Agenda Principal.*"
+                f"- **Veículo:** {pref_final}\n- **Serviço:** {desc_final}\n"
+                f"- **Área:** {area_final}\n- **Data:** {data_final}\n"
+                f"- **Executor:** {exec_final}\n\n*A OS foi enviada para a Agenda Principal.*"
             )
         except Exception as e:
             return f"❌ Ocorreu um erro ao salvar a OS no banco: {str(e)}"
@@ -331,41 +319,31 @@ def processar_comando_os(texto_usuario, emp_id):
 
     template_fluxo = f"""
 Você é o assistente Mr. Halley da plataforma Up 2 Today, especialista em agendamento de OS.
-
-Histórico Recente da Conversa no Chat:
+Histórico Recente:
 {ultimas_msgs if ultimas_msgs else "Nenhuma mensagem anterior."}
 
 Mensagem Atual do Usuário: "{texto_usuario}"
-Rascunho Existente de OS: {json.dumps(rascunho, ensure_ascii=False)}
-Em Fluxo de OS Ativo? {bool(rascunho or st.session_state.aguardando_confirmacao_os)}
+Rascunho Atual: {json.dumps(rascunho, ensure_ascii=False)}
+Em Fluxo Ativo? {bool(rascunho or st.session_state.aguardando_confirmacao_os)}
 
-DIRETRIZ CRÍTICA DE INTERRUPÇÃO:
-- Se a mensagem atual do usuário for uma **pergunta sobre o sistema, funcionalidades, dúvidas gerais ou qualquer assunto que mude de contexto** (mesmo que haja um rascunho de OS aberto), você DEVE cancelar o fluxo de OS imediatamente retornando `em_fluxo_os: false`.
-- Se o usuário estiver de fato fornecendo dados para continuar o preenchimento da OS, mantenha `em_fluxo_os: true` e preencha os campos.
+ETAPA 1: O assistente deve obter primeiro o **prefixo** (veículo) e a **descricao** (problema).
+ETAPA 2: Somente se veículo e descrição já estiverem preenchidos, o assistente coleta o **executor** (mecânico) e a **data**.
 
-CAMPOS DA OS:
-- prefixo: Número/placa do veículo.
-- descricao: Descrição detalhada do problema ou serviço a ser realizado.
-- executor: Mecânico ou responsável.
-- data: Data AAAA-MM-DD.
-- area: Mecânica, Elétrica, Borracharia, Chapeamento ou Limpeza.
-- turno: Não definido, Dia ou Noite.
-- inicio: HH:MM
-- fim: HH:MM
+Extraia os campos mencionados na mensagem atual:
+- prefixo: Número/placa.
+- descricao: O problema ou serviço relatado.
+- executor: Mecânico responsável.
+- data: AAAA-MM-DD.
+- area: Mecânica, Elétrica, Borracharia, Chapeamento ou Limpeza (padrão: Mecânica).
+- turno, inicio, fim: Opcionais.
 
-Responda EXCLUSIVAMENTE em formato JSON puro:
-
-Se for pergunta geral, dúvida ou interrupção:
-{{"em_fluxo_os": false}}
-
-Se for continuação do preenchimento da OS:
+Retorne EXCLUSIVAMENTE em JSON puro:
 {{"em_fluxo_os": true, "prefixo": "...", "descricao": "...", "executor": "...", "data": "...", "area": "...", "turno": "...", "inicio": "...", "fim": "..."}}
 """
 
     try:
         resultado = chamar_groq_direto(template_fluxo, api_key)
-        resultado_limpo = resultado.replace("```json", "").replace("```", "").strip()
-        dados = json.loads(resultado_limpo)
+        dados = json.loads(resultado.replace("```json", "").replace("```", "").strip())
 
         if not dados.get("em_fluxo_os"):
             st.session_state.rascunho_os = None
@@ -380,50 +358,59 @@ Se for continuação do preenchimento da OS:
 
         texto_usuario_lower = texto_usuario.lower()
         
-        pede_mesmo_veiculo = any(termo in texto_usuario_lower for termo in ["mesmo veículo", "mesmo carro", "desse veículo", "desse carro", "dele", "mesmo"])
-        if not novo_rascunho.get("prefixo") or str(novo_rascunho.get("prefixo")).lower() in ["desse", "desse veículo", "último"]:
+        # Validações de contexto anterior
+        pede_mesmo_veiculo = any(t in texto_usuario_lower for t in ["mesmo veículo", "mesmo carro", "desse veículo", "desse carro", "dele", "mesmo"])
+        if not novo_rascunho.get("prefixo") or str(novo_rascunho.get("prefixo")).lower() in ["desse", "último"]:
             if pede_mesmo_veiculo and veiculo_contexto != "Não informado":
                 novo_rascunho["prefixo"] = veiculo_contexto
             else:
                 novo_rascunho["prefixo"] = None
-                
-        pede_mesmo_problema = any(termo in texto_usuario_lower for termo in ["mesmo problema", "mesmo defeito", "igual", "mesma falha"])
-        if not pede_mesmo_problema:
-            novo_rascunho["descricao"] = None
 
-        if not novo_rascunho.get("descricao") or str(novo_rascunho.get("descricao")) in ["...", "None", "null", "Não informado"]:
-            if texto_baixo not in ["ok", "sim", "certo", "confirmar", "cancelar"]:
+        pede_mesmo_problema = any(t in texto_usuario_lower for t in ["mesmo problema", "mesmo defeito", "igual"])
+        if not pede_mesmo_problema and not novo_rascunho.get("prefixo") and not rascunho.get("prefixo"):
+            pass
+
+        # REDE DE SEGURANÇA POR ETAPAS:
+        # Se falta Veículo ou Descrição, impede que o texto vire Executor ou Data
+        if not novo_rascunho.get("prefixo") or not novo_rascunho.get("descricao"):
+            if not novo_rascunho.get("descricao") and texto_baixo not in ["ok", "sim", "certo"]:
                 novo_rascunho["descricao"] = texto_usuario
+        else:
+            # Se Veículo e Descrição já estão preenchidos, o texto atual responde à Etapa 2 (Executor/Data)
+            if not novo_rascunho.get("executor") and not any(char.isdigit() for char in texto_usuario):
+                novo_rascunho["executor"] = texto_usuario
 
-        if not novo_rascunho.get("turno"):
-            novo_rascunho["turno"] = "Não definido"
-        if not novo_rascunho.get("inicio"):
-            novo_rascunho["inicio"] = "00:00"
-        if not novo_rascunho.get("fim"):
-            novo_rascunho["fim"] = "00:00"
+        if not novo_rascunho.get("turno"): novo_rascunho["turno"] = "Não definido"
+        if not novo_rascunho.get("inicio"): novo_rascunho["inicio"] = "00:00"
+        if not novo_rascunho.get("fim"): novo_rascunho["fim"] = "00:00"
+        if not novo_rascunho.get("area"): novo_rascunho["area"] = "Mecânica"
 
         st.session_state.rascunho_os = novo_rascunho
 
-        campos_faltantes = []
+        # ORDEM DE COBRANÇA EM 2 BLOCOS LÓGICOS:
+        # Bloco 1: Primeiro exige Veículo e Descrição do Serviço
+        campos_faltantes_etapa1 = []
         if not novo_rascunho.get("prefixo") or str(novo_rascunho.get("prefixo")) in ["...", "None", "null", "Não informado"]:
-            campos_faltantes.append("Prefixo do Veículo")
+            campos_faltantes_etapa1.append("Prefixo do Veículo")
         if not novo_rascunho.get("descricao") or str(novo_rascunho.get("descricao")) in ["...", "None", "null", "Não informado"]:
-            campos_faltantes.append("Descrição do Serviço")
-        if not novo_rascunho.get("executor") or str(novo_rascunho.get("executor")) in ["...", "None", "null", "Não informado"]:
-            campos_faltantes.append("Mecânico Responsável")
-        if not novo_rascunho.get("data") or str(novo_rascunho.get("data")) in ["...", "None", "null", "Não informado"]:
-            campos_faltantes.append("Data de Agendamento")
-        if not novo_rascunho.get("area") or str(novo_rascunho.get("area")) in ["...", "None", "null", "Não informado"]:
-            campos_faltantes.append("Área (Mecânica, Elétrica, Borracharia, Chapeamento ou Limpeza)")
+            campos_faltantes_etapa1.append("Descrição do Serviço")
 
-        if campos_faltantes:
+        if campos_faltantes_etapa1:
             st.session_state.aguardando_confirmacao_os = False
-            return (
-                f"Para prosseguir com a abertura da OS, por favor informe:\n\n"
-                f"- **{', '.join(campos_faltantes)}**\n\n"
-                f"*(Horários e Turno são opcionais)*"
-            )
+            return f"Para prosseguir com a abertura da OS, por favor informe:\n\n- **{', '.join(campos_faltantes_etapa1)}**"
 
+        # Bloco 2: Com Veículo e Descrição garantidos, exige Mecânico e Data
+        campos_faltantes_etapa2 = []
+        if not novo_rascunho.get("executor") or str(novo_rascunho.get("executor")) in ["...", "None", "null", "Não informado"]:
+            campos_faltantes_etapa2.append("Mecânico Responsável")
+        if not novo_rascunho.get("data") or str(novo_rascunho.get("data")) in ["...", "None", "null", "Não informado"]:
+            campos_faltantes_etapa2.append("Data de Agendamento")
+
+        if campos_faltantes_etapa2:
+            st.session_state.aguardando_confirmacao_os = False
+            return f"Perfeito! Agora, para finalizar, por favor informe:\n\n- **{', '.join(campos_faltantes_etapa2)}**\n\n*(Horários, Área e Turno são opcionais)*"
+
+        # Tudo preenchido! Mostra o resumo para confirmação
         st.session_state.aguardando_confirmacao_os = True
         return (
             f"📋 **Resumo da Ordem de Serviço:**\n\n"
