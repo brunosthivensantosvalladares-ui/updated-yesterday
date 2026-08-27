@@ -253,16 +253,6 @@ def processar_comando_os(texto_usuario, emp_id):
         st.session_state.aguardando_confirmacao_os = False
         return "❌ Agendamento de Ordem de Serviço cancelado."
 
-    tem_rascunho_ativo = bool(rascunho or st.session_state.aguardando_confirmacao_os)
-    pediu_abertura = any(termo in texto_baixo for termo in ["abrir os", "criar os", "agendar os", "abrir uma os", "mesmo veículo", "mesmo carro", "desse veículo", "desse carro", "este mesmo veículo"])
-
-    if not tem_rascunho_ativo and not pediu_abertura:
-        return None
-
-    if not rascunho:
-        rascunho = {"prefixo": None, "descricao": None, "executor": None, "data": None, "area": "Mecânica", "turno": "Não definido", "inicio": "00:00", "fim": "00:00"}
-        st.session_state.rascunho_os = rascunho
-
     palavras_confirmacao = ["ok", "sim", "tudo certo", "pode agendar", "confirmo", "confirmar", "fechar", "gerar", "certo", "ok."]
     eh_confirmacao = (
         st.session_state.aguardando_confirmacao_os 
@@ -1060,6 +1050,20 @@ def inicializar_banco():
             conn.execute(text("CREATE TABLE IF NOT EXISTS tarefas (id SERIAL PRIMARY KEY, data TEXT, executor TEXT, prefixo TEXT, inicio_disp TEXT, fim_disp TEXT, descricao TEXT, area TEXT, turno TEXT, realizado BOOLEAN DEFAULT FALSE, id_chamado INTEGER, origem TEXT, empresa_id TEXT)"))
             conn.execute(text("CREATE TABLE IF NOT EXISTS chamados (id SERIAL PRIMARY KEY, motorista TEXT, prefixo TEXT, descricao TEXT, data_solicitacao TEXT, status TEXT DEFAULT 'Pendente', empresa_id TEXT)"))
             conn.execute(text("ALTER TABLE tarefas ADD COLUMN IF NOT EXISTS numero_os INTEGER"))
+            
+            # --- NOVA TABELA PARA PLANOS DE PREVENTIVAS ---
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS planos_preventivas (
+                    id SERIAL PRIMARY KEY,
+                    empresa_id TEXT NOT NULL,
+                    prefixo TEXT NOT NULL,
+                    descricao_servico TEXT NOT NULL,
+                    tipo_criterio TEXT NOT NULL, -- 'dias', 'horimetro', 'odometro'
+                    intervalo_valor INTEGER NOT NULL,
+                    proxima_data_vencimento DATE,
+                    ativo BOOLEAN DEFAULT TRUE
+                )
+            """))
             conn.commit()
             
             conn.execute(text("""
@@ -1394,21 +1398,30 @@ else:
     def obter_notificacoes_header():
         qtd_atrasadas = 0
         qtd_chamados = 0
+        qtd_preventivas = 0
         try:
             hoje_header = str(datetime.now().date())
+            limite_alerta = str(datetime.now().date() + timedelta(days=3))
             with engine.connect() as conn:
                 qtd_atrasadas = conn.execute(
                     text("SELECT COUNT(*) FROM tarefas WHERE data < :hoje AND realizado = FALSE AND empresa_id = :eid"),
                     {"hoje": hoje_header, "eid": str(emp_id)}
                 ).scalar() or 0
+                
                 if st.session_state.get("perfil") == "admin":
                     qtd_chamados = conn.execute(
                         text("SELECT COUNT(*) FROM chamados WHERE status = 'Pendente' AND empresa_id = :eid"),
                         {"eid": str(emp_id)}
                     ).scalar() or 0
+                    
+                    # Preventivas próximas do vencimento (vencem hoje ou nos próximos 3 dias)
+                    qtd_preventivas = conn.execute(
+                        text("SELECT COUNT(*) FROM planos_preventivas WHERE ativo = TRUE AND proxima_data_vencimento <= :limite AND empresa_id = :eid"),
+                        {"limite": limite_alerta, "eid": str(emp_id)}
+                    ).scalar() or 0
         except Exception:
             pass
-        return int(qtd_atrasadas), int(qtd_chamados)
+        return int(qtd_atrasadas), int(qtd_chamados), int(qtd_preventivas)
 
     with st.sidebar:
         st.markdown(f"""
@@ -1455,8 +1468,8 @@ else:
 
     st.markdown("<div class='top-fixed-section'>", unsafe_allow_html=True)
     
-    qtd_atrasadas_header, qtd_chamados_header = obter_notificacoes_header()
-    total_notificacoes_header = qtd_atrasadas_header + qtd_chamados_header
+    qtd_atrasadas_header, qtd_chamados_header, qtd_preventivas_header = obter_notificacoes_header()
+    total_notificacoes_header = qtd_atrasadas_header + qtd_chamados_header + qtd_preventivas_header
     
     c_srch, c_help, c_lang, c_notify = st.columns([0.54, 0.16, 0.14, 0.16])
 
@@ -1505,6 +1518,11 @@ else:
                 st.info(f"📥 {qtd_chamados_header} {tr('chamados pendentes')}.")
                 if st.button(f"📥 {tr('Avaliar chamados')}", key="header_calls", use_container_width=True):
                     set_nav("Chamados Oficina")
+                    st.rerun()
+            if qtd_preventivas_header:
+                st.warning(f"🔧 {qtd_preventivas_header} planos preventivos próximos ao vencimento.")
+                if st.button("📅 Ver Cadastro Direto / Preventivas", key="header_prev", use_container_width=True):
+                    set_nav("Cadastro Direto")
                     st.rerun()
             if not total_notificacoes_header:
                 st.success(tr("Nenhuma notificação nova."))
@@ -2229,39 +2247,79 @@ else:
                             time_module.sleep(0.5); st.rerun()
 
     elif "Cadastro Direto" in aba_ativa:
-        st.subheader("📝 Agendamento Direto")
-        with st.popover("💡 Como usar o Cadastro Direto?"):
-            st.markdown("""
-                ### 📝 Guia Rápido - Cadastro
-                1. **Uso:** Utilize para preventivas ou serviços que não vieram de uma reclamação de motorista.
-                2. **Formulário:** Preencha os campos e confirme.
-                3. **Gestão:** Na lista abaixo, você pode excluir registros marcando a coluna **Exc** e clicando em excluir.
-            """)
-        st.info("💡 **Atenção:** Use este formulário para serviços que não vieram de chamados.")
-        st.warning("⚠️ **Nota:** Para reagendar ou corrigir, basta alterar diretamente na lista abaixo. O salvamento é automático.")
+        st.subheader("📝 Agendamento Direto & Planos Preventivos")
         
-        with st.form("f_d", clear_on_submit=True):
-            c1, c2, c3, c4 = st.columns(4)
-            with c1: d_i = st.date_input("Data", datetime.now())
-            with c2: e_i = st.text_input("Executor")
-            with c3: p_i = st.text_input("Prefixo")
-            with c4: a_i = st.selectbox("Área", ORDEM_AREAS)
-            c5, c6 = st.columns(2)
-            with c5: t_ini = st.text_input("Início (Ex: 08:00)", "00:00")
-            with c6: t_fim = st.text_input("Fim (Ex: 10:00)", "00:00")
-            ds_i, t_i = st.text_area("Descrição"), st.selectbox("Turno", LISTA_TURNOS)
-            if st.form_submit_button("Confirmar Agendamento"):
-                nova_os = obter_proxima_os(engine, emp_id)
-                with engine.connect() as conn:
-                    conn.execute(text("INSERT INTO tarefas (data, executor, prefixo, inicio_disp, fim_disp, descricao, area, turno, origem, empresa_id, numero_os) VALUES (:dt, :ex, :pr, :ti, :tf, :ds, :ar, :tu, 'Direto', :eid, :nos)"), 
-                                 {"dt": str(d_i), "ex": e_i, "pr": p_i, "ti": t_ini, "tf": t_fim, "ds": ds_i, "ar": a_i, "tu": t_i, "eid": str(emp_id), "nos": nova_os})
-                    conn.commit()
-                st.success(f"✅ SERVIÇO AGENDADO!")
-                st.code(f"NÚMERO DA ORDEM DE SERVIÇO: {nova_os}", language="markdown")
-                st.rerun()
+        # Sistema de Abas Internas para Cadastro Direto vs Preventivas
+        sub_aba_cad1, sub_aba_cad2 = st.tabs(["📝 Agendamento Direto", "🔄 Planos Preventivos Recorrentes"])
+        
+        with sub_aba_cad1:
+            with st.popover("💡 Como usar o Cadastro Direto?"):
+                st.markdown("""
+                    ### 📝 Guia Rápido - Cadastro
+                    1. **Uso:** Utilize para preventivas avulsas ou serviços diretos.
+                    2. **Formulário:** Preencha os campos e confirme.
+                """)
+            
+            with st.form("f_d", clear_on_submit=True):
+                c1, c2, c3, c4 = st.columns(4)
+                with c1: d_i = st.date_input("Data", datetime.now())
+                with c2: e_i = st.text_input("Executor")
+                with c3: p_i = st.text_input("Prefixo")
+                with c4: a_i = st.selectbox("Área", ORDEM_AREAS)
+                c5, c6 = st.columns(2)
+                with c5: t_ini = st.text_input("Início (Ex: 08:00)", "00:00")
+                with c6: t_fim = st.text_input("Fim (Ex: 10:00)", "00:00")
+                ds_i, t_i = st.text_area("Descrição"), st.selectbox("Turno", LISTA_TURNOS)
+                
+                if st.form_submit_button("Confirmar Agendamento"):
+                    nova_os = obter_proxima_os(engine, emp_id)
+                    with engine.connect() as conn:
+                        conn.execute(text("INSERT INTO tarefas (data, executor, prefixo, inicio_disp, fim_disp, descricao, area, turno, origem, empresa_id, numero_os) VALUES (:dt, :ex, :pr, :ti, :tf, :ds, :ar, :tu, 'Direto', :eid, :nos)"), 
+                                     {"dt": str(d_i), "ex": e_i, "pr": p_i, "ti": t_ini, "tf": t_fim, "ds": ds_i, "ar": a_i, "tu": t_i, "eid": str(emp_id), "nos": nova_os})
+                        conn.commit()
+                    st.success(f"✅ SERVIÇO AGENDADO! Nº {nova_os}")
+                    st.rerun()
+
+        with sub_aba_cad2:
+            st.markdown("### 🔄 Gestão de Planos Preventivos Automáticos")
+            st.info("💡 Cadastre planos recorrentes. Quando uma OS deste tipo for concluída, o sistema agendará a próxima automaticamente.")
+            
+            with st.form("f_preventiva", clear_on_submit=True):
+                cp1, cp2 = st.columns(2)
+                prev_pref = cp1.text_input("Prefixo do Veículo")
+                prev_desc = cp2.text_input("Descrição do Serviço Preventivo (Ex: Troca de Óleo)")
+                
+                cp3, cp4 = st.columns(2)
+                prev_criterio = cp3.selectbox("Critério de Periodicidade", ["Dias", "Horímetro", "Odômetro"])
+                prev_intervalo = cp4.number_input("Intervalo (Ex: A cada 30 dias ou 10000 km)", min_value=1, value=30)
+                prev_data_base = st.date_input("Próxima Data Base / Vencimento", datetime.now())
+                
+                if st.form_submit_button("💾 Salvar Plano Preventivo"):
+                    if prev_pref and prev_desc:
+                        with engine.connect() as conn:
+                            conn.execute(text("""
+                                INSERT INTO planos_preventivas (empresa_id, prefixo, descricao_servico, tipo_criterio, intervalo_valor, proxima_data_vencimento, ativo)
+                                VALUES (:eid, :pref, :desc, :crit, :ival, :dt, TRUE)
+                            """), {
+                                "eid": str(emp_id), "pref": prev_pref, "desc": prev_desc, 
+                                "crit": prev_criterio, "ival": int(prev_intervalo), "dt": str(prev_data_base)
+                            })
+                            conn.commit()
+                        st.success("✅ Plano preventivo cadastrado com sucesso!")
+                        st.rerun()
+                    else:
+                        st.warning("Preencha o prefixo e a descrição do serviço.")
+
+            st.divider()
+            st.subheader("📋 Planos Preventivos Ativos")
+            df_planos = pd.read_sql(text("SELECT id, prefixo, descricao_servico, tipo_criterio, intervalo_valor, proxima_data_vencimento, ativo FROM planos_preventivas WHERE empresa_id = :eid ORDER BY id DESC"), engine, params={"eid": str(emp_id)})
+            if not df_planos.empty:
+                st.dataframe(df_planos, use_container_width=True, hide_index=True)
+            else:
+                st.info("Nenhum plano preventivo cadastrado.")
         
         st.divider()
-        st.subheader("📋 Lista de serviços")
+        st.subheader("📋 Lista geral de serviços")
         df_lista = pd.read_sql(text("SELECT * FROM tarefas WHERE empresa_id = :eid ORDER BY data DESC, id DESC"), engine, params={"eid": str(emp_id)})
         
         if not df_lista.empty:
@@ -2578,7 +2636,7 @@ else:
             
             if st.button("🗑️ Excluir Selecionados da Equipe"):
                 usuarios_para_deletar = ed_users[ed_users['Exc'] == True]['id'].tolist()
-                if usuarios_para_deletar:
+                if usuarios_preventivas_para_deletar := usuarios_para_deletar:
                     with engine.connect() as conn:
                         for u_id in usuarios_para_deletar: 
                             conn.execute(text("DELETE FROM usuarios WHERE id = :id AND empresa_id = :eid"), {"id": int(u_id), "eid": str(emp_id)})
