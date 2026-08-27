@@ -256,7 +256,6 @@ def processar_comando_os(texto_usuario, emp_id):
         st.session_state.aguardando_confirmacao_os = False
         return "❌ Agendamento de Ordem de Serviço cancelado."
 
-    # Interceptação Python: Garante que frases de abertura ou menção a veículo INICIAM o fluxo imediatamente
     tem_rascunho_ativo = bool(rascunho or st.session_state.aguardando_confirmacao_os)
     pediu_abertura = any(termo in texto_baixo for termo in ["abrir os", "criar os", "agendar os", "abrir uma os", "mesmo veículo", "mesmo carro", "desse veículo", "desse carro", "este mesmo veículo"])
 
@@ -321,7 +320,6 @@ def processar_comando_os(texto_usuario, emp_id):
     if "analises_halley" in st.session_state and st.session_state.analises_halley:
         veiculo_contexto = str(st.session_state.analises_halley[-1].get("veiculo", "Não informado"))
 
-    # Extração via LLM para preencher o rascunho
     try:
         prompt_extracao = f"""
 Extraia os dados da OS da mensagem do usuário: "{texto_usuario}"
@@ -338,24 +336,17 @@ Se um campo não foi mencionado, retorne null.
     except Exception:
         pass
 
-    # Tratamento de contexto anterior para o veículo
     pede_mesmo_veiculo = any(t in texto_baixo for t in ["mesmo veículo", "mesmo carro", "desse veículo", "desse carro", "dele", "mesmo", "este mesmo veículo"])
     if not rascunho.get("prefixo") or str(rascunho.get("prefixo")).lower() in ["desse", "último"]:
         if pede_mesmo_veiculo and veiculo_contexto != "Não informado":
             rascunho["prefixo"] = veiculo_contexto
 
-    # RECURSO BLINDADO DE ETAPAS:
-    # Etapa 1: Se ainda falta Veículo ou Descrição, o texto enviado (se não for comando de abertura) é a Descrição!
     if not rascunho.get("prefixo") or not rascunho.get("descricao"):
         if not rascunho.get("descricao") and not pediu_abertura and texto_baixo not in ["ok", "sim"]:
             rascunho["descricao"] = texto_usuario
     else:
-        # Etapa 2: Se Veículo e Descrição já estão preenchidos, o texto atual responde ao Executor (se não tiver número/data)
         if not rascunho.get("executor") and not any(char.isdigit() for char in texto_usuario):
             rascunho["executor"] = texto_usuario
-        elif not rascunho.get("data"):
-            # Se tem números, tenta capturar como data ou deixa o usuário informar
-            pass
 
     if not rascunho.get("turno"): rascunho["turno"] = "Não definido"
     if not rascunho.get("inicio"): rascunho["inicio"] = "00:00"
@@ -364,7 +355,6 @@ Se um campo não foi mencionado, retorne null.
 
     st.session_state.rascunho_os = rascunho
 
-    # BLOCO 1 DE COBRANÇA: Exige primeiro Prefixo e Descrição
     campos_faltantes_bloco1 = []
     if not rascunho.get("prefixo"):
         campos_faltantes_bloco1.append("Prefixo do Veículo")
@@ -375,18 +365,16 @@ Se um campo não foi mencionado, retorne null.
         st.session_state.aguardando_confirmacao_os = False
         return f"Para prosseguir com a abertura da OS, por favor informe:\n\n- **{', '.join(campos_faltantes_bloco1)}**"
 
-    # BLOCO 2 DE COBRANÇA: Com veículo e descrição prontos, exige Executor e Data
     campos_faltantes_bloco2 = []
     if not rascunho.get("executor"):
         campos_faltantes_bloco2.append("Mecânico Responsável")
-    if not rascunho.get("data"):
+    if not rascunno.get("data") if "rascunno" in locals() else not rascunho.get("data"):
         campos_faltantes_bloco2.append("Data de Agendamento")
 
     if campos_faltantes_bloco2:
         st.session_state.aguardando_confirmacao_os = False
         return f"Perfeito! Agora, por favor informe:\n\n- **{', '.join(campos_faltantes_bloco2)}**\n\n*(Horários e Turno são opcionais)*"
 
-    # Tudo pronto para confirmação
     st.session_state.aguardando_confirmacao_os = True
     return (
         f"📋 **Resumo da Ordem de Serviço:**\n\n"
