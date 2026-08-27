@@ -368,7 +368,7 @@ Se um campo não foi mencionado, retorne null.
     campos_faltantes_bloco2 = []
     if not rascunho.get("executor"):
         campos_faltantes_bloco2.append("Mecânico Responsável")
-    if not rascunno.get("data") if "rascunno" in locals() else not rascunho.get("data"):
+    if not rascunho.get("data"):
         campos_faltantes_bloco2.append("Data de Agendamento")
 
     if campos_faltantes_bloco2:
