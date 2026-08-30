@@ -1052,18 +1052,41 @@ def inicializar_banco():
             conn.execute(text("CREATE TABLE IF NOT EXISTS chamados (id SERIAL PRIMARY KEY, motorista TEXT, prefixo TEXT, descricao TEXT, data_solicitacao TEXT, status TEXT DEFAULT 'Pendente', empresa_id TEXT)"))
             conn.execute(text("ALTER TABLE tarefas ADD COLUMN IF NOT EXISTS numero_os INTEGER"))
             conn.execute(text("ALTER TABLE tarefas ADD COLUMN IF NOT EXISTS tipo_os TEXT DEFAULT 'Corretiva'"))
+            conn.execute(text("ALTER TABLE tarefas ADD COLUMN IF NOT EXISTS plano_id INTEGER"))
             
-            # --- NOVA TABELA PARA PLANOS DE PREVENTIVAS ---
+            # --- TABELA ANTIGA DE PREVENTIVAS (COMPATIBILIDADE) ---
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS planos_preventivas (
                     id SERIAL PRIMARY KEY,
                     empresa_id TEXT NOT NULL,
                     prefixo TEXT NOT NULL,
                     descricao_servico TEXT NOT NULL,
-                    tipo_criterio TEXT NOT NULL, -- 'dias', 'horimetro', 'odometro'
+                    tipo_criterio TEXT NOT NULL,
                     intervalo_valor INTEGER NOT NULL,
                     proxima_data_vencimento DATE,
                     ativo BOOLEAN DEFAULT TRUE
+                )
+            """))
+
+            # --- NOVAS TABELAS PARA PLANOS MASTER E SERVIÇOS AGRUPADOS ---
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS planos_master (
+                    id SERIAL PRIMARY KEY,
+                    empresa_id TEXT NOT NULL,
+                    nome_plano TEXT NOT NULL,
+                    tipo_os TEXT NOT NULL,
+                    prefixo TEXT NOT NULL
+                )
+            """))
+
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS servicos_plano (
+                    id SERIAL PRIMARY KEY,
+                    plano_id INTEGER NOT NULL,
+                    descricao_servico TEXT NOT NULL,
+                    retorna_valor BOOLEAN DEFAULT FALSE,
+                    min_toleravel NUMERIC,
+                    max_toleravel NUMERIC
                 )
             """))
 
@@ -1970,25 +1993,39 @@ else:
         if st.session_state.os_em_baixa is not None:
             os_data = st.session_state.os_em_baixa
             os_num = str(os_data['numero_os']).split('.')[0]
+            tipo_os_atual = os_data.get('tipo_os', 'Corretiva')
             
             st.button("⬅️ Voltar para a Lista", on_click=lambda: setattr(st.session_state, 'os_em_baixa', None))
-            st.subheader(f"⚡ Baixa Técnica: OS {os_num}")
+            st.subheader(f"⚡ Baixa Técnica [{tipo_os_atual}]: OS {os_num}")
+            
             with st.container(border=True):
                 st.write(f"🚜 **Veículo:** {os_data['prefixo']}")
                 st.write(f"📝 **Serviço Planejado:** {os_data['descricao']}")
                 
                 with st.form("form_baixa_exclusiva"):
-                    servico_realizado = st.text_area("O que foi feito de fato?", placeholder="Descreva a execução...")
+                    servico_realizado = st.text_area("O que foi feito de fato / Observações gerais?")
+                    
+                    # --- CAMPOS DINÂMICOS CONFORME O TIPO DE OS ---
+                    respostas_tecnicas = ""
+                    if tipo_os_atual == "Preditiva":
+                        st.markdown("#### 🔍 Medições Preditivas:")
+                        val_medido = st.number_input("Valor Medido (Ex: Pressão, Temperatura ou Desgaste)", value=0.0)
+                        respostas_tecnicas = f" | [Valor Medido: {val_medido}]"
+                    elif tipo_os_atual == "Checklist":
+                        st.markdown("#### ✔️ Avaliação de Checklist:")
+                        status_check = st.radio("Status do item:", ["Conforme (C)", "Não conforme (NC)"], horizontal=True)
+                        respostas_tecnicas = f" | [Status: {status_check}]"
+
                     executor = st.text_input("Mecânico Responsável")
                     c1, c2 = st.columns(2)
                     h_ini = c1.text_input("Início", "08:00")
                     h_fim = c2.text_input("Fim", "10:00")
 
-                    if st.form_submit_button("💾 Finalizar e Salvar"):
+                    if st.form_submit_button("💾 Finalizar e Salvar Baixa"):
                         if not servico_realizado:
                             st.error("A descrição do serviço é obrigatória.")
                         else:
-                            relato = f"Execução: {servico_realizado}; Mecânico: {executor}; Horário: {h_ini}-{h_fim}"
+                            relato = f"Execução: {servico_realizado}{respostas_tecnicas}; Mecânico: {executor}; Horário: {h_ini}-{h_fim}"
                             with engine.begin() as conn:
                                 query_update = text("""
                                     UPDATE tarefas 
@@ -1998,10 +2035,8 @@ else:
                                     AND empresa_id = :eid
                                 """)
                                 conn.execute(query_update, {
-                                    "relato": str(relato),
-                                    "os": str(os_num),
-                                    "pref": str(os_data['prefixo']),
-                                    "id_banco": int(os_data['id']),
+                                    "relato": str(relato), "os": str(os_num),
+                                    "pref": str(os_data['prefixo']), "id_banco": int(os_data['id']),
                                     "eid": str(emp_id)
                                 })
                             st.cache_data.clear()
@@ -2279,10 +2314,9 @@ else:
                             time_module.sleep(0.5); st.rerun()
 
     elif "Cadastro Direto" in aba_ativa:
-        st.subheader("📝 Agendamento Direto & Planos Preventivos")
+        st.subheader("📝 Agendamento Direto & Planos Master")
         
-        # Sistema de Abas Internas para Cadastro Direto vs Preventivas
-        sub_aba_cad1, sub_aba_cad2 = st.tabs(["📝 Agendamento Direto", "🔄 Planos Preventivos Recorrentes"])
+        sub_aba_cad1, sub_aba_cad2 = st.tabs(["📝 Agendamento Direto", "📚 Gerenciar Planos Master (Preventiva/Preditiva/Checklist)"])
         
         with sub_aba_cad1:
             with st.popover("💡 Como usar o Cadastro Direto?"):
@@ -2309,52 +2343,88 @@ else:
                 with cc1: t_i = st.selectbox("Turno", LISTA_TURNOS)
                 with cc2: tipo_os_i = st.selectbox("Tipo de OS", LISTA_TIPOS_OS)
                 
+                # Seleção opcional de Plano Master cadastrado
+                df_planos_box = pd.read_sql(text("SELECT id, nome_plano FROM planos_master WHERE empresa_id = :eid"), engine, params={"eid": str(emp_id)})
+                lista_nomes_planos = ["Nenhum (Avulso)"] + (df_planos_box['nome_plano'].tolist() if not df_planos_box.empty else [])
+                plano_escolhido = st.selectbox("Vincular a um Plano Master (Opcional)", lista_nomes_planos)
+                
                 if st.form_submit_button("Confirmar Agendamento"):
                     nova_os = obter_proxima_os(engine, emp_id)
+                    h_prox, o_prox = obter_medidor_proximo(engine, emp_id, p_i, d_i)
+                    desc_com_medidor = f"{ds_i} | [Leitura Ref: Horímetro {h_prox}h, Odômetro {o_prox}km]"
+                    
+                    plano_id_val = None
+                    if plano_escolhido != "Nenhum (Avulso)":
+                        row_plano = df_planos_box[df_planos_box['nome_plano'] == plano_escolhido]
+                        if not row_plano.empty:
+                            plano_id_val = int(row_plano.iloc[0]['id'])
+
                     with engine.connect() as conn:
-                        conn.execute(text("INSERT INTO tarefas (data, executor, prefixo, inicio_disp, fim_disp, descricao, area, turno, origem, empresa_id, numero_os) VALUES (:dt, :ex, :pr, :ti, :tf, :ds, :ar, :tu, 'Direto', :eid, :nos)"), 
-                                     {"dt": str(d_i), "ex": e_i, "pr": p_i, "ti": t_ini, "tf": t_fim, "ds": ds_i, "ar": a_i, "tu": t_i, "eid": str(emp_id), "nos": nova_os})
+                        conn.execute(
+                            text("INSERT INTO tarefas (data, executor, prefixo, inicio_disp, fim_disp, descricao, area, tipo_os, turno, plano_id, origem, empresa_id, numero_os) VALUES (:dt, :ex, :pr, :ti, :tf, :ds, :ar, :tp, :tu, :pid, 'Direto', :eid, :nos)"), 
+                            {
+                                "dt": str(d_i), "ex": e_i, "pr": p_i, "ti": t_ini, "tf": t_fim, 
+                                "ds": desc_com_medidor, "ar": a_i, "tp": tipo_os_i, "tu": t_i, 
+                                "pid": plano_id_val, "eid": str(emp_id), "nos": nova_os
+                            }
+                        )
                         conn.commit()
-                    st.success(f"✅ SERVIÇO AGENDADO! Nº {nova_os}")
+                    st.success(f"✅ SERVIÇO AGENDADO! Nº {nova_os} (Horímetro ref: {h_prox}h | Odômetro ref: {o_prox}km)")
                     st.rerun()
 
         with sub_aba_cad2:
-            st.markdown("### 🔄 Gestão de Planos Preventivos Automáticos")
-            st.info("💡 Cadastre planos recorrentes. Quando uma OS deste tipo for concluída, o sistema agendará a próxima automaticamente.")
+            st.markdown("### 📚 Gestão de Planos Master e Serviços Agrupados")
+            st.info("💡 Crie um plano nomeado, defina se é Preventiva, Preditiva ou Checklist, e adicione os serviços que o compõem.")
             
-            with st.form("f_preventiva", clear_on_submit=True):
-                cp1, cp2 = st.columns(2)
-                prev_pref = cp1.text_input("Prefixo do Veículo")
-                prev_desc = cp2.text_input("Descrição do Serviço Preventivo (Ex: Troca de Óleo)")
+            with st.form("form_plano_master", clear_on_submit=True):
+                p_nome = st.text_input("Nome do Plano (Ex: Revisão 500h - Trator)")
+                p_tipo = st.selectbox("Tipo de Plano / OS", ["Preventiva", "Preditiva", "Checklist"])
+                p_pref = st.text_input("Prefixo do Veículo/Equipamento Alvo")
                 
-                cp3, cp4 = st.columns(2)
-                prev_criterio = cp3.selectbox("Critério de Periodicidade", ["Dias", "Horímetro", "Odômetro"])
-                prev_intervalo = cp4.number_input("Intervalo (Ex: A cada 30 dias ou 10000 km)", min_value=1, value=30)
-                prev_data_base = st.date_input("Próxima Data Base / Vencimento", datetime.now())
+                st.markdown("---")
+                st.markdown("#### Adicionar Serviço Específico ao Plano:")
+                s_desc = st.text_input("Descrição do Serviço (Ex: Troca de Elemento do Filtro)")
                 
-                if st.form_submit_button("💾 Salvar Plano Preventivo"):
-                    if prev_pref and prev_desc:
+                retorna_val = False
+                min_tol, max_tol = None, None
+                
+                if p_tipo == "Preditiva":
+                    retorna_val = st.checkbox("Retorna valor medido?")
+                    if retorna_val:
+                        col_m1, col_m2 = st.columns(2)
+                        min_tol = col_m1.number_input("Mínimo Tolerável", value=0.0)
+                        max_tol = col_m2.number_input("Máximo Tolerável", value=0.0)
+                elif p_tipo == "Checklist":
+                    st.caption("ℹ️ Para Checklists, a baixa técnica exigirá resposta Conforme (C) ou Não Conforme (NC).")
+
+                if st.form_submit_button("➕ Salvar Serviço no Plano"):
+                    if p_nome and s_desc and p_pref:
                         with engine.connect() as conn:
-                            conn.execute(text("""
-                                INSERT INTO planos_preventivas (empresa_id, prefixo, descricao_servico, tipo_criterio, intervalo_valor, proxima_data_vencimento, ativo)
-                                VALUES (:eid, :pref, :desc, :crit, :ival, :dt, TRUE)
-                            """), {
-                                "eid": str(emp_id), "pref": prev_pref, "desc": prev_desc, 
-                                "crit": prev_criterio, "ival": int(prev_intervalo), "dt": str(prev_data_base)
-                            })
+                            # Cria ou busca o plano master existente pelo nome/prefixo
+                            res_plano = conn.execute(
+                                text("INSERT INTO planos_master (empresa_id, nome_plano, tipo_os, prefixo) VALUES (:eid, :nome, :tipo, :pref) RETURNING id"),
+                                {"eid": str(emp_id), "nome": p_nome, "tipo": p_tipo, "pref": p_pref}
+                            ).fetchone()
+                            
+                            plano_id = res_plano[0]
+                            
+                            conn.execute(
+                                text("INSERT INTO servicos_plano (plano_id, descricao_servico, retorna_valor, min_toleravel, max_toleravel) VALUES (:pid, :desc, :ret, :minv, :maxv)"),
+                                {"pid": plano_id, "desc": s_desc, "ret": retorna_val, "minv": min_tol, "maxv": max_tol}
+                            )
                             conn.commit()
-                        st.success("✅ Plano preventivo cadastrado com sucesso!")
+                        st.success("✅ Serviço adicionado ao plano master com sucesso!")
                         st.rerun()
                     else:
-                        st.warning("Preencha o prefixo e a descrição do serviço.")
+                        st.warning("Preencha o nome do plano, o prefixo e a descrição do serviço.")
 
             st.divider()
-            st.subheader("📋 Planos Preventivos Ativos")
-            df_planos = pd.read_sql(text("SELECT id, prefixo, descricao_servico, tipo_criterio, intervalo_valor, proxima_data_vencimento, ativo FROM planos_preventivas WHERE empresa_id = :eid ORDER BY id DESC"), engine, params={"eid": str(emp_id)})
-            if not df_planos.empty:
-                st.dataframe(df_planos, use_container_width=True, hide_index=True)
+            st.subheader("📋 Planos Master Cadastrados")
+            df_m = pd.read_sql(text("SELECT id, nome_plano, tipo_os, prefixo FROM planos_master WHERE empresa_id = :eid ORDER BY id DESC"), engine, params={"eid": str(emp_id)})
+            if not df_m.empty:
+                st.dataframe(df_m, use_container_width=True, hide_index=True)
             else:
-                st.info("Nenhum plano preventivo cadastrado.")
+                st.info("Nenhum plano master cadastrado.")
         
         st.divider()
         st.subheader("📋 Lista geral de serviços")
