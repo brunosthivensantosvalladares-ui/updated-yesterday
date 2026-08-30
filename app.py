@@ -2445,7 +2445,7 @@ else:
                 ### 📥 Guia Rápido - Chamados
                 1. **Triagem:** Veja o que os motoristas relataram. 
                 2. **Aprovação:** Marque a caixa **Aprovar?** para o Mr. Halley dar o diagnóstico de cada veículo!
-                3. **Planejamento:** Defina o Executor e a Área com base nos pareceres.
+                3. **Planejamento:** Defina o Executor, o Tipo de OS e a Área com base nos pareceres.
                 4. **Finalizar:** Clique em **Processar Agendamentos**.
             """)
             
@@ -2454,14 +2454,13 @@ else:
         if not df_p.empty:
             if 'df_ap_work' not in st.session_state:
                 df_p['Aprovar'] = False
-                df_p['Tipo_OS'] = "Corretiva"  # <--- Adicionado aqui
+                df_p['Tipo_OS'] = "Corretiva"
                 df_p['Executor'] = ""
                 df_p['Area_Destino'] = "Mecânica"
                 df_p['Data_Programada'] = datetime.now().date()
                 df_p['Inicio'] = "00:00"
                 df_p['Fim'] = "00:00"
                 
-                # Inclua 'Tipo_OS' na ordem das colunas
                 colunas_ordenadas = ['Aprovar', 'prefixo', 'descricao', 'motorista', 'Tipo_OS', 'Area_Destino', 'Executor', 'Data_Programada', 'Inicio', 'Fim', 'data_solicitacao', 'id']
                 st.session_state.df_ap_work = df_p[colunas_ordenadas]
             
@@ -2519,6 +2518,7 @@ else:
                     "prefixo": st.column_config.TextColumn("Prefixo", width="small"),
                     "descricao": st.column_config.TextColumn("Descrição", width="large"),
                     "motorista": st.column_config.TextColumn("Solicitante", width="medium"),
+                    "Tipo_OS": st.column_config.SelectboxColumn("Tipo de OS", options=LISTA_TIPOS_OS, width="medium"),
                     "Area_Destino": st.column_config.SelectboxColumn("Área", options=ORDEM_AREAS, width="medium"), 
                     "Data_Programada": st.column_config.DateColumn("Data Programada", width="medium"), 
                     "data_solicitacao": None, 
@@ -2534,9 +2534,16 @@ else:
                     with engine.connect() as conn:
                         for _, r in selecionados.iterrows():
                             v_os = obter_proxima_os(engine, emp_id)
+                            h_prox, o_prox = obter_medidor_proximo(engine, emp_id, r['prefixo'], r['Data_Programada'])
+                            desc_com_med = f"{r['descricao']} | [Leitura Ref: Horímetro {h_prox}h, Odômetro {o_prox}km]"
+                            
                             conn.execute(
-                                text("INSERT INTO tarefas (data, executor, prefixo, inicio_disp, fim_disp, descricao, area, turno, id_chamado, origem, empresa_id, numero_os) VALUES (:dt, :ex, :pr, :ti, :tf, :ds, :ar, 'Não definido', :ic, 'Chamado', :eid, :nos)"), 
-                                {"dt": str(r['Data_Programada']), "ex": r['Executor'], "pr": r['prefixo'], "ti": r['Inicio'], "tf": r['Fim'], "ds": r['descricao'], "ar": r['Area_Destino'], "ic": r['id'], "eid": str(emp_id), "nos": v_os}
+                                text("INSERT INTO tarefas (data, executor, prefixo, inicio_disp, fim_disp, descricao, area, tipo_os, turno, id_chamado, origem, empresa_id, numero_os) VALUES (:dt, :ex, :pr, :ti, :tf, :ds, :ar, :tp, 'Não definido', :ic, 'Chamado', :eid, :nos)"), 
+                                {
+                                    "dt": str(r['Data_Programada']), "ex": r['Executor'], "pr": r['prefixo'], 
+                                    "ti": r['Inicio'], "tf": r['Fim'], "ds": desc_com_med, "ar": r['Area_Destino'], 
+                                    "tp": r['Tipo_OS'], "ic": r['id'], "eid": str(emp_id), "nos": v_os
+                                }
                             )
                             conn.execute(text("UPDATE chamados SET status = 'Agendado' WHERE id = :id AND empresa_id = :eid"), {"id": int(r['id']), "eid": str(emp_id)})
                         conn.commit()
@@ -2550,7 +2557,7 @@ else:
                     st.warning("⚠️ Selecione ao menos um chamado na coluna 'Aprovar?' antes de processar.")
         else: 
             st.info("Nenhum chamado pendente no momento.")
-
+            
     elif "Chat Mr. Halley" in aba_ativa:
         st.subheader("🤖 Conversar com Mr. Halley - Telemetria & IA")
         st.caption("Tire dúvidas técnicas sobre falhas, consulte históricos ou solicite a abertura de OS diretamente pelo chat.")
