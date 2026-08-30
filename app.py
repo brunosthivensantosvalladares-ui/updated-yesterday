@@ -2298,10 +2298,16 @@ else:
                 with c2: e_i = st.text_input("Executor")
                 with c3: p_i = st.text_input("Prefixo")
                 with c4: a_i = st.selectbox("Área", ORDEM_AREAS)
+                
                 c5, c6 = st.columns(2)
                 with c5: t_ini = st.text_input("Início (Ex: 08:00)", "00:00")
                 with c6: t_fim = st.text_input("Fim (Ex: 10:00)", "00:00")
-                ds_i, t_i = st.text_area("Descrição"), st.selectbox("Turno", LISTA_TURNOS)
+                
+                ds_i = st.text_area("Descrição")
+                
+                cc1, cc2 = st.columns(2)
+                with cc1: t_i = st.selectbox("Turno", LISTA_TURNOS)
+                with cc2: tipo_os_i = st.selectbox("Tipo de OS", LISTA_TIPOS_OS)
                 
                 if st.form_submit_button("Confirmar Agendamento"):
                     nova_os = obter_proxima_os(engine, emp_id)
@@ -2378,6 +2384,49 @@ else:
                     conn.commit()
                 st.rerun()
 
+    elif "Alimentar Horímetros" in aba_ativa:
+        st.subheader("⚡ Alimentação de Horímetros e Odômetros da Frota")
+        st.info("💡 Alimente regularmente as leituras para que o sistema cruze com as datas de realização das OSs. Você também pode extrair a lista em Excel abaixo.")
+        
+        with st.form("form_medidor", clear_on_submit=True):
+            mc1, mc2, mc3 = st.columns(3)
+            m_pref = mc1.text_input("Prefixo do Veículo/Equipamento")
+            m_data = mc2.date_input("Data da Leitura", datetime.now())
+            m_hor = mc3.number_input("Horímetro (h)", min_value=0.0, step=1.0)
+            m_odo = st.number_input("Odômetro (km)", min_value=0.0, step=1.0)
+            
+            if st.form_submit_button("💾 Salvar Leitura"):
+                if m_pref:
+                    with engine.connect() as conn:
+                        conn.execute(
+                            text("INSERT INTO medidores_frota (empresa_id, prefixo, data_leitura, horimetro, odometro) VALUES (:eid, :pref, :dt, :hor, :odo)"),
+                            {"eid": str(emp_id), "pref": m_pref, "dt": str(m_data), "hor": m_hor, "odo": m_odo}
+                        )
+                        conn.commit()
+                    st.success("✅ Leitura de medidor salva com sucesso!")
+                    st.rerun()
+                else:
+                    st.warning("Informe o prefixo do veículo.")
+
+        st.divider()
+        st.subheader("📋 Lista de Leituras Acumuladas")
+        
+        df_med = pd.read_sql(text("SELECT id, prefixo, data_leitura, horimetro, odometro FROM medidores_frota WHERE empresa_id = :eid ORDER BY data_leitura DESC"), engine, params={"eid": str(emp_id)})
+        if not df_med.empty:
+            st.dataframe(df_med, use_container_width=True, hide_index=True)
+            
+            # Botão de Exportação para Excel
+            excel_bytes = to_excel_native(df_med)
+            st.download_button(
+                label="📊 Exportar Leituras para Excel",
+                data=excel_bytes,
+                file_name="medidores_frota.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True
+            )
+        else:
+            st.info("Nenhuma leitura de medidor registrada até o momento.")
+
     elif "Chamados Oficina" in aba_ativa:
         c_tit, c_refresh = st.columns([0.8, 0.2])
         with c_tit: 
@@ -2405,13 +2454,15 @@ else:
         if not df_p.empty:
             if 'df_ap_work' not in st.session_state:
                 df_p['Aprovar'] = False
+                df_p['Tipo_OS'] = "Corretiva"  # <--- Adicionado aqui
                 df_p['Executor'] = ""
                 df_p['Area_Destino'] = "Mecânica"
                 df_p['Data_Programada'] = datetime.now().date()
                 df_p['Inicio'] = "00:00"
                 df_p['Fim'] = "00:00"
                 
-                colunas_ordenadas = ['Aprovar', 'prefixo', 'descricao', 'motorista', 'Area_Destino', 'Executor', 'Data_Programada', 'Inicio', 'Fim', 'data_solicitacao', 'id']
+                # Inclua 'Tipo_OS' na ordem das colunas
+                colunas_ordenadas = ['Aprovar', 'prefixo', 'descricao', 'motorista', 'Tipo_OS', 'Area_Destino', 'Executor', 'Data_Programada', 'Inicio', 'Fim', 'data_solicitacao', 'id']
                 st.session_state.df_ap_work = df_p[colunas_ordenadas]
             
             if "editor_chamados" in st.session_state and st.session_state.editor_chamados.get("edited_rows"):
