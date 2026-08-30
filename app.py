@@ -107,6 +107,7 @@ SLOGAN = "Seu controle. Nossa prioridade."
 LOGO_URL = "https://i.postimg.cc/rwQs1cpc/Design-sem-nome-(2).png"
 ORDEM_AREAS = ["Motorista", "Borracharia", "Mecânica", "Elétrica", "Chapeamento", "Limpeza"]
 LISTA_TURNOS = ["Não definido", "Dia", "Noite"]
+LISTA_TIPOS_OS = ["Preventiva", "Corretiva", "Preditiva", "Checklist", "Abastecimento", "Intervenção programada", "Limpeza"]
 
 # --- 2. FUNÇÕES DE SUPORTE E BANCO ---
 @st.cache_resource
@@ -1047,9 +1048,10 @@ def inicializar_banco():
     engine = get_engine()
     try:
         with engine.connect() as conn:
-            conn.execute(text("CREATE TABLE IF NOT EXISTS tarefas (id SERIAL PRIMARY KEY, data TEXT, executor TEXT, prefixo TEXT, inicio_disp TEXT, fim_disp TEXT, descricao TEXT, area TEXT, turno TEXT, realizado BOOLEAN DEFAULT FALSE, id_chamado INTEGER, origem TEXT, empresa_id TEXT)"))
+            conn.execute(text("CREATE TABLE IF NOT EXISTS tarefas (id SERIAL PRIMARY KEY, data TEXT, executor TEXT, prefixo TEXT, inicio_disp TEXT, fim_disp TEXT, descricao TEXT, area TEXT, tipo_os TEXT DEFAULT 'Corretiva', turno TEXT, realizado BOOLEAN DEFAULT FALSE, id_chamado INTEGER, origem TEXT, empresa_id TEXT)"))
             conn.execute(text("CREATE TABLE IF NOT EXISTS chamados (id SERIAL PRIMARY KEY, motorista TEXT, prefixo TEXT, descricao TEXT, data_solicitacao TEXT, status TEXT DEFAULT 'Pendente', empresa_id TEXT)"))
             conn.execute(text("ALTER TABLE tarefas ADD COLUMN IF NOT EXISTS numero_os INTEGER"))
+            conn.execute(text("ALTER TABLE tarefas ADD COLUMN IF NOT EXISTS tipo_os TEXT DEFAULT 'Corretiva'"))
             
             # --- NOVA TABELA PARA PLANOS DE PREVENTIVAS ---
             conn.execute(text("""
@@ -1062,6 +1064,18 @@ def inicializar_banco():
                     intervalo_valor INTEGER NOT NULL,
                     proxima_data_vencimento DATE,
                     ativo BOOLEAN DEFAULT TRUE
+                )
+            """))
+
+            # --- TELA DE MEDIDORES (HORÍMETROS / ODÔMETROS) ---
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS medidores_frota (
+                    id SERIAL PRIMARY KEY,
+                    empresa_id TEXT NOT NULL,
+                    prefixo TEXT NOT NULL,
+                    data_leitura DATE NOT NULL,
+                    horimetro NUMERIC DEFAULT 0,
+                    odometro NUMERIC DEFAULT 0
                 )
             """))
             conn.commit()
@@ -1094,6 +1108,23 @@ def inicializar_banco():
             conn.commit()
     except Exception:
         pass
+
+def obter_medidor_proximo(engine, emp_id, prefixo, data_os):
+    try:
+        with engine.connect() as conn:
+            query = text("""
+                SELECT horimetro, odometro, ABS(data_leitura - CAST(:dt AS DATE)) as diff_dias
+                FROM medidores_frota 
+                WHERE empresa_id = :eid AND prefixo = :pref
+                ORDER BY diff_dias ASC, data_leitura DESC
+                LIMIT 1
+            """)
+            res = conn.execute(query, {"eid": str(emp_id), "pref": str(prefixo), "dt": str(data_os)}).fetchone()
+            if res:
+                return float(res[0] or 0), float(res[1] or 0)
+    except Exception:
+        pass
+    return 0.0, 0.0
 
 def to_excel_native(df):
     output = BytesIO()
@@ -1310,6 +1341,7 @@ else:
             "⌂  Dashboard",
             "◰  Agenda Principal",
             "🗎  Cadastro Direto",
+            "⚡  Alimentar Horímetros/Odômetros",
             "🗀  Chamados Oficina",
             "🗩  Chat Mr. Halley",
             "⧖  OSs Pendentes",
