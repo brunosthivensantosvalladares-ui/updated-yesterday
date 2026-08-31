@@ -1827,7 +1827,7 @@ else:
 
     aba_ativa = st.session_state.opcao_selecionada
 
-    elif "Dashboard" in aba_ativa:
+    if "Dashboard" in aba_ativa:
         st.markdown("<h4 style='color: #2D241E; font-weight: 700; margin-bottom: 16px;'>Cronograma Geral de Manutenção</h4>", unsafe_allow_html=True)
         
         df_dash_stats = pd.read_sql(text("SELECT data, realizado FROM tarefas WHERE empresa_id = :eid"), engine, params={"eid": str(emp_id)})
@@ -1951,7 +1951,7 @@ else:
                 st.info("Nenhum plano master cadastrado para monitoramento.")
         except Exception as e:
             st.info("Cadastre leituras de medidores e planos master para ativar o painel preditivo de vencimentos.")
-            
+
     elif "Gestão Master" in aba_ativa and usuario_ativo == "bruno":
         st.subheader("👑 Painel de Controle Master")
         
@@ -2035,7 +2035,7 @@ else:
                 )
             except Exception:
                 st.error("Erro ao gerar o arquivo PDF. Verifique a codificação dos textos.")
-        
+
         st.divider()
         col_m1, col_m2 = st.columns(2)
         with col_m1:
@@ -2747,7 +2747,7 @@ else:
                             st.warning("Selecione pelo menos um veículo.")
             else:
                 st.info("Nenhum plano master cadastrado para geração em lote.")
-                
+
     elif "Alimentar Horímetros" in aba_ativa:
         st.subheader("⚡ Alimentação de Horímetros e Odômetros da Frota")
         st.info("💡 Alimente regularmente as leituras para que o sistema cruze com as datas de realização das OSs. Você também pode extrair a lista em Excel abaixo.")
