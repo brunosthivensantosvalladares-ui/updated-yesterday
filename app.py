@@ -2416,13 +2416,25 @@ else:
             # --- FORMULÁRIO 1: CRIAR O PLANO MASTER ---
             with st.form("form_novo_plano", clear_on_submit=True):
                 st.markdown("#### ➕ Criar Novo Plano Master")
-                p_nome = st.text_input("Nome do Plano (Ex: Revisão 10.000 km - Caminhão)")
+                p_nome = st.text_input("Nome do Plano (Ex: Revisão 250h - Motor)")
                 p_tipo = st.selectbox("Tipo de Plano / OS", ["Preventiva", "Preditiva", "Checklist"])
                 
                 c_p1, c_p2 = st.columns(2)
                 p_criterio = c_p1.selectbox("Critério de Periodicidade", ["Dias", "Horímetro", "Odômetro"], index=2)
-                label_intervalo = f"Valor do Intervalo (Ex: 10.000 km)" if p_criterio == "Odômetro" else f"Valor do Intervalo (Ex: 250 para {p_criterio.lower()})"
-                p_intervalo = c_p2.number_input(label_intervalo, min_value=1, value=10000)
+                
+                # Define a sugestão inicial baseada no critério, mas permitindo edição total livre
+                if p_criterio == "Dias":
+                    val_sugerido = 30
+                    label_intervalo = "Valor do Intervalo (Editável em dias)"
+                elif p_criterio == "Horímetro":
+                    val_sugerido = 250
+                    label_intervalo = "Valor do Intervalo (Editável em horas)"
+                else:
+                    val_sugerido = 10000
+                    label_intervalo = "Valor do Intervalo (Editável em km)"
+                
+                # O usuário pode alterar livremente este número para qualquer valor desejado
+                p_intervalo = c_p2.number_input(label_intervalo, min_value=1, value=val_sugerido, step=1)
                 
                 p_prefs = st.text_input("Prefixos dos Veículos Vinculados (Separe por vírgula, ex: 101, 102, 103)")
                 
