@@ -2374,32 +2374,32 @@ else:
 
         with sub_aba_cad2:
             st.markdown("### 📚 Gestão de Planos Master e Serviços")
-            st.info("💡 Primeiro crie o Plano Master (Cabeçalho). Depois, adicione os serviços específicos vinculados a ele.")
+            st.info("💡 Cadastre o Plano Master abaixo. Em seguida, você poderá adicionar os serviços específicos vinculados a ele.")
             
-            # Seção 1: Criar o Plano Master
-            with st.expander("➕ Criar Novo Plano Master", expanded=False):
-                with st.form("form_novo_plano"):
-                    p_nome = st.text_input("Nome do Plano (Ex: Revisão 250h - Pá Carregadeira)")
-                    p_tipo = st.selectbox("Tipo de Plano / OS", ["Preventiva", "Preditiva", "Checklist"])
-                    p_pref = st.text_input("Prefixo do Veículo/Equipamento Alvo")
-                    
-                    if st.form_submit_button("Salvar Cabeçalho do Plano"):
-                        if p_nome and p_pref:
-                            with engine.connect() as conn:
-                                conn.execute(
-                                    text("INSERT INTO planos_master (empresa_id, nome_plano, tipo_os, prefixo) VALUES (:eid, :nome, :tipo, :pref)"),
-                                    {"eid": str(emp_id), "nome": p_nome, "tipo": p_tipo, "pref": p_pref}
-                                )
-                                conn.commit()
-                            st.success("✅ Plano Master criado com sucesso!")
-                            st.rerun()
-                        else:
-                            st.warning("Preencha o nome do plano e o prefixo.")
+            # --- FORMULÁRIO 1: CRIAR O PLANO MASTER (VISÍVEL DIRETAMENTE) ---
+            with st.form("form_novo_plano", clear_on_submit=True):
+                st.markdown("#### ➕ Passo 1: Criar Novo Plano Master")
+                p_nome = st.text_input("Nome do Plano (Ex: Revisão 250h - Pá Carregadeira)")
+                p_tipo = st.selectbox("Tipo de Plano / OS", ["Preventiva", "Preditiva", "Checklist"])
+                p_pref = st.text_input("Prefixo do Veículo/Equipamento Alvo")
+                
+                if st.form_submit_button("Salvar Cabeçalho do Plano"):
+                    if p_nome and p_pref:
+                        with engine.connect() as conn:
+                            conn.execute(
+                                text("INSERT INTO planos_master (empresa_id, nome_plano, tipo_os, prefixo) VALUES (:eid, :nome, :tipo, :pref)"),
+                                {"eid": str(emp_id), "nome": p_nome, "tipo": p_tipo, "pref": p_pref}
+                            )
+                            conn.commit()
+                        st.success("✅ Plano Master criado com sucesso!")
+                        st.rerun()
+                    else:
+                        st.warning("Preencha o nome do plano e o prefixo.")
 
             st.divider()
 
-            # Seção 2: Adicionar Serviços aos Planos Existentes
-            st.markdown("#### ➕ Adicionar Serviços a um Plano Existente")
+            # --- FORMULÁRIO 2: ADICIONAR SERVIÇOS AO PLANO SELECIONADO ---
+            st.markdown("#### ➕ Passo 2: Adicionar Serviços a um Plano Existente")
             
             df_m_box = pd.read_sql(text("SELECT id, nome_plano, tipo_os FROM planos_master WHERE empresa_id = :eid"), engine, params={"eid": str(emp_id)})
             
@@ -2408,7 +2408,6 @@ else:
                 plano_selecionado_nome = st.selectbox("Selecione o Plano Master", list(mapa_planos.keys()))
                 id_plano_ativo = mapa_planos[plano_selecionado_nome]
                 
-                # Descobre o tipo do plano selecionado para mostrar os campos corretos
                 tipo_do_plano_atual = df_m_box[df_m_box['id'] == id_plano_ativo].iloc[0]['tipo_os']
 
                 with st.form("form_add_servico_plano", clear_on_submit=True):
@@ -2439,7 +2438,7 @@ else:
                         else:
                             st.warning("Digite a descrição do serviço.")
             else:
-                st.info("Cadastre um Plano Master acima para poder inserir serviços nele.")
+                st.info("Cadastre um Plano Master no formulário acima para poder inserir serviços nele.")
 
             st.divider()
             st.subheader("📋 Planos e Serviços Cadastrados")
