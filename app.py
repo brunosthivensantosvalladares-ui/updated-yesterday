@@ -1503,6 +1503,28 @@ else:
 
         for indice, opcao in enumerate(opcoes):
             if opcao == "🗎  Cadastro Direto":
+                # Botão principal que ativa a seção
+                st.button(
+                    traduzir_nav(opcao),
+                    key=f"nav_btn_{indice}_{st.session_state.radio_key}",
+                    type="primary" if opcao == st.session_state.opcao_selecionada else "secondary",
+                    use_container_width=True,
+                    on_click=set_nav,
+                    args=(opcao,)
+                )
+                # Expander embutido logo abaixo do botão de Cadastro Direto sem rótulos extras
+                with st.expander("📂 Sub-opções", expanded=(st.session_state.opcao_selecionada == "🗎  Cadastro Direto")):
+                    sub_opcoes = [
+                        ("📝 Agendamento Direto", 0), 
+                        ("📚 Gerenciar Planos Master", 1), 
+                        ("⚡ Gerar OS em Lote (Planos)", 2)
+                    ]
+                    for so_label, so_idx in sub_opcoes:
+                        if st.button(so_label, key=f"sub_nav_{so_idx}", use_container_width=True, type="primary" if st.session_state.get("sub_aba_idx", 0) == so_idx and st.session_state.opcao_selecionada == "🗎  Cadastro Direto" else "secondary"):
+                            st.session_state.opcao_selecionada = "🗎  Cadastro Direto"
+                            st.session_state.sub_aba_idx = so_idx
+                            st.rerun()
+            else:
                 st.button(
                     traduzir_nav(opcao),
                     key=f"nav_btn_{indice}_{st.session_state.radio_key}",
