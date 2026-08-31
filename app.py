@@ -1086,6 +1086,7 @@ def inicializar_banco():
             # Garante a compatibilidade caso a tabela já exista sem essas colunas
             conn.execute(text("ALTER TABLE planos_master ADD COLUMN IF NOT EXISTS tipo_criterio TEXT DEFAULT 'Dias'"))
             conn.execute(text("ALTER TABLE planos_master ADD COLUMN IF NOT EXISTS intervalo_valor INTEGER DEFAULT 30"))
+            conn.execute(text("ALTER TABLE planos_master ADD COLUMN IF NOT EXISTS area TEXT DEFAULT 'Mecânica'"))
 
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS servicos_plano (
@@ -1501,14 +1502,32 @@ else:
         st.markdown(f"<div class='sidebar-nav-title'>{tr('NAVEGAÇÃO')}</div>", unsafe_allow_html=True)
 
         for indice, opcao in enumerate(opcoes):
-            st.button(
-                traduzir_nav(opcao),
-                key=f"nav_btn_{indice}_{st.session_state.radio_key}",
-                type="primary" if opcao == st.session_state.opcao_selecionada else "secondary",
-                use_container_width=True,
-                on_click=set_nav,
-                args=(opcao,)
-            )
+            if opcao == "🗎  Cadastro Direto":
+                st.button(
+                    traduzir_nav(opcao),
+                    key=f"nav_btn_{indice}_{st.session_state.radio_key}",
+                    type="primary" if opcao == st.session_state.opcao_selecionada else "secondary",
+                    use_container_width=True,
+                    on_click=set_nav,
+                    args=(opcao,)
+                )
+                # Menu expansível na barra lateral para as 3 sub-abas de Cadastro Direto
+                with st.expander("📂 Opções de Cadastro", expanded=(st.session_state.opcao_selecionada == "🗎  Cadastro Direto")):
+                    sub_opcoes = ["📝 Agendamento Direto", "📚 Gerenciar Planos Master", "⚡ Gerar OS em Lote (Planos)"]
+                    for so in sub_opcoes:
+                        if st.button(so, key=f"sub_nav_{so}", use_container_width=True, type="primary" if st.session_state.get("sub_aba_selecionada") == so else "secondary"):
+                            st.session_state.opcao_selecionada = "🗎  Cadastro Direto"
+                            st.session_state.sub_aba_selecionada = so
+                            st.rerun()
+            else:
+                st.button(
+                    traduzir_nav(opcao),
+                    key=f"nav_btn_{indice}_{st.session_state.radio_key}",
+                    type="primary" if opcao == st.session_state.opcao_selecionada else "secondary",
+                    use_container_width=True,
+                    on_click=set_nav,
+                    args=(opcao,)
+                )
         
         st.markdown("""
             <div style='margin-top: 3px; background: rgba(197, 160, 89, 0.08); border: 1px solid #C5A059; border-radius: 8px; padding: 8px 10px; margin-bottom: 4px;'>
@@ -2376,12 +2395,24 @@ else:
     elif "Cadastro Direto" in aba_ativa:
         st.subheader("📝 Agendamento Direto & Planos Master")
         
+        if "sub_aba_selecionada" not in st.session_state:
+            st.session_state.sub_aba_selecionada = "📝 Agendamento Direto"
+            
+        sub_aba_escolhida = st.session_state.sub_aba_selecionada
+        
         sub_aba_cad1, sub_aba_cad2, sub_aba_cad3 = st.tabs([
             "📝 Agendamento Direto", 
             "📚 Gerenciar Planos Master", 
             "⚡ Gerar OS em Lote (Planos)"
         ])
         
+        if sub_aba_escolhida == "📝 Agendamento Direto":
+            sub_aba_target = sub_aba_cad1
+        elif sub_aba_escolhida == "📚 Gerenciar Planos Master":
+            sub_aba_target = sub_aba_cad2
+        else:
+            sub_aba_target = sub_aba_cad3
+            
         with sub_aba_cad1:
             with st.popover("💡 Como usar o Cadastro Direto?"):
                 st.markdown("""
@@ -2467,18 +2498,18 @@ else:
 
         with sub_aba_cad2:
             st.markdown("### 📚 Gestão de Planos Master e Serviços")
-            st.info("💡 Cadastre o plano, defina a periodicidade e adicione os serviços. Para planos preditivos, os campos de tolerância aparecem instantaneamente ao marcar o flag.")
+            st.info("💡 Cadastre o plano, defina a periodicidade, a área e adicione os serviços.")
             
-            # --- FORMULÁRIO 1: CRIAR O PLANO MASTER COM ESTADO REATIVO DE PERIODICIDADE ---
+            # --- FORMULÁRIO 1: CRIAR O PLANO MASTER COM ÁREA E ESTADO REATIVO ---
             with st.form("form_novo_plano", clear_on_submit=True):
                 st.markdown("#### ➕ Criar Novo Plano Master")
                 p_nome = st.text_input("Nome do Plano (Ex: Preventiva Quinzenal)")
                 p_tipo = st.selectbox("Tipo de Plano / OS", ["Preventiva", "Preditiva", "Checklist"])
+                p_area = st.selectbox("Área do Plano", ORDEM_AREAS, key="select_area_master")
                 
                 c_p1, c_p2 = st.columns(2)
                 p_criterio = c_p1.selectbox("Critério de Periodicidade", ["Dias", "Horímetro", "Odômetro"], key="select_criterio_master")
                 
-                # Define sugestão reativa limpa com base na seleção imediata
                 if p_criterio == "Dias":
                     val_padrao = 30
                     lbl_int = "Valor do Intervalo (Ex: 15 ou 30 dias)"
@@ -2497,11 +2528,11 @@ else:
                         with engine.connect() as conn:
                             conn.execute(
                                 text("""
-                                    INSERT INTO planos_master (empresa_id, nome_plano, tipo_os, prefixo, tipo_criterio, intervalo_valor) 
-                                    VALUES (:eid, :nome, :tipo, :pref, :crit, :ival)
+                                    INSERT INTO planos_master (empresa_id, nome_plano, tipo_os, area, prefixo, tipo_criterio, intervalo_valor) 
+                                    VALUES (:eid, :nome, :tipo, :area, :pref, :crit, :ival)
                                 """),
                                 {
-                                    "eid": str(emp_id), "nome": p_nome, "tipo": p_tipo, 
+                                    "eid": str(emp_id), "nome": p_nome, "tipo": p_tipo, "area": p_area,
                                     "pref": p_prefs.strip(), "crit": p_criterio, "ival": int(p_intervalo)
                                 }
                             )
@@ -2513,7 +2544,7 @@ else:
 
             st.divider()
 
-            # --- FORMULÁRIO 2: ADICIONAR SERVIÇOS (COM FLAG REATIVO SEM SUMIR A DESCRIÇÃO) ---
+            # --- FORMULÁRIO 2: ADICIONAR SERVIÇOS ---
             st.markdown("#### ➕ Adicionar Serviços a um Plano Existente")
             
             df_m_box = pd.read_sql(text("SELECT id, nome_plano, tipo_os FROM planos_master WHERE empresa_id = :eid"), engine, params={"eid": str(emp_id)})
@@ -2559,7 +2590,7 @@ else:
             st.subheader("📋 Planos Cadastrados (Clique para Expandir e Gerenciar)")
             
             # --- LISTAGEM COM ACORDEÃO SEGURO ---
-            df_planos_master = pd.read_sql(text("SELECT id, nome_plano, tipo_os, prefixo, tipo_criterio, intervalo_valor FROM planos_master WHERE empresa_id = :eid ORDER BY id DESC"), engine, params={"eid": str(emp_id)})
+            df_planos_master = pd.read_sql(text("SELECT id, nome_plano, tipo_os, area, prefixo, tipo_criterio, intervalo_valor FROM planos_master WHERE empresa_id = :eid ORDER BY id DESC"), engine, params={"eid": str(emp_id)})
             
             if not df_planos_master.empty:
                 with st.container(key="container_lista_planos_master"):
@@ -2567,6 +2598,7 @@ else:
                         pid = plano['id']
                         p_nome = plano['nome_plano']
                         p_tipo = plano['tipo_os']
+                        p_area = plano.get('area', 'Mecânica')
                         p_crit = plano['tipo_criterio']
                         p_ival = plano['intervalo_valor']
                         p_veiculos = plano['prefixo']
@@ -2578,10 +2610,10 @@ else:
                         else:
                             texto_periodicidade = f"A cada {p_ival} dias"
 
-                        with st.expander(f"📦 {p_nome} — [{p_tipo}] | {texto_periodicidade}"):
+                        with st.expander(f"📦 {p_nome} — [{p_tipo} | {p_area}] | {texto_periodicidade}"):
                             col_info, col_b1, col_b2 = st.columns([0.6, 0.2, 0.2])
                             with col_info:
-                                st.markdown(f"**Veículos Vinculados:** `{p_veiculos}`")
+                                st.markdown(f"**Área:** `{p_area}` | **Veículos Vinculados:** `{p_veiculos}`")
                             with col_b1:
                                 btn_edita = st.button("✏️ Editar Plano", key=f"edit_p_{pid}", use_container_width=True)
                             with col_b2:
@@ -2601,6 +2633,7 @@ else:
                             if st.session_state.get(f"editando_{pid}", False):
                                 with st.form(f"form_edicao_plano_{pid}"):
                                     novo_nome = st.text_input("Alterar Nome do Plano", value=p_nome)
+                                    nova_area = st.selectbox("Área", ORDEM_AREAS, index=ORDEM_AREAS.index(p_area) if p_area in ORDEM_AREAS else 0)
                                     nc1, nc2 = st.columns(2)
                                     novo_crit = nc1.selectbox("Critério", ["Dias", "Horímetro", "Odômetro"], index=["Dias", "Horímetro", "Odômetro"].index(p_crit) if p_crit in ["Dias", "Horímetro", "Odômetro"] else 0)
                                     novo_ival = nc2.number_input("Intervalo", value=int(p_ival), min_value=1)
@@ -2610,8 +2643,8 @@ else:
                                     if c_salvar.form_submit_button("💾 Salvar"):
                                         with engine.connect() as conn:
                                             conn.execute(
-                                                text("UPDATE planos_master SET nome_plano = :nome, tipo_criterio = :crit, intervalo_valor = :ival, prefixo = :pref WHERE id = :pid"),
-                                                {"nome": novo_nome, "crit": novo_crit, "ival": int(novo_ival), "pref": novo_veiculos, "pid": int(pid)}
+                                                text("UPDATE planos_master SET nome_plano = :nome, area = :area, tipo_criterio = :crit, intervalo_valor = :ival, prefixo = :pref WHERE id = :pid"),
+                                                {"nome": novo_nome, "area": nova_area, "crit": novo_crit, "ival": int(novo_ival), "pref": novo_veiculos, "pid": int(pid)}
                                             )
                                             conn.commit()
                                         st.session_state[f"editando_{pid}"] = False
@@ -2688,9 +2721,9 @@ else:
 
         with sub_aba_cad3:
             st.markdown("### ⚡ Geração de Ordens de Serviço em Lote via Planos Master")
-            st.info("💡 Selecione um plano cadastrado, escolha a data de execução e selecione quais veículos receberão a OS simultaneamente.")
+            st.info("💡 Selecione um plano cadastrado, escolha a data de execução, os horários (opcionais) e os veículos para gerar as OSs.")
 
-            df_planos_lote = pd.read_sql(text("SELECT id, nome_plano, tipo_os, prefixo, tipo_criterio, intervalo_valor FROM planos_master WHERE empresa_id = :eid"), engine, params={"eid": str(emp_id)})
+            df_planos_lote = pd.read_sql(text("SELECT id, nome_plano, tipo_os, area, prefixo, tipo_criterio, intervalo_valor FROM planos_master WHERE empresa_id = :eid"), engine, params={"eid": str(emp_id)})
 
             if not df_planos_lote.empty:
                 mapa_p_lote = {f"{row['nome_plano']} ({row['tipo_os']} - Cada {row['intervalo_valor']} {row['tipo_criterio'].lower()})": row['id'] for _, row in df_planos_lote.iterrows()}
@@ -2702,6 +2735,11 @@ else:
 
                 with st.form("form_geracao_lote_os"):
                     dt_lote = st.date_input("Data de Execução Programada", datetime.now(), key="dt_lote_exec")
+                    
+                    c_l1, c_l2 = st.columns(2)
+                    t_ini_lote = c_l1.text_input("Início (Ex: 08:00 - Deixe vazio se preferir)", "", key="lote_t_ini")
+                    t_fim_lote = c_l2.text_input("Fim (Ex: 10:00 - Deixe vazio se preferir)", "", key="lote_t_fim")
+                    
                     turno_lote = st.selectbox("Turno", LISTA_TURNOS, key="turno_lote_exec")
                     executor_lote = st.text_input("Executor / Mecânico Padrão", key="exec_lote_exec")
                     
@@ -2718,6 +2756,7 @@ else:
                             
                             if not df_serv_lote.empty:
                                 descricao_unificada = " | ".join(df_serv_lote['descricao_servico'].tolist())
+                                area_plano_lote = dados_plano_atual.get('area', 'Mecânica')
                                 
                                 with engine.connect() as conn:
                                     contador_gerados = 0
@@ -2729,11 +2768,11 @@ else:
                                         conn.execute(
                                             text("""
                                                 INSERT INTO tarefas (data, executor, prefixo, inicio_disp, fim_disp, descricao, area, tipo_os, turno, plano_id, origem, empresa_id, numero_os) 
-                                                VALUES (:dt, :ex, :pr, '08:00', '10:00', :ds, 'Mecânica', :tp, :tu, :pid, 'Plano Master', :eid, :nos)
+                                                VALUES (:dt, :ex, :pr, :ti, :tf, :ds, :ar, :tp, :tu, :pid, 'Plano Master', :eid, :nos)
                                             """), 
                                             {
-                                                "dt": str(dt_lote), "ex": executor_lote, "pr": pref, 
-                                                "ds": desc_final_os, "tp": dados_plano_atual['tipo_os'], "tu": turno_lote, 
+                                                "dt": str(dt_lote), "ex": executor_lote, "pr": pref, "ti": t_ini_lote, "tf": t_fim_lote,
+                                                "ds": desc_final_os, "ar": area_plano_lote, "tp": dados_plano_atual['tipo_os'], "tu": turno_lote, 
                                                 "pid": int(id_plano_lote), "eid": str(emp_id), "nos": nova_os
                                             }
                                         )
@@ -2747,7 +2786,7 @@ else:
                             st.warning("Selecione pelo menos um veículo.")
             else:
                 st.info("Nenhum plano master cadastrado para geração em lote.")
-
+                
     elif "Alimentar Horímetros" in aba_ativa:
         st.subheader("⚡ Alimentação de Horímetros e Odômetros da Frota")
         st.info("💡 Alimente regularmente as leituras para que o sistema cruze com as datas de realização das OSs. Você também pode extrair a lista em Excel abaixo.")
