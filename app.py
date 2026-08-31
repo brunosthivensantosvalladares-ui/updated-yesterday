@@ -2505,9 +2505,9 @@ else:
                 st.info("Cadastre um Plano Master acima para poder inserir serviços nele.")
 
             st.divider()
-            st.subheader("📋 Planos Cadastrados (Com Opção de Edição e Exclusão)")
+            st.subheader("📋 Planos Cadastrados (Com Opção de Edição de Planos e Serviços)")
             
-            # --- LISTAGEM COM OPÇÃO DE EDIÇÃO DOS PLANOS JÁ EXISTENTES ---
+            # --- LISTAGEM COM OPÇÃO DE EDIÇÃO DE PLANOS E SERVIÇOS VINCULADOS ---
             df_planos_master = pd.read_sql(text("SELECT id, nome_plano, tipo_os, prefixo, tipo_criterio, intervalo_valor FROM planos_master WHERE empresa_id = :eid ORDER BY id DESC"), engine, params={"eid": str(emp_id)})
             
             if not df_planos_master.empty:
@@ -2543,7 +2543,7 @@ else:
                                 st.warning("Plano excluído com sucesso!")
                                 st.rerun()
 
-                        # Se o usuário clicar em Editar, abre campos interativos para alterar direto na tela
+                        # Edição do Plano Master
                         if btn_edita:
                             st.session_state[f"editando_{pid}"] = True
 
@@ -2572,16 +2572,68 @@ else:
                         else:
                             st.markdown(f"**Veículos / Equipamentos Vinculados:** `{p_veiculos}`")
                             
+                        # --- SEÇÃO DE SERVIÇOS VINCULADOS COM EDIÇÃO E EXCLUSÃO INDIVIDUAL ---
                         df_servicos_vinculados = pd.read_sql(text("SELECT id, descricao_servico, retorna_valor, min_toleravel, max_toleravel FROM servicos_plano WHERE plano_id = :pid"), engine, params={"pid": int(pid)})
                         
                         st.markdown("---")
                         st.markdown("**🛠️ Serviços deste Plano:**")
+                        
                         if not df_servicos_vinculados.empty:
                             for _, serv in df_servicos_vinculados.iterrows():
-                                info_extra = ""
-                                if serv['retorna_valor']:
-                                    info_extra = f" *(Retorna Valor | Mín: {serv['min_toleravel']} | Máx: {serv['max_toleravel']})*"
-                                st.markdown(f"- {serv['descricao_servico']}{info_extra}")
+                                sid = serv['id']
+                                s_desc = serv['descricao_servico']
+                                s_ret = serv['retorna_valor']
+                                s_min = serv['min_toleravel']
+                                s_max = serv['max_toleravel']
+                                
+                                # Container para cada serviço permitindo gerenciar individualmente
+                                with st.container():
+                                    cs1, cs2, cs3 = st.columns([0.6, 0.25, 0.15])
+                                    
+                                    info_resumo = s_desc
+                                    if s_ret:
+                                        info_resumo += f" *(Retorna Valor | Mín: {s_min} | Máx: {s_max})*"
+                                        
+                                    cs1.markdown(f"- {info_resumo}")
+                                    
+                                    edit_serv = cs2.button("✏️ Editar Serv.", key=f"edit_serv_{sid}")
+                                    del_serv = cs3.button("🗑️ Excluir", key=f"del_serv_{sid}")
+                                    
+                                    if del_serv:
+                                        with engine.connect() as conn:
+                                            conn.execute(text("DELETE FROM servicos_plano WHERE id = :sid"), {"sid": int(sid)})
+                                            conn.commit()
+                                        st.success("Serviço removido do plano!")
+                                        st.rerun()
+                                        
+                                    if edit_serv:
+                                        st.session_state[f"editando_serv_{sid}"] = True
+                                        
+                                    if st.session_state.get(f"editando_serv_{sid}", False):
+                                        with st.form(f"form_edit_serv_{sid}"):
+                                            novo_desc_serv = st.text_input("Descrição do Serviço", value=s_desc)
+                                            novo_ret_serv = st.checkbox("Retorna valor medido?", value=bool(s_ret))
+                                            
+                                            novo_min_serv, novo_max_serv = float(s_min or 0), float(s_max or 0)
+                                            if novo_ret_serv:
+                                                cm1, cm2 = st.columns(2)
+                                                novo_min_serv = cm1.number_input("Novo Mínimo", value=float(s_min or 0))
+                                                novo_max_serv = cm2.number_input("Novo Máximo", value=float(s_max or 0))
+                                                
+                                            bs_salvar, bs_cancel = st.columns(2)
+                                            if bs_salvar.form_submit_button("💾 Salvar Serviço"):
+                                                with engine.connect() as conn:
+                                                    conn.execute(
+                                                        text("UPDATE servicos_plano SET descricao_servico = :desc, retorna_valor = :ret, min_toleravel = :minv, max_toleravel = :maxv WHERE id = :sid"),
+                                                        {"desc": novo_desc_serv, "ret": novo_ret_serv, "minv": novo_min_serv, "maxv": novo_max_serv, "sid": int(sid)}
+                                                    )
+                                                    conn.commit()
+                                                st.session_state[f"editando_serv_{sid}"] = False
+                                                st.success("✅ Serviço atualizado!")
+                                                st.rerun()
+                                            if bs_cancel.form_submit_button("❌ Cancelar"):
+                                                st.session_state[f"editando_serv_{sid}"] = False
+                                                st.rerun()
                         else:
                             st.info("⚠️ Nenhum serviço foi vinculado a este plano ainda.")
             else:
