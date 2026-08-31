@@ -2379,9 +2379,11 @@ else:
             if not df_lista.empty:
                 df_lista['data'] = pd.to_datetime(df_lista['data']).dt.date
                 df_lista['Exc'] = False
-                ed_l = st.data_editor(df_lista[['Exc', 'data', 'turno', 'executor', 'prefixo', 'inicio_disp', 'fim_disp', 'descricao', 'area', 'id']], hide_index=True, use_container_width=True, key="ed_lista")
                 
-                if st.button("🗑️ Excluir Selecionados"):
+                # Chave modificada para evitar conflito de duplicidade
+                ed_l = st.data_editor(df_lista[['Exc', 'data', 'turno', 'executor', 'prefixo', 'inicio_disp', 'fim_disp', 'descricao', 'area', 'id']], hide_index=True, use_container_width=True, key="ed_lista_servicos_direto")
+                
+                if st.button("🗑️ Excluir Selecionados", key="btn_excluir_servicos_direto"):
                     with engine.connect() as conn:
                         for i in ed_l[ed_l['Exc']==True]['id'].tolist(): 
                             conn.execute(text("DELETE FROM tarefas WHERE id = :id AND empresa_id = :eid"), {"id": int(i), "eid": str(emp_id)})
@@ -2389,11 +2391,11 @@ else:
                     st.warning("🗑️ Itens excluídos.")
                     st.rerun()
                     
-                if st.session_state.ed_lista.get("edited_rows"):
+                if st.session_state.get("ed_lista_servicos_direto") and st.session_state.ed_lista_servicos_direto.get("edited_rows"):
                     COLUNAS_PERMITIDAS_TAREFAS = {"data", "turno", "executor", "prefixo", "inicio_disp", "fim_disp", "descricao", "area"}
                     with engine.connect() as conn:
-                        for idx, changes in st.session_state.ed_lista["edited_rows"].items():
-                            rid = int(df_lista.iloc[idx]['id'])
+                        for idx, changes in st.session_state.ed_lista_servicos_direto["edited_rows"].items():
+                            rid = int(df_lista.iloc[int(idx)]['id'])
                             for col, val in changes.items():
                                 if col in COLUNAS_PERMITIDAS_TAREFAS: 
                                     conn.execute(text(f"UPDATE tarefas SET {col} = :v WHERE id = :i AND empresa_id = :eid"), {"v": str(val), "i": rid, "eid": str(emp_id)})
