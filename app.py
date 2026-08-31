@@ -2505,36 +2505,40 @@ else:
                 st.info("Cadastre um Plano Master acima para poder inserir serviços nele.")
 
             st.divider()
-            st.subheader("📋 Planos Cadastrados (Com Opção de Edição de Planos e Serviços)")
+            st.subheader("📋 Planos Cadastrados (Clique para Expandir e Gerenciar)")
             
-            # --- LISTAGEM COM OPÇÃO DE EDIÇÃO DE PLANOS E SERVIÇOS VINCULADOS ---
+            # --- LISTAGEM COM ACORDEÃO SEGURO (NÃO INTERFERE NO CHAT FLUTUANTE) ---
             df_planos_master = pd.read_sql(text("SELECT id, nome_plano, tipo_os, prefixo, tipo_criterio, intervalo_valor FROM planos_master WHERE empresa_id = :eid ORDER BY id DESC"), engine, params={"eid": str(emp_id)})
             
             if not df_planos_master.empty:
-                for _, plano in df_planos_master.iterrows():
-                    pid = plano['id']
-                    p_nome = plano['nome_plano']
-                    p_tipo = plano['tipo_os']
-                    p_crit = plano['tipo_criterio']
-                    p_ival = plano['intervalo_valor']
-                    p_veiculos = plano['prefixo']
-                    
-                    if p_crit == "Odômetro":
-                        texto_periodicidade = f"A cada {p_ival:,} km".replace(",", ".")
-                    elif p_crit == "Horímetro":
-                        texto_periodicidade = f"A cada {p_ival} horas"
-                    else:
-                        texto_periodicidade = f"A cada {p_ival} dias"
+                # Container isolado para garantir estabilidade visual na página principal
+                with st.container(key="container_lista_planos_master"):
+                    for _, plano in df_planos_master.iterrows():
+                        pid = plano['id']
+                        p_nome = plano['nome_plano']
+                        p_tipo = plano['tipo_os']
+                        p_crit = plano['tipo_criterio']
+                        p_ival = plano['intervalo_valor']
+                        p_veiculos = plano['prefixo']
+                        
+                        if p_crit == "Odômetro":
+                            texto_periodicidade = f"A cada {p_ival:,} km".replace(",", ".")
+                        elif p_crit == "Horímetro":
+                            texto_periodicidade = f"A cada {p_ival} horas"
+                        else:
+                            texto_periodicidade = f"A cada {p_ival} dias"
 
-                    with st.container(border=True):
-                        c_t1, c_t2 = st.columns([0.75, 0.25])
-                        with c_t1:
-                            st.markdown(f"📦 **{p_nome}** — `[{p_tipo}]` | *{texto_periodicidade}*")
-                        with c_t2:
-                            col_e1, col_e2 = st.columns(2)
-                            btn_edita = col_e1.button("✏️ Editar", key=f"edit_p_{pid}", use_container_width=True)
-                            btn_exclui = col_e2.button("🗑️ Excluir", key=f"del_p_{pid}", use_container_width=True)
-                            
+                        # st.expander nativo com os detalhes ocultos até o clique
+                        with st.expander(f"📦 {p_nome} — [{p_tipo}] | {texto_periodicidade}"):
+                            # Cabeçalho interno limpo com botões de Ação do Plano bem distribuídos
+                            col_info, col_b1, col_b2 = st.columns([0.6, 0.2, 0.2])
+                            with col_info:
+                                st.markdown(f"**Veículos Vinculados:** `{p_veiculos}`")
+                            with col_b1:
+                                btn_edita = st.button("✏️ Editar Plano", key=f"edit_p_{pid}", use_container_width=True)
+                            with col_b2:
+                                btn_exclui = st.button("🗑️ Excluir Plano", key=f"del_p_{pid}", use_container_width=True)
+                                
                             if btn_exclui:
                                 with engine.connect() as conn:
                                     conn.execute(text("DELETE FROM servicos_plano WHERE plano_id = :pid"), {"pid": int(pid)})
@@ -2543,99 +2547,95 @@ else:
                                 st.warning("Plano excluído com sucesso!")
                                 st.rerun()
 
-                        # Edição do Plano Master
-                        if btn_edita:
-                            st.session_state[f"editando_{pid}"] = True
+                            # Edição do Plano Master
+                            if btn_edita:
+                                st.session_state[f"editando_{pid}"] = True
 
-                        if st.session_state.get(f"editando_{pid}", False):
-                            with st.form(f"form_edicao_plano_{pid}"):
-                                novo_nome = st.text_input("Alterar Nome do Plano", value=p_nome)
-                                nc1, nc2 = st.columns(2)
-                                novo_crit = nc1.selectbox("Critério", ["Dias", "Horímetro", "Odômetro"], index=["Dias", "Horímetro", "Odômetro"].index(p_crit) if p_crit in ["Dias", "Horímetro", "Odômetro"] else 0)
-                                novo_ival = nc2.number_input("Intervalo", value=int(p_ival), min_value=1)
-                                novo_veiculos = st.text_input("Veículos Vinculados", value=p_veiculos)
-                                
-                                c_salvar, c_cancelar = st.columns(2)
-                                if c_salvar.form_submit_button("💾 Salvar Alterações"):
-                                    with engine.connect() as conn:
-                                        conn.execute(
-                                            text("UPDATE planos_master SET nome_plano = :nome, tipo_criterio = :crit, intervalo_valor = :ival, prefixo = :pref WHERE id = :pid"),
-                                            {"nome": novo_nome, "crit": novo_crit, "ival": int(novo_ival), "pref": novo_veiculos, "pid": int(pid)}
-                                        )
-                                        conn.commit()
-                                    st.session_state[f"editando_{pid}"] = False
-                                    st.success("✅ Plano atualizado com sucesso!")
-                                    st.rerun()
-                                if c_cancelar.form_submit_button("❌ Cancelar"):
-                                    st.session_state[f"editando_{pid}"] = False
-                                    st.rerun()
-                        else:
-                            st.markdown(f"**Veículos / Equipamentos Vinculados:** `{p_veiculos}`")
-                            
-                        # --- SEÇÃO DE SERVIÇOS VINCULADOS COM EDIÇÃO E EXCLUSÃO INDIVIDUAL ---
-                        df_servicos_vinculados = pd.read_sql(text("SELECT id, descricao_servico, retorna_valor, min_toleravel, max_toleravel FROM servicos_plano WHERE plano_id = :pid"), engine, params={"pid": int(pid)})
-                        
-                        st.markdown("---")
-                        st.markdown("**🛠️ Serviços deste Plano:**")
-                        
-                        if not df_servicos_vinculados.empty:
-                            for _, serv in df_servicos_vinculados.iterrows():
-                                sid = serv['id']
-                                s_desc = serv['descricao_servico']
-                                s_ret = serv['retorna_valor']
-                                s_min = serv['min_toleravel']
-                                s_max = serv['max_toleravel']
-                                
-                                # Container para cada serviço permitindo gerenciar individualmente
-                                with st.container():
-                                    cs1, cs2, cs3 = st.columns([0.6, 0.25, 0.15])
+                            if st.session_state.get(f"editando_{pid}", False):
+                                with st.form(f"form_edicao_plano_{pid}"):
+                                    novo_nome = st.text_input("Alterar Nome do Plano", value=p_nome)
+                                    nc1, nc2 = st.columns(2)
+                                    novo_crit = nc1.selectbox("Critério", ["Dias", "Horímetro", "Odômetro"], index=["Dias", "Horímetro", "Odômetro"].index(p_crit) if p_crit in ["Dias", "Horímetro", "Odômetro"] else 0)
+                                    novo_ival = nc2.number_input("Intervalo", value=int(p_ival), min_value=1)
+                                    novo_veiculos = st.text_input("Veículos Vinculados", value=p_veiculos)
                                     
-                                    info_resumo = s_desc
-                                    if s_ret:
-                                        info_resumo += f" *(Retorna Valor | Mín: {s_min} | Máx: {s_max})*"
-                                        
-                                    cs1.markdown(f"- {info_resumo}")
-                                    
-                                    edit_serv = cs2.button("✏️ Editar Serv.", key=f"edit_serv_{sid}")
-                                    del_serv = cs3.button("🗑️ Excluir", key=f"del_serv_{sid}")
-                                    
-                                    if del_serv:
+                                    c_salvar, c_cancelar = st.columns(2)
+                                    if c_salvar.form_submit_button("💾 Salvar"):
                                         with engine.connect() as conn:
-                                            conn.execute(text("DELETE FROM servicos_plano WHERE id = :sid"), {"sid": int(sid)})
+                                            conn.execute(
+                                                text("UPDATE planos_master SET nome_plano = :nome, tipo_criterio = :crit, intervalo_valor = :ival, prefixo = :pref WHERE id = :pid"),
+                                                {"nome": novo_nome, "crit": novo_crit, "ival": int(novo_ival), "pref": novo_veiculos, "pid": int(pid)}
+                                            )
                                             conn.commit()
-                                        st.success("Serviço removido do plano!")
+                                        st.session_state[f"editando_{pid}"] = False
+                                        st.success("✅ Plano atualizado com sucesso!")
+                                        st.rerun()
+                                    if c_cancelar.form_submit_button("❌ Cancelar"):
+                                        st.session_state[f"editando_{pid}"] = False
                                         st.rerun()
                                         
-                                    if edit_serv:
-                                        st.session_state[f"editando_serv_{sid}"] = True
+                            st.divider()
+                            st.markdown("##### 🛠️ Serviços deste Plano:")
+                            
+                            df_servicos_vinculados = pd.read_sql(text("SELECT id, descricao_servico, retorna_valor, min_toleravel, max_toleravel FROM servicos_plano WHERE plano_id = :pid"), engine, params={"pid": int(pid)})
+                            
+                            if not df_servicos_vinculados.empty:
+                                for _, serv in df_servicos_vinculados.iterrows():
+                                    sid = serv['id']
+                                    s_desc = serv['descricao_servico']
+                                    s_ret = serv['retorna_valor']
+                                    s_min = serv['min_toleravel']
+                                    s_max = serv['max_toleravel']
+                                    
+                                    with st.container(border=True):
+                                        cs1, cs2, cs3 = st.columns([0.65, 0.17, 0.18])
                                         
-                                    if st.session_state.get(f"editando_serv_{sid}", False):
-                                        with st.form(f"form_edit_serv_{sid}"):
-                                            novo_desc_serv = st.text_input("Descrição do Serviço", value=s_desc)
-                                            novo_ret_serv = st.checkbox("Retorna valor medido?", value=bool(s_ret))
+                                        info_resumo = s_desc
+                                        if s_ret:
+                                            info_resumo += f" *(Retorna Valor | Mín: {s_min} | Máx: {s_max})*"
                                             
-                                            novo_min_serv, novo_max_serv = float(s_min or 0), float(s_max or 0)
-                                            if novo_ret_serv:
-                                                cm1, cm2 = st.columns(2)
-                                                novo_min_serv = cm1.number_input("Novo Mínimo", value=float(s_min or 0))
-                                                novo_max_serv = cm2.number_input("Novo Máximo", value=float(s_max or 0))
+                                        cs1.markdown(f"• {info_resumo}")
+                                        
+                                        edit_serv = cs2.button("✏️ Editar", key=f"edit_serv_{sid}", use_container_width=True)
+                                        del_serv = cs3.button("🗑️ Excluir", key=f"del_serv_{sid}", use_container_width=True)
+                                        
+                                        if del_serv:
+                                            with engine.connect() as conn:
+                                                conn.execute(text("DELETE FROM servicos_plano WHERE id = :sid"), {"sid": int(sid)})
+                                                conn.commit()
+                                            st.success("Serviço removido do plano!")
+                                            st.rerun()
+                                            
+                                        if edit_serv:
+                                            st.session_state[f"editando_serv_{sid}"] = True
+                                            
+                                        if st.session_state.get(f"editando_serv_{sid}", False):
+                                            with st.form(f"form_edit_serv_{sid}"):
+                                                novo_desc_serv = st.text_input("Descrição do Serviço", value=s_desc)
+                                                novo_ret_serv = st.checkbox("Retorna valor medido?", value=bool(s_ret))
                                                 
-                                            bs_salvar, bs_cancel = st.columns(2)
-                                            if bs_salvar.form_submit_button("💾 Salvar Serviço"):
-                                                with engine.connect() as conn:
-                                                    conn.execute(
-                                                        text("UPDATE servicos_plano SET descricao_servico = :desc, retorna_valor = :ret, min_toleravel = :minv, max_toleravel = :maxv WHERE id = :sid"),
-                                                        {"desc": novo_desc_serv, "ret": novo_ret_serv, "minv": novo_min_serv, "maxv": novo_max_serv, "sid": int(sid)}
-                                                    )
-                                                    conn.commit()
-                                                st.session_state[f"editando_serv_{sid}"] = False
-                                                st.success("✅ Serviço atualizado!")
-                                                st.rerun()
-                                            if bs_cancel.form_submit_button("❌ Cancelar"):
-                                                st.session_state[f"editando_serv_{sid}"] = False
-                                                st.rerun()
-                        else:
-                            st.info("⚠️ Nenhum serviço foi vinculado a este plano ainda.")
+                                                novo_min_serv, novo_max_serv = float(s_min or 0), float(s_max or 0)
+                                                if novo_ret_serv:
+                                                    cm1, cm2 = st.columns(2)
+                                                    novo_min_serv = cm1.number_input("Novo Mínimo", value=float(s_min or 0))
+                                                    novo_max_serv = cm2.number_input("Novo Máximo", value=float(s_max or 0))
+                                                    
+                                                bs_salvar, bs_cancel = st.columns(2)
+                                                if bs_salvar.form_submit_button("💾 Salvar"):
+                                                    with engine.connect() as conn:
+                                                        conn.execute(
+                                                            text("UPDATE servicos_plano SET descricao_servico = :desc, retorna_valor = :ret, min_toleravel = :minv, max_toleravel = :maxv WHERE id = :sid"),
+                                                            {"desc": novo_desc_serv, "ret": novo_ret_serv, "minv": novo_min_serv, "maxv": novo_max_serv, "sid": int(sid)}
+                                                        )
+                                                        conn.commit()
+                                                    st.session_state[f"editando_serv_{sid}"] = False
+                                                    st.success("✅ Serviço atualizado!")
+                                                    st.rerun()
+                                                if bs_cancel.form_submit_button("❌ Cancelar"):
+                                                    st.session_state[f"editando_serv_{sid}"] = False
+                                                    st.rerun()
+                            else:
+                                st.info("⚠️ Nenhum serviço foi vinculado a este plano ainda.")
             else:
                 st.info("Nenhum plano cadastrado.")
                 
