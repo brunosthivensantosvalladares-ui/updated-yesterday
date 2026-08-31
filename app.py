@@ -2417,25 +2417,26 @@ else:
     elif "Cadastro Direto" in aba_ativa:
         st.subheader("📝 Agendamento Direto & Planos Master")
         
-        if "sub_aba_selecionada" not in st.session_state:
-            st.session_state.sub_aba_selecionada = "📝 Agendamento Direto"
+        if "sub_aba_idx" not in st.session_state:
+            st.session_state.sub_aba_idx = 0
             
-        sub_aba_escolhida = st.session_state.sub_aba_selecionada
+        # Radio horizontal superior espelhado com o estado da barra lateral para garantir a aba correta
+        abas_nomes = ["📝 Agendamento Direto", "📚 Gerenciar Planos Master", "⚡ Gerar OS em Lote (Planos)"]
+        sub_escolhida = st.radio(
+            "Navegação interna", 
+            abas_nomes, 
+            index=st.session_state.sub_aba_idx, 
+            horizontal=True, 
+            label_visibility="collapsed",
+            key="radio_abas_cadastro_direto"
+        )
         
-        sub_aba_cad1, sub_aba_cad2, sub_aba_cad3 = st.tabs([
-            "📝 Agendamento Direto", 
-            "📚 Gerenciar Planos Master", 
-            "⚡ Gerar OS em Lote (Planos)"
-        ])
+        # Atualiza o índice caso o usuário clique diretamente nos botões das abas superiores
+        st.session_state.sub_aba_idx = abas_nomes.index(sub_escolhida)
         
-        if sub_aba_escolhida == "📝 Agendamento Direto":
-            sub_aba_target = sub_aba_cad1
-        elif sub_aba_escolhida == "📚 Gerenciar Planos Master":
-            sub_aba_target = sub_aba_cad2
-        else:
-            sub_aba_target = sub_aba_cad3
-            
-        with sub_aba_cad1:
+        st.divider()
+
+        if st.session_state.sub_aba_idx == 0:
             with st.popover("💡 Como usar o Cadastro Direto?"):
                 st.markdown("""
                     ### 📝 Guia Rápido - Cadastro
@@ -2518,7 +2519,7 @@ else:
                         conn.commit()
                     st.rerun()
 
-        with sub_aba_cad2:
+        elif st.session_state.sub_aba_idx == 1:
             st.markdown("### 📚 Gestão de Planos Master e Serviços")
             st.info("💡 Cadastre o plano, defina a periodicidade, a área e adicione os serviços.")
             
@@ -2741,7 +2742,7 @@ else:
             else:
                 st.info("Nenhum plano cadastrado.")
 
-        with sub_aba_cad3:
+        else:
             st.markdown("### ⚡ Geração de Ordens de Serviço em Lote via Planos Master")
             st.info("💡 Selecione um plano cadastrado, escolha a data de execução, os horários (opcionais) e os veículos para gerar as OSs.")
 
