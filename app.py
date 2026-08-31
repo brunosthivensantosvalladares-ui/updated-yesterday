@@ -1075,9 +1075,15 @@ def inicializar_banco():
                     empresa_id TEXT NOT NULL,
                     nome_plano TEXT NOT NULL,
                     tipo_os TEXT NOT NULL,
-                    prefixo TEXT NOT NULL
+                    prefixo TEXT NOT NULL,
+                    tipo_criterio TEXT DEFAULT 'Dias',
+                    intervalo_valor INTEGER DEFAULT 30
                 )
             """))
+
+            # Garante a compatibilidade caso a tabela já exista sem essas colunas
+            conn.execute(text("ALTER TABLE planos_master ADD COLUMN IF NOT EXISTS tipo_criterio TEXT DEFAULT 'Dias'"))
+            conn.execute(text("ALTER TABLE planos_master ADD COLUMN IF NOT EXISTS intervalo_valor INTEGER DEFAULT 30"))
 
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS servicos_plano (
@@ -2403,45 +2409,57 @@ else:
                     st.rerun()
 
         with sub_aba_cad2:
-            st.markdown("### 📚 Gestão de Planos Master e Serviços")
-            st.info("💡 Cadastre o Plano Master abaixo. Você pode editar diretamente o nome, tipo ou prefixo na tabela de planos cadastrados.")
+            st.markdown("### 📚 Gestão de Planos Master, Serviços e Veículos Vinculados")
+            st.info("💡 Cadastre o plano informando a periodicidade e os veículos. Depois, expanda os planos abaixo para gerenciar seus serviços e equipamentos.")
             
-            # --- FORMULÁRIO 1: CRIAR O PLANO MASTER ---
+            # --- FORMULÁRIO 1: CRIAR O PLANO MASTER COM PERIODICIDADE ---
             with st.form("form_novo_plano", clear_on_submit=True):
-                st.markdown("#### ➕ Passo 1: Criar Novo Plano Master")
-                p_nome = st.text_input("Nome do Plano (Ex: Revisão 250h - Pá Carregadeira)")
+                st.markdown("#### ➕ Criar Novo Plano Master")
+                p_nome = st.text_input("Nome do Plano (Ex: Revisão 250h - Escavadeira)")
                 p_tipo = st.selectbox("Tipo de Plano / OS", ["Preventiva", "Preditiva", "Checklist"])
-                p_pref = st.text_input("Prefixo do Veículo/Equipamento Alvo")
                 
-                if st.form_submit_button("Salvar Cabeçalho do Plano"):
-                    if p_nome and p_pref:
+                c_p1, c_p2 = st.columns(2)
+                p_criterio = c_p1.selectbox("Periodicidade Base", ["Dias", "Horímetro", "Odômetro"])
+                p_intervalo = c_p2.number_input("Intervalo Numérico (Ex: 30 dias ou 250h)", min_value=1, value=30)
+                
+                # Lista de veículos vinculados ao plano (separados por vírgula ou lista)
+                p_prefs = st.text_input("Prefixos dos Veículos Vinculados (Separe por vírgula, ex: 101, 102, 103)")
+                
+                if st.form_submit_button("💾 Salvar Novo Plano Master"):
+                    if p_nome and p_prefs:
                         with engine.connect() as conn:
                             conn.execute(
-                                text("INSERT INTO planos_master (empresa_id, nome_plano, tipo_os, prefixo) VALUES (:eid, :nome, :tipo, :pref)"),
-                                {"eid": str(emp_id), "nome": p_nome, "tipo": p_tipo, "pref": p_pref}
+                                text("""
+                                    INSERT INTO planos_master (empresa_id, nome_plano, tipo_os, prefixo, tipo_criterio, intervalo_valor) 
+                                    VALUES (:eid, :nome, :tipo, :pref, :crit, :ival)
+                                """),
+                                {
+                                    "eid": str(emp_id), "nome": p_nome, "tipo": p_tipo, 
+                                    "pref": p_prefs.strip(), "crit": p_criterio, "ival": int(p_intervalo)
+                                }
                             )
                             conn.commit()
                         st.success("✅ Plano Master criado com sucesso!")
                         st.rerun()
                     else:
-                        st.warning("Preencha o nome do plano e o prefixo.")
+                        st.warning("Preencha o nome do plano e informe ao menos um veículo/prefixo.")
 
             st.divider()
 
             # --- FORMULÁRIO 2: ADICIONAR SERVIÇOS AO PLANO SELECIONADO ---
-            st.markdown("#### ➕ Passo 2: Adicionar Serviços a um Plano Existente")
+            st.markdown("#### ➕ Adicionar Serviços a um Plano Existente")
             
             df_m_box = pd.read_sql(text("SELECT id, nome_plano, tipo_os FROM planos_master WHERE empresa_id = :eid"), engine, params={"eid": str(emp_id)})
             
             if not df_m_box.empty:
                 mapa_planos = {f"{row['nome_plano']} ({row['tipo_os']})": row['id'] for _, row in df_m_box.iterrows()}
-                plano_selecionado_nome = st.selectbox("Selecione o Plano Master", list(mapa_planos.keys()))
+                plano_selecionado_nome = st.selectbox("Selecione o Plano Master para adicionar serviço", list(mapa_planos.keys()))
                 id_plano_ativo = mapa_planos[plano_selecionado_nome]
                 
                 tipo_do_plano_atual = df_m_box[df_m_box['id'] == id_plano_ativo].iloc[0]['tipo_os']
 
                 with st.form("form_add_servico_plano", clear_on_submit=True):
-                    s_desc = st.text_input("Descrição do Serviço Específico (Ex: Medição de Pressão da Bomba)")
+                    s_desc = st.text_input("Descrição do Serviço Específico (Ex: Troca de Óleo do Sistema)")
                     
                     retorna_val = False
                     min_tol, max_tol = None, None
@@ -2453,9 +2471,9 @@ else:
                             min_tol = col_m1.number_input("Mínimo Tolerável", value=0.0)
                             max_tol = col_m2.number_input("Máximo Tolerável", value=0.0)
                     elif tipo_do_plano_atual == "Checklist":
-                        st.caption("ℹ️ Este item será avaliado como Conforme (C) ou Não Conforme (NC) na baixa.")
+                        st.caption("ℹ️ Este item será avaliado como Conforme (C) ou Não Conforme (NC) na baixa da OS.")
 
-                    if st.form_submit_button("Adicionar Serviço ao Plano"):
+                    if st.form_submit_button("➕ Adicionar Serviço ao Plano"):
                         if s_desc:
                             with engine.connect() as conn:
                                 conn.execute(
@@ -2468,53 +2486,39 @@ else:
                         else:
                             st.warning("Digite a descrição do serviço.")
             else:
-                st.info("Cadastre um Plano Master no formulário acima para poder inserir serviços nele.")
+                st.info("Cadastre um Plano Master acima para poder inserir serviços nele.")
 
             st.divider()
-            st.subheader("📋 Planos Master Cadastrados (Editáveis)")
+            st.subheader("📋 Planos Cadastrados (Clique para Expandir e Ver Serviços/Veículos)")
             
-            # Tabela interativa para permitir editar o nome, tipo e prefixo do plano diretamente
-            df_planos_master = pd.read_sql(text("SELECT id, nome_plano, tipo_os, prefixo FROM planos_master WHERE empresa_id = :eid ORDER BY id DESC"), engine, params={"eid": str(emp_id)})
+            # --- VISUALIZAÇÃO EXPANSIVA DOS PLANOS, SERVIÇOS E VEÍCULOS ---
+            df_planos_master = pd.read_sql(text("SELECT id, nome_plano, tipo_os, prefixo, tipo_criterio, intervalo_valor FROM planos_master WHERE empresa_id = :eid ORDER BY id DESC"), engine, params={"eid": str(emp_id)})
             
             if not df_planos_master.empty:
-                df_planos_master['Excluir'] = False
-                ed_master = st.data_editor(
-                    df_planos_master,
-                    hide_index=True,
-                    use_container_width=True,
-                    column_config={
-                        "id": None,
-                        "nome_plano": st.column_config.TextColumn("Nome do Plano"),
-                        "tipo_os": st.column_config.SelectboxColumn("Tipo", options=["Preventiva", "Preditiva", "Checklist"]),
-                        "prefixo": st.column_config.TextColumn("Prefixo Alvo"),
-                        "Excluir": st.column_config.CheckboxColumn("Excluir?", width="small")
-                    },
-                    key="editor_planos_master"
-                )
-
-                if st.button("💾 Salvar Alterações / Excluir Planos Selecionados"):
-                    with engine.connect() as conn:
-                        # Exclusão dos marcados
-                        ids_excluir = ed_master[ed_master['Excluir'] == True]['id'].tolist()
-                        for pid in ids_excluir:
-                            conn.execute(text("DELETE FROM servicos_plano WHERE plano_id = :pid"), {"pid": int(pid)})
-                            conn.execute(text("DELETE FROM planos_master WHERE id = :pid"), {"pid": int(pid)})
+                for _, plano in df_planos_master.iterrows():
+                    pid = plano['id']
+                    p_nome = plano['nome_plano']
+                    p_tipo = plano['tipo_os']
+                    p_crit = plano['tipo_criterio']
+                    p_ival = plano['intervalo_valor']
+                    p_veiculos = plano['prefixo']
+                    
+                    # Cria um expander para cada plano
+                    with st.expander(f"📦 {p_nome} — [{p_tipo}] | Periodicidade: A cada {p_ival} {p_crit.lower()}"):
+                        st.markdown(f"**Veículos / Equipamentos Vinculados:** `{p_veiculos}`")
                         
-                        # Atualização dos editados
-                        if st.session_state.editor_planos_master.get("edited_rows"):
-                            for idx_str, mudancas in st.session_state.editor_planos_master["edited_rows"].items():
-                                pid = int(df_planos_master.iloc[int(idx_str)]['id'])
-                                novo_nome = mudancas.get("nome_plano", df_planos_master.iloc[int(idx_str)]['nome_plano'])
-                                novo_tipo = mudancas.get("tipo_os", df_planos_master.iloc[int(idx_str)]['tipo_os'])
-                                novo_pref = mudancas.get("prefixo", df_planos_master.iloc[int(idx_str)]['prefixo'])
-                                
-                                conn.execute(
-                                    text("UPDATE planos_master SET nome_plano = :nome, tipo_os = :tipo, prefixo = :pref WHERE id = :pid"),
-                                    {"nome": novo_nome, "tipo": novo_tipo, "pref": novo_pref, "pid": pid}
-                                )
-                        conn.commit()
-                    st.success("✅ Alterações salvas com sucesso!")
-                    st.rerun()
+                        # Busca os serviços vinculados a este plano específico
+                        df_servicos_vinculados = pd.read_sql(text("SELECT id, descricao_servico, retorna_valor, min_toleravel, max_toleravel FROM servicos_plano WHERE plano_id = :pid"), engine, params={"pid": pid})
+                        
+                        st.markdown("#### 🛠️ Serviços deste Plano:")
+                        if not df_servicos_vinculados.empty:
+                            for _, serv in df_servicos_vinculados.iterrows():
+                                info_extra = ""
+                                if serv['retorna_valor']:
+                                    info_extra = f" *(Retorna Valor | Mín: {serv['min_toleravel']} | Máx: {serv['max_toleravel']})*"
+                                st.markdown(f"- {serv['descricao_servico']}{info_extra}")
+                        else:
+                            st.info("Nenhum serviço cadastrado para este plano ainda.")
             else:
                 st.info("Nenhum plano cadastrado.")
         
