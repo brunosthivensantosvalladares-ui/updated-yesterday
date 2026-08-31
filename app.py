@@ -2412,17 +2412,20 @@ else:
             st.markdown("### 📚 Gestão de Planos Master, Serviços e Veículos Vinculados")
             st.info("💡 Cadastre o plano informando a periodicidade e os veículos. Depois, expanda os planos abaixo para gerenciar seus serviços e equipamentos.")
             
-            # --- FORMULÁRIO 1: CRIAR O PLANO MASTER COM PERIODICIDADE ---
+            # --- FORMULÁRIO 1: CRIAR O PLANO MASTER COM PERIODICIDADE CORRETA ---
             with st.form("form_novo_plano", clear_on_submit=True):
                 st.markdown("#### ➕ Criar Novo Plano Master")
-                p_nome = st.text_input("Nome do Plano (Ex: Revisão 250h - Escavadeira)")
+                p_nome = st.text_input("Nome do Plano (Ex: Revisão 10.000 km - Caminhão)")
                 p_tipo = st.selectbox("Tipo de Plano / OS", ["Preventiva", "Preditiva", "Checklist"])
                 
                 c_p1, c_p2 = st.columns(2)
-                p_criterio = c_p1.selectbox("Periodicidade Base", ["Dias", "Horímetro", "Odômetro"])
-                p_intervalo = c_p2.number_input("Intervalo Numérico (Ex: 30 dias ou 250h)", min_value=1, value=30)
+                p_criterio = c_p1.selectbox("Critério de Periodicidade", ["Dias", "Horímetro", "Odômetro"])
                 
-                # Lista de veículos vinculados ao plano (separados por vírgula ou lista)
+                # Altera o label dinamicamente com base na escolha para ficar intuitivo
+                label_intervalo = f"Valor do Intervalo (Ex: 10000 para {p_criterio.lower()})"
+                p_intervalo = c_p2.number_input(label_intervalo, min_value=1, value=10000)
+                
+                # Lista de veículos vinculados ao plano
                 p_prefs = st.text_input("Prefixos dos Veículos Vinculados (Separe por vírgula, ex: 101, 102, 103)")
                 
                 if st.form_submit_button("💾 Salvar Novo Plano Master"):
@@ -2503,12 +2506,30 @@ else:
                     p_ival = plano['intervalo_valor']
                     p_veiculos = plano['prefixo']
                     
-                    # Cria um expander para cada plano
-                    with st.expander(f"📦 {p_nome} — [{p_tipo}] | Periodicidade: A cada {p_ival} {p_crit.lower()}"):
-                        st.markdown(f"**Veículos / Equipamentos Vinculados:** `{p_veiculos}`")
+                    # Formata o texto de exibição do critério corretamente
+                    if p_crit == "Odômetro":
+                        texto_periodicidade = f"A cada {p_ival:,} km".replace(",", ".")
+                    elif p_crit == "Horímetro":
+                        texto_periodicidade = f"A cada {p_ival} horas"
+                    else:
+                        texto_periodicidade = f"A cada {p_ival} dias"
+
+                    # Cria um expander para cada plano com a periodicidade certa
+                    with st.expander(f"📦 {p_nome} — [{p_tipo}] | {texto_periodicidade}"):
+                        c_inf1, c_inf2 = st.columns([0.8, 0.2])
+                        with c_inf1:
+                            st.markdown(f"**Veículos / Equipamentos Vinculados:** `{p_veiculos}`")
+                        with c_inf2:
+                            if st.button("🗑️ Excluir Plano", key=f"del_plano_{pid}"):
+                                with engine.connect() as conn:
+                                    conn.execute(text("DELETE FROM servicos_plano WHERE plano_id = :pid"), {"pid": int(pid)})
+                                    conn.execute(text("DELETE FROM planos_master WHERE id = :pid"), {"pid": int(pid)})
+                                    conn.commit()
+                                st.warning("Plano excluído com sucesso!")
+                                st.rerun()
                         
                         # Busca os serviços vinculados a este plano específico
-                        df_servicos_vinculados = pd.read_sql(text("SELECT id, descricao_servico, retorna_valor, min_toleravel, max_toleravel FROM servicos_plano WHERE plano_id = :pid"), engine, params={"pid": pid})
+                        df_servicos_vinculados = pd.read_sql(text("SELECT id, descricao_servico, retorna_valor, min_toleravel, max_toleravel FROM servicos_plano WHERE plano_id = :pid"), engine, params={"pid": int(pid)})
                         
                         st.markdown("#### 🛠️ Serviços deste Plano:")
                         if not df_servicos_vinculados.empty:
@@ -2518,7 +2539,7 @@ else:
                                     info_extra = f" *(Retorna Valor | Mín: {serv['min_toleravel']} | Máx: {serv['max_toleravel']})*"
                                 st.markdown(f"- {serv['descricao_servico']}{info_extra}")
                         else:
-                            st.info("Nenhum serviço cadastrado para este plano ainda.")
+                            st.info("⚠️ Nenhum serviço foi vinculado a este plano ainda. Selecione o plano no seletor acima e adicione os serviços.")
             else:
                 st.info("Nenhum plano cadastrado.")
         
