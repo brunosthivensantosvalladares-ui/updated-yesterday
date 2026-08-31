@@ -2444,7 +2444,7 @@ else:
             st.divider()
             st.subheader("📋 Planos e Serviços Cadastrados")
             df_planos_detalhes = pd.read_sql(text("""
-                pm.nome_plano, pm.tipo_os, pm.prefixo, sp.descricao_servico, sp.retorna_valor, sp.min_toleravel, sp.max_toleravel
+                SELECT pm.nome_plano, pm.tipo_os, pm.prefixo, sp.descricao_servico, sp.retorna_valor, sp.min_toleravel, sp.max_toleravel
                 FROM planos_master pm
                 LEFT JOIN servicos_plano sp ON pm.id = sp.plano_id
                 WHERE pm.empresa_id = :eid
