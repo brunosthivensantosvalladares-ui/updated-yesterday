@@ -2343,7 +2343,6 @@ else:
                 with cc1: t_i = st.selectbox("Turno", LISTA_TURNOS)
                 with cc2: tipo_os_i = st.selectbox("Tipo de OS", LISTA_TIPOS_OS)
                 
-                # Seleção opcional de Plano Master cadastrado
                 df_planos_box = pd.read_sql(text("SELECT id, nome_plano FROM planos_master WHERE empresa_id = :eid"), engine, params={"eid": str(emp_id)})
                 lista_nomes_planos = ["Nenhum (Avulso)"] + (df_planos_box['nome_plano'].tolist() if not df_planos_box.empty else [])
                 plano_escolhido = st.selectbox("Vincular a um Plano Master (Opcional)", lista_nomes_planos)
@@ -2372,11 +2371,40 @@ else:
                     st.success(f"✅ SERVIÇO AGENDADO! Nº {nova_os} (Horímetro ref: {h_prox}h | Odômetro ref: {o_prox}km)")
                     st.rerun()
 
+            # --- LISTA GERAL DE SERVIÇOS EXCLUSIVA DA ABA DE AGENDAMENTO DIRETO ---
+            st.divider()
+            st.subheader("📋 Lista geral de serviços")
+            df_lista = pd.read_sql(text("SELECT * FROM tarefas WHERE empresa_id = :eid ORDER BY data DESC, id DESC"), engine, params={"eid": str(emp_id)})
+            
+            if not df_lista.empty:
+                df_lista['data'] = pd.to_datetime(df_lista['data']).dt.date
+                df_lista['Exc'] = False
+                ed_l = st.data_editor(df_lista[['Exc', 'data', 'turno', 'executor', 'prefixo', 'inicio_disp', 'fim_disp', 'descricao', 'area', 'id']], hide_index=True, use_container_width=True, key="ed_lista")
+                
+                if st.button("🗑️ Excluir Selecionados"):
+                    with engine.connect() as conn:
+                        for i in ed_l[ed_l['Exc']==True]['id'].tolist(): 
+                            conn.execute(text("DELETE FROM tarefas WHERE id = :id AND empresa_id = :eid"), {"id": int(i), "eid": str(emp_id)})
+                        conn.commit()
+                    st.warning("🗑️ Itens excluídos.")
+                    st.rerun()
+                    
+                if st.session_state.ed_lista.get("edited_rows"):
+                    COLUNAS_PERMITIDAS_TAREFAS = {"data", "turno", "executor", "prefixo", "inicio_disp", "fim_disp", "descricao", "area"}
+                    with engine.connect() as conn:
+                        for idx, changes in st.session_state.ed_lista["edited_rows"].items():
+                            rid = int(df_lista.iloc[idx]['id'])
+                            for col, val in changes.items():
+                                if col in COLUNAS_PERMITIDAS_TAREFAS: 
+                                    conn.execute(text(f"UPDATE tarefas SET {col} = :v WHERE id = :i AND empresa_id = :eid"), {"v": str(val), "i": rid, "eid": str(emp_id)})
+                        conn.commit()
+                    st.rerun()
+
         with sub_aba_cad2:
             st.markdown("### 📚 Gestão de Planos Master e Serviços")
-            st.info("💡 Cadastre o Plano Master abaixo. Em seguida, você poderá adicionar os serviços específicos vinculados a ele.")
+            st.info("💡 Cadastre o Plano Master abaixo. Você pode editar diretamente o nome, tipo ou prefixo na tabela de planos cadastrados.")
             
-            # --- FORMULÁRIO 1: CRIAR O PLANO MASTER (VISÍVEL DIRETAMENTE) ---
+            # --- FORMULÁRIO 1: CRIAR O PLANO MASTER ---
             with st.form("form_novo_plano", clear_on_submit=True):
                 st.markdown("#### ➕ Passo 1: Criar Novo Plano Master")
                 p_nome = st.text_input("Nome do Plano (Ex: Revisão 250h - Pá Carregadeira)")
@@ -2441,17 +2469,50 @@ else:
                 st.info("Cadastre um Plano Master no formulário acima para poder inserir serviços nele.")
 
             st.divider()
-            st.subheader("📋 Planos e Serviços Cadastrados")
-            df_planos_detalhes = pd.read_sql(text("""
-                SELECT pm.nome_plano, pm.tipo_os, pm.prefixo, sp.descricao_servico, sp.retorna_valor, sp.min_toleravel, sp.max_toleravel
-                FROM planos_master pm
-                LEFT JOIN servicos_plano sp ON pm.id = sp.plano_id
-                WHERE pm.empresa_id = :eid
-                ORDER BY pm.id DESC
-            """), engine, params={"eid": str(emp_id)})
+            st.subheader("📋 Planos Master Cadastrados (Editáveis)")
             
-            if not df_planos_detalhes.empty:
-                st.dataframe(df_planos_detalhes, use_container_width=True, hide_index=True)
+            # Tabela interativa para permitir editar o nome, tipo e prefixo do plano diretamente
+            df_planos_master = pd.read_sql(text("SELECT id, nome_plano, tipo_os, prefixo FROM planos_master WHERE empresa_id = :eid ORDER BY id DESC"), engine, params={"eid": str(emp_id)})
+            
+            if not df_planos_master.empty:
+                df_planos_master['Excluir'] = False
+                ed_master = st.data_editor(
+                    df_planos_master,
+                    hide_index=True,
+                    use_container_width=True,
+                    column_config={
+                        "id": None,
+                        "nome_plano": st.column_config.TextColumn("Nome do Plano"),
+                        "tipo_os": st.column_config.SelectboxColumn("Tipo", options=["Preventiva", "Preditiva", "Checklist"]),
+                        "prefixo": st.column_config.TextColumn("Prefixo Alvo"),
+                        "Excluir": st.column_config.CheckboxColumn("Excluir?", width="small")
+                    },
+                    key="editor_planos_master"
+                )
+
+                if st.button("💾 Salvar Alterações / Excluir Planos Selecionados"):
+                    with engine.connect() as conn:
+                        # Exclusão dos marcados
+                        ids_excluir = ed_master[ed_master['Excluir'] == True]['id'].tolist()
+                        for pid in ids_excluir:
+                            conn.execute(text("DELETE FROM servicos_plano WHERE plano_id = :pid"), {"pid": int(pid)})
+                            conn.execute(text("DELETE FROM planos_master WHERE id = :pid"), {"pid": int(pid)})
+                        
+                        # Atualização dos editados
+                        if st.session_state.editor_planos_master.get("edited_rows"):
+                            for idx_str, mudancas in st.session_state.editor_planos_master["edited_rows"].items():
+                                pid = int(df_planos_master.iloc[int(idx_str)]['id'])
+                                novo_nome = mudancas.get("nome_plano", df_planos_master.iloc[int(idx_str)]['nome_plano'])
+                                novo_tipo = mudancas.get("tipo_os", df_planos_master.iloc[int(idx_str)]['tipo_os'])
+                                novo_pref = mudancas.get("prefixo", df_planos_master.iloc[int(idx_str)]['prefixo'])
+                                
+                                conn.execute(
+                                    text("UPDATE planos_master SET nome_plano = :nome, tipo_os = :tipo, prefixo = :pref WHERE id = :pid"),
+                                    {"nome": novo_nome, "tipo": novo_tipo, "pref": novo_pref, "pid": pid}
+                                )
+                        conn.commit()
+                    st.success("✅ Alterações salvas com sucesso!")
+                    st.rerun()
             else:
                 st.info("Nenhum plano cadastrado.")
         
