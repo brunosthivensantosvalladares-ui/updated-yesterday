@@ -1951,7 +1951,7 @@ else:
                 st.info("Nenhum plano master cadastrado para monitoramento.")
         except Exception as e:
             st.info("Cadastre leituras de medidores e planos master para ativar o painel preditivo de vencimentos.")
-
+            
     elif "Gestão Master" in aba_ativa and usuario_ativo == "bruno":
         st.subheader("👑 Painel de Controle Master")
         
