@@ -1827,7 +1827,7 @@ else:
 
     aba_ativa = st.session_state.opcao_selecionada
 
-        elif "Dashboard" in aba_ativa:
+    elif "Dashboard" in aba_ativa:
         st.markdown("<h4 style='color: #2D241E; font-weight: 700; margin-bottom: 16px;'>Cronograma Geral de Manutenção</h4>", unsafe_allow_html=True)
         
         df_dash_stats = pd.read_sql(text("SELECT data, realizado FROM tarefas WHERE empresa_id = :eid"), engine, params={"eid": str(emp_id)})
