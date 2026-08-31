@@ -1827,7 +1827,7 @@ else:
 
     aba_ativa = st.session_state.opcao_selecionada
 
-    if "Dashboard" in aba_ativa:
+    elif "Dashboard" in aba_ativa:
         st.markdown("<h4 style='color: #2D241E; font-weight: 700; margin-bottom: 16px;'>Cronograma Geral de Manutenção</h4>", unsafe_allow_html=True)
         
         df_dash_stats = pd.read_sql(text("SELECT data, realizado FROM tarefas WHERE empresa_id = :eid"), engine, params={"eid": str(emp_id)})
@@ -1899,6 +1899,58 @@ else:
                 2. Preencha os horários de início e fim da janela logística.
                 3. Finalize a execução na aba de baixa técnica para atualizar os relatórios em tempo real.
                 """)
+
+        # --- PAINEL DE MONITORAMENTO DE VENCIMENTOS DE PLANOS NO DASHBOARD ---
+        st.divider()
+        st.markdown("<h4 style='color: #2D241E; font-weight: 700; margin-bottom: 12px;'>⏳ Controle de Vencimentos de Planos por Veículo</h4>", unsafe_allow_html=True)
+        st.caption("Acompanhamento preditivo e preventivo do saldo restante (Horas, Quilômetros ou Dias) para a próxima manutenção.")
+
+        try:
+            df_planos_dash = pd.read_sql(text("SELECT id, nome_plano, tipo_os, prefixo, tipo_criterio, intervalo_valor FROM planos_master WHERE empresa_id = :eid"), engine, params={"eid": str(emp_id)})
+
+            if not df_planos_dash.empty:
+                lista_status_frota = []
+                
+                with engine.connect() as conn:
+                    for _, p in df_planos_dash.iterrows():
+                        prefs = [x.strip() for x in str(p['prefixo']).split(",") if x.strip()]
+                        crit = p['tipo_criterio']
+                        intervalo_limite = float(p['intervalo_valor'])
+                        
+                        for pref in prefs:
+                            med = conn.execute(
+                                text("SELECT data_leitura, horimetro, odometro FROM medidores_frota WHERE empresa_id = :eid AND prefixo = :pref ORDER BY data_leitura DESC LIMIT 1"),
+                                {"eid": str(emp_id), "pref": pref}
+                            ).fetchone()
+                            
+                            atual_val = 0.0
+                            if med:
+                                if crit == "Horímetro":
+                                    atual_val = float(med[1] or 0)
+                                elif crit == "Odômetro":
+                                    atual_val = float(med[2] or 0)
+                            
+                            saldo_restante = intervalo_limite - (atual_val % intervalo_limite) if crit in ["Horímetro", "Odômetro"] else intervalo_limite
+                            
+                            lista_status_frota.append({
+                                "Plano": p['nome_plano'],
+                                "Tipo": p['tipo_os'],
+                                "Veículo": pref,
+                                "Critério": crit,
+                                "Intervalo Padrão": intervalo_limite,
+                                "Leitura Atual": atual_val if crit != "Dias" else "-",
+                                "Saldo Restante Estimado": f"{saldo_restante:,.0f} {'km' if crit=='Odômetro' else 'h' if crit=='Horímetro' else 'dias'}"
+                            })
+
+                df_status_final = pd.DataFrame(lista_status_frota)
+                if not df_status_final.empty:
+                    st.dataframe(df_status_final, use_container_width=True, hide_index=True)
+                else:
+                    st.info("Nenhum veículo vinculado aos planos cadastrados.")
+            else:
+                st.info("Nenhum plano master cadastrado para monitoramento.")
+        except Exception as e:
+            st.info("Cadastre leituras de medidores e planos master para ativar o painel preditivo de vencimentos.")
 
     elif "Gestão Master" in aba_ativa and usuario_ativo == "bruno":
         st.subheader("👑 Painel de Controle Master")
@@ -1983,7 +2035,7 @@ else:
                 )
             except Exception:
                 st.error("Erro ao gerar o arquivo PDF. Verifique a codificação dos textos.")
-
+        
         st.divider()
         col_m1, col_m2 = st.columns(2)
         with col_m1:
@@ -2324,7 +2376,11 @@ else:
     elif "Cadastro Direto" in aba_ativa:
         st.subheader("📝 Agendamento Direto & Planos Master")
         
-        sub_aba_cad1, sub_aba_cad2 = st.tabs(["📝 Agendamento Direto", "📚 Gerenciar Planos Master (Preventiva/Preditiva/Checklist)"])
+        sub_aba_cad1, sub_aba_cad2, sub_aba_cad3 = st.tabs([
+            "📝 Agendamento Direto", 
+            "📚 Gerenciar Planos Master", 
+            "⚡ Gerar OS em Lote (Planos)"
+        ])
         
         with sub_aba_cad1:
             with st.popover("💡 Como usar o Cadastro Direto?"):
@@ -2414,9 +2470,6 @@ else:
             st.info("💡 Cadastre o plano, defina a periodicidade e adicione os serviços. Para planos preditivos, os campos de tolerância aparecem instantaneamente ao marcar o flag.")
             
             # --- FORMULÁRIO 1: CRIAR O PLANO MASTER COM ESTADO REATIVO DE PERIODICIDADE ---
-            if "crit_anterior" not in st.session_state:
-                st.session_state.crit_anterior = "Odômetro"
-
             with st.form("form_novo_plano", clear_on_submit=True):
                 st.markdown("#### ➕ Criar Novo Plano Master")
                 p_nome = st.text_input("Nome do Plano (Ex: Preventiva Quinzenal)")
@@ -2425,7 +2478,7 @@ else:
                 c_p1, c_p2 = st.columns(2)
                 p_criterio = c_p1.selectbox("Critério de Periodicidade", ["Dias", "Horímetro", "Odômetro"], key="select_criterio_master")
                 
-                # Define sugestão reativa baseada na escolha atual
+                # Define sugestão reativa limpa com base na seleção imediata
                 if p_criterio == "Dias":
                     val_padrao = 30
                     lbl_int = "Valor do Intervalo (Ex: 15 ou 30 dias)"
@@ -2472,7 +2525,6 @@ else:
                 
                 tipo_do_plano_atual = df_m_box[df_m_box['id'] == id_plano_ativo].iloc[0]['tipo_os']
 
-                # Removido o st.form fechado neste bloco para permitir reatividade instantânea do checkbox de preditiva
                 with st.container(border=True):
                     s_desc = st.text_input("Descrição do Serviço Específico (Ex: Medição de Vibração)", key="input_desc_servico_master")
                     
@@ -2480,7 +2532,6 @@ else:
                     min_tol, max_tol = 0.0, 0.0
                     
                     if tipo_do_plano_atual == "Preditiva":
-                        # Ao marcar este checkbox, os campos abrem imediatamente sem apagar o texto digitado acima
                         retorna_val = st.checkbox("Este serviço retorna valor medido?", key="chk_retorna_valor_master")
                         if retorna_val:
                             col_m1, col_m2 = st.columns(2)
@@ -2507,11 +2558,10 @@ else:
             st.divider()
             st.subheader("📋 Planos Cadastrados (Clique para Expandir e Gerenciar)")
             
-            # --- LISTAGEM COM ACORDEÃO SEGURO (NÃO INTERFERE NO CHAT FLUTUANTE) ---
+            # --- LISTAGEM COM ACORDEÃO SEGURO ---
             df_planos_master = pd.read_sql(text("SELECT id, nome_plano, tipo_os, prefixo, tipo_criterio, intervalo_valor FROM planos_master WHERE empresa_id = :eid ORDER BY id DESC"), engine, params={"eid": str(emp_id)})
             
             if not df_planos_master.empty:
-                # Container isolado para garantir estabilidade visual na página principal
                 with st.container(key="container_lista_planos_master"):
                     for _, plano in df_planos_master.iterrows():
                         pid = plano['id']
@@ -2528,9 +2578,7 @@ else:
                         else:
                             texto_periodicidade = f"A cada {p_ival} dias"
 
-                        # st.expander nativo com os detalhes ocultos até o clique
                         with st.expander(f"📦 {p_nome} — [{p_tipo}] | {texto_periodicidade}"):
-                            # Cabeçalho interno limpo com botões de Ação do Plano bem distribuídos
                             col_info, col_b1, col_b2 = st.columns([0.6, 0.2, 0.2])
                             with col_info:
                                 st.markdown(f"**Veículos Vinculados:** `{p_veiculos}`")
@@ -2547,7 +2595,6 @@ else:
                                 st.warning("Plano excluído com sucesso!")
                                 st.rerun()
 
-                            # Edição do Plano Master
                             if btn_edita:
                                 st.session_state[f"editando_{pid}"] = True
 
@@ -2638,6 +2685,68 @@ else:
                                 st.info("⚠️ Nenhum serviço foi vinculado a este plano ainda.")
             else:
                 st.info("Nenhum plano cadastrado.")
+
+        with sub_aba_cad3:
+            st.markdown("### ⚡ Geração de Ordens de Serviço em Lote via Planos Master")
+            st.info("💡 Selecione um plano cadastrado, escolha a data de execução e selecione quais veículos receberão a OS simultaneamente.")
+
+            df_planos_lote = pd.read_sql(text("SELECT id, nome_plano, tipo_os, prefixo, tipo_criterio, intervalo_valor FROM planos_master WHERE empresa_id = :eid"), engine, params={"eid": str(emp_id)})
+
+            if not df_planos_lote.empty:
+                mapa_p_lote = {f"{row['nome_plano']} ({row['tipo_os']} - Cada {row['intervalo_valor']} {row['tipo_criterio'].lower()})": row['id'] for _, row in df_planos_lote.iterrows()}
+                plano_lote_escolhido = st.selectbox("Selecione o Plano Master", list(mapa_p_lote.keys()), key="sel_plano_lote")
+                id_plano_lote = mapa_p_lote[plano_lote_escolhido]
+                
+                dados_plano_atual = df_planos_lote[df_planos_lote['id'] == id_plano_lote].iloc[0]
+                prefixos_padrao = [p.strip() for p in str(dados_plano_atual['prefixo']).split(",") if p.strip()]
+
+                with st.form("form_geracao_lote_os"):
+                    dt_lote = st.date_input("Data de Execução Programada", datetime.now(), key="dt_lote_exec")
+                    turno_lote = st.selectbox("Turno", LISTA_TURNOS, key="turno_lote_exec")
+                    executor_lote = st.text_input("Executor / Mecânico Padrão", key="exec_lote_exec")
+                    
+                    veiculos_selecionados = st.multiselect(
+                        "Veículos / Equipamentos Alvo para esta OS",
+                        options=prefixos_padrao,
+                        default=prefixos_padrao,
+                        key="multi_veiculos_lote"
+                    )
+                    
+                    if st.form_submit_button("🚀 Gerar OSs para os Veículos Selecionados"):
+                        if veiculos_selecionados:
+                            df_serv_lote = pd.read_sql(text("SELECT descricao_servico FROM servicos_plano WHERE plano_id = :pid"), engine, params={"pid": int(id_plano_lote)})
+                            
+                            if not df_serv_lote.empty:
+                                descricao_unificada = " | ".join(df_serv_lote['descricao_servico'].tolist())
+                                
+                                with engine.connect() as conn:
+                                    contador_gerados = 0
+                                    for pref in veiculos_selecionados:
+                                        nova_os = obter_proxima_os(engine, emp_id)
+                                        h_prox, o_prox = obter_medidor_proximo(engine, emp_id, pref, dt_lote)
+                                        desc_final_os = f"[{dados_plano_atual['nome_plano']}] Servicos: {descricao_unificada} | [Leitura Ref: Horímetro {h_prox}h, Odômetro {o_prox}km]"
+                                        
+                                        conn.execute(
+                                            text("""
+                                                INSERT INTO tarefas (data, executor, prefixo, inicio_disp, fim_disp, descricao, area, tipo_os, turno, plano_id, origem, empresa_id, numero_os) 
+                                                VALUES (:dt, :ex, :pr, '08:00', '10:00', :ds, 'Mecânica', :tp, :tu, :pid, 'Plano Master', :eid, :nos)
+                                            """), 
+                                            {
+                                                "dt": str(dt_lote), "ex": executor_lote, "pr": pref, 
+                                                "ds": desc_final_os, "tp": dados_plano_atual['tipo_os'], "tu": turno_lote, 
+                                                "pid": int(id_plano_lote), "eid": str(emp_id), "nos": nova_os
+                                            }
+                                        )
+                                        contador_gerados += 1
+                                    conn.commit()
+                                st.success(f"✅ {contador_gerados} Ordens de Serviço geradas e enviadas para a Agenda Principal com sucesso!")
+                                st.rerun()
+                            else:
+                                st.warning("⚠️ Este plano master não possui serviços cadastrados para gerar a OS.")
+                        else:
+                            st.warning("Selecione pelo menos um veículo.")
+            else:
+                st.info("Nenhum plano master cadastrado para geração em lote.")
                 
     elif "Alimentar Horímetros" in aba_ativa:
         st.subheader("⚡ Alimentação de Horímetros e Odômetros da Frota")
