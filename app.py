@@ -2411,31 +2411,32 @@ else:
 
         with sub_aba_cad2:
             st.markdown("### 📚 Gestão de Planos Master e Serviços")
-            st.info("💡 Cadastre o plano informando a periodicidade e os veículos. Os detalhes dos planos aparecem abaixo no fluxo normal da página.")
+            st.info("💡 Cadastre o plano, defina a periodicidade e adicione os serviços. Para planos preditivos, os campos de tolerância aparecem instantaneamente ao marcar o flag.")
             
-            # --- FORMULÁRIO 1: CRIAR O PLANO MASTER ---
+            # --- FORMULÁRIO 1: CRIAR O PLANO MASTER COM ESTADO REATIVO DE PERIODICIDADE ---
+            if "crit_anterior" not in st.session_state:
+                st.session_state.crit_anterior = "Odômetro"
+
             with st.form("form_novo_plano", clear_on_submit=True):
                 st.markdown("#### ➕ Criar Novo Plano Master")
-                p_nome = st.text_input("Nome do Plano (Ex: Revisão 250h - Motor)")
+                p_nome = st.text_input("Nome do Plano (Ex: Preventiva Quinzenal)")
                 p_tipo = st.selectbox("Tipo de Plano / OS", ["Preventiva", "Preditiva", "Checklist"])
                 
                 c_p1, c_p2 = st.columns(2)
-                p_criterio = c_p1.selectbox("Critério de Periodicidade", ["Dias", "Horímetro", "Odômetro"], index=2)
+                p_criterio = c_p1.selectbox("Critério de Periodicidade", ["Dias", "Horímetro", "Odômetro"], key="select_criterio_master")
                 
-                # Define a sugestão inicial baseada no critério, mas permitindo edição total livre
+                # Define sugestão reativa baseada na escolha atual
                 if p_criterio == "Dias":
-                    val_sugerido = 30
-                    label_intervalo = "Valor do Intervalo (Editável em dias)"
+                    val_padrao = 30
+                    lbl_int = "Valor do Intervalo (Ex: 15 ou 30 dias)"
                 elif p_criterio == "Horímetro":
-                    val_sugerido = 250
-                    label_intervalo = "Valor do Intervalo (Editável em horas)"
+                    val_padrao = 250
+                    lbl_int = "Valor do Intervalo (Ex: 250 horas)"
                 else:
-                    val_sugerido = 10000
-                    label_intervalo = "Valor do Intervalo (Editável em km)"
+                    val_padrao = 10000
+                    lbl_int = "Valor do Intervalo (Ex: 10.000 km)"
                 
-                # O usuário pode alterar livremente este número para qualquer valor desejado
-                p_intervalo = c_p2.number_input(label_intervalo, min_value=1, value=val_sugerido, step=1)
-                
+                p_intervalo = c_p2.number_input(lbl_int, min_value=1, value=val_padrao, step=1, key="input_val_intervalo")
                 p_prefs = st.text_input("Prefixos dos Veículos Vinculados (Separe por vírgula, ex: 101, 102, 103)")
                 
                 if st.form_submit_button("💾 Salvar Novo Plano Master"):
@@ -2459,7 +2460,7 @@ else:
 
             st.divider()
 
-            # --- FORMULÁRIO 2: ADICIONAR SERVIÇOS AO PLANO SELECIONADO ---
+            # --- FORMULÁRIO 2: ADICIONAR SERVIÇOS (COM FLAG REATIVO SEM SUMIR A DESCRIÇÃO) ---
             st.markdown("#### ➕ Adicionar Serviços a um Plano Existente")
             
             df_m_box = pd.read_sql(text("SELECT id, nome_plano, tipo_os FROM planos_master WHERE empresa_id = :eid"), engine, params={"eid": str(emp_id)})
@@ -2471,22 +2472,24 @@ else:
                 
                 tipo_do_plano_atual = df_m_box[df_m_box['id'] == id_plano_ativo].iloc[0]['tipo_os']
 
-                with st.form("form_add_servico_plano", clear_on_submit=True):
-                    s_desc = st.text_input("Descrição do Serviço Específico (Ex: Troca de Óleo do Sistema)")
+                # Removido o st.form fechado neste bloco para permitir reatividade instantânea do checkbox de preditiva
+                with st.container(border=True):
+                    s_desc = st.text_input("Descrição do Serviço Específico (Ex: Medição de Vibração)", key="input_desc_servico_master")
                     
                     retorna_val = False
-                    min_tol, max_tol = None, None
+                    min_tol, max_tol = 0.0, 0.0
                     
                     if tipo_do_plano_atual == "Preditiva":
-                        retorna_val = st.checkbox("Este serviço retorna valor medido?")
+                        # Ao marcar este checkbox, os campos abrem imediatamente sem apagar o texto digitado acima
+                        retorna_val = st.checkbox("Este serviço retorna valor medido?", key="chk_retorna_valor_master")
                         if retorna_val:
                             col_m1, col_m2 = st.columns(2)
-                            min_tol = col_m1.number_input("Mínimo Tolerável", value=0.0)
-                            max_tol = col_m2.number_input("Máximo Tolerável", value=0.0)
+                            min_tol = col_m1.number_input("Mínimo Tolerável", value=0.0, key="num_min_toleravel")
+                            max_tol = col_m2.number_input("Máximo Tolerável", value=0.0, key="num_max_toleravel")
                     elif tipo_do_plano_atual == "Checklist":
                         st.caption("ℹ️ Este item será avaliado como Conforme (C) ou Não Conforme (NC) na baixa da OS.")
 
-                    if st.form_submit_button("➕ Adicionar Serviço ao Plano"):
+                    if st.button("➕ Adicionar Serviço ao Plano", type="primary", key="btn_add_servico_direto_master"):
                         if s_desc:
                             with engine.connect() as conn:
                                 conn.execute(
@@ -2502,9 +2505,9 @@ else:
                 st.info("Cadastre um Plano Master acima para poder inserir serviços nele.")
 
             st.divider()
-            st.subheader("📋 Planos Cadastrados (Serviços e Veículos)")
+            st.subheader("📋 Planos Cadastrados (Com Opção de Edição e Exclusão)")
             
-            # --- LISTAGEM COM CONTAINER FIXO COM BORDA (ELIMINA QUALQUER RISCO DE FLUTUAÇÃO) ---
+            # --- LISTAGEM COM OPÇÃO DE EDIÇÃO DOS PLANOS JÁ EXISTENTES ---
             df_planos_master = pd.read_sql(text("SELECT id, nome_plano, tipo_os, prefixo, tipo_criterio, intervalo_valor FROM planos_master WHERE empresa_id = :eid ORDER BY id DESC"), engine, params={"eid": str(emp_id)})
             
             if not df_planos_master.empty:
@@ -2528,16 +2531,47 @@ else:
                         with c_t1:
                             st.markdown(f"📦 **{p_nome}** — `[{p_tipo}]` | *{texto_periodicidade}*")
                         with c_t2:
-                            if st.button("🗑️ Excluir Plano", key=f"del_plano_{pid}", use_container_width=True):
+                            col_e1, col_e2 = st.columns(2)
+                            btn_edita = col_e1.button("✏️ Editar", key=f"edit_p_{pid}", use_container_width=True)
+                            btn_exclui = col_e2.button("🗑️ Excluir", key=f"del_p_{pid}", use_container_width=True)
+                            
+                            if btn_exclui:
                                 with engine.connect() as conn:
                                     conn.execute(text("DELETE FROM servicos_plano WHERE plano_id = :pid"), {"pid": int(pid)})
                                     conn.execute(text("DELETE FROM planos_master WHERE id = :pid"), {"pid": int(pid)})
                                     conn.commit()
                                 st.warning("Plano excluído com sucesso!")
                                 st.rerun()
-                        
-                        st.markdown(f"**Veículos / Equipamentos Vinculados:** `{p_veiculos}`")
-                        
+
+                        # Se o usuário clicar em Editar, abre campos interativos para alterar direto na tela
+                        if btn_edita:
+                            st.session_state[f"editando_{pid}"] = True
+
+                        if st.session_state.get(f"editando_{pid}", False):
+                            with st.form(f"form_edicao_plano_{pid}"):
+                                novo_nome = st.text_input("Alterar Nome do Plano", value=p_nome)
+                                nc1, nc2 = st.columns(2)
+                                novo_crit = nc1.selectbox("Critério", ["Dias", "Horímetro", "Odômetro"], index=["Dias", "Horímetro", "Odômetro"].index(p_crit) if p_crit in ["Dias", "Horímetro", "Odômetro"] else 0)
+                                novo_ival = nc2.number_input("Intervalo", value=int(p_ival), min_value=1)
+                                novo_veiculos = st.text_input("Veículos Vinculados", value=p_veiculos)
+                                
+                                c_salvar, c_cancelar = st.columns(2)
+                                if c_salvar.form_submit_button("💾 Salvar Alterações"):
+                                    with engine.connect() as conn:
+                                        conn.execute(
+                                            text("UPDATE planos_master SET nome_plano = :nome, tipo_criterio = :crit, intervalo_valor = :ival, prefixo = :pref WHERE id = :pid"),
+                                            {"nome": novo_nome, "crit": novo_crit, "ival": int(novo_ival), "pref": novo_veiculos, "pid": int(pid)}
+                                        )
+                                        conn.commit()
+                                    st.session_state[f"editando_{pid}"] = False
+                                    st.success("✅ Plano atualizado com sucesso!")
+                                    st.rerun()
+                                if c_cancelar.form_submit_button("❌ Cancelar"):
+                                    st.session_state[f"editando_{pid}"] = False
+                                    st.rerun()
+                        else:
+                            st.markdown(f"**Veículos / Equipamentos Vinculados:** `{p_veiculos}`")
+                            
                         df_servicos_vinculados = pd.read_sql(text("SELECT id, descricao_servico, retorna_valor, min_toleravel, max_toleravel FROM servicos_plano WHERE plano_id = :pid"), engine, params={"pid": int(pid)})
                         
                         st.markdown("---")
