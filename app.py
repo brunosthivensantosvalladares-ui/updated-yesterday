@@ -2492,14 +2492,17 @@ else:
                 st.info("Cadastre um Plano Master acima para poder inserir serviços nele.")
 
             st.divider()
+            
+            # --- SEÇÃO PRINCIPAL DE PLANOS CADASTRADOS ---
             st.subheader("📋 Planos Cadastrados (Clique para Expandir e Ver Serviços/Veículos)")
             
-            # --- LISTAGEM CORRETA ALINHADA NO FLUXO DA PÁGINA ---
+            # Busca os planos no banco
             df_planos_master = pd.read_sql(text("SELECT id, nome_plano, tipo_os, prefixo, tipo_criterio, intervalo_valor FROM planos_master WHERE empresa_id = :eid ORDER BY id DESC"), engine, params={"eid": str(emp_id)})
             
             if not df_planos_master.empty:
-                # Contêiner limpo para garantir que os expanders fiquem no lugar certo
-                with st.container():
+                # Contêiner dedicado para manter os planos estritamente na posição correta
+                container_planos = st.container()
+                with container_planos:
                     for _, plano in df_planos_master.iterrows():
                         pid = plano['id']
                         p_nome = plano['nome_plano']
@@ -2515,6 +2518,7 @@ else:
                         else:
                             texto_periodicidade = f"A cada {p_ival} dias"
 
+                        # Cada expander é gerado dentro do fluxo normal da página
                         with st.expander(f"📦 {p_nome} — [{p_tipo}] | {texto_periodicidade}"):
                             c_inf1, c_inf2 = st.columns([0.75, 0.25])
                             with c_inf1:
