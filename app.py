@@ -525,9 +525,10 @@ def renderizar_chat_flutuante(emp_id):
     qtd_analises = len(st.session_state.get("analises_halley", []))
     label_status = f"💬 Mr. Halley ({qtd_analises})" if qtd_analises > 0 else "💬 Mr. Halley (IA)"
 
+    # CSS restrito exclusivamente à chave do expander do chat flutuante (não afeta o resto do sistema)
     st.markdown("""
         <style>
-        div[data-testid="stExpander"] {
+        div.st-key-chat_flutuante_expander div[data-testid="stExpander"] {
             position: fixed !important;
             bottom: 20px !important;
             right: 20px !important;
@@ -539,17 +540,17 @@ def renderizar_chat_flutuante(emp_id):
             box-shadow: 0px 6px 20px rgba(0, 0, 0, 0.25) !important;
         }
 
-        details[data-testid="stExpander"][open] {
+        div.st-key-chat_flutuante_expander details[data-testid="stExpander"][open] {
             max-height: 80vh !important;
         }
 
-        div[data-testid="stExpander"] div[data-testid="stChatMessage"] p {
+        div.st-key-chat_flutuante_expander div[data-testid="stExpander"] div[data-testid="stChatMessage"] p {
             font-size: 0.95rem !important;
             line-height: 1.45 !important;
         }
 
-        div[data-testid="stExpander"] div[data-testid="stChatMessage"] img,
-        div[data-testid="stExpander"] div[data-testid="stChatMessageAvatarCustom"] {
+        div.st-key-chat_flutuante_expander div[data-testid="stExpander"] div[data-testid="stChatMessage"] img,
+        div.st-key-chat_flutuante_expander div[data-testid="stExpander"] div[data-testid="stChatMessageAvatarCustom"] {
             width: 44px !important;
             height: 44px !important;
             min-width: 44px !important;
@@ -559,38 +560,39 @@ def renderizar_chat_flutuante(emp_id):
         </style>
     """, unsafe_allow_html=True)
 
-    with st.expander(label_status, expanded=st.session_state.chat_aberto_usuario):
-        chat_box = st.container(height=390)
-        with chat_box:
-            for msg in st.session_state.mensagens_chat_halley:
-                avatar = URL_AVATAR_HALLEY if msg["role"] == "assistant" else "👤"
-                with st.chat_message(msg["role"], avatar=avatar):
-                    st.markdown(msg["content"])
-
-        if prompt := st.chat_input("Dúvida técnica ou agendar OS...", key="chat_flutuante_input"):
-            st.session_state.chat_aberto_usuario = True
-            st.session_state.mensagens_chat_halley.append({"role": "user", "content": prompt})
+    with st.container(key="chat_flutuante_expander"):
+        with st.expander(label_status, expanded=st.session_state.chat_aberto_usuario):
+            chat_box = st.container(height=390)
             with chat_box:
-                with st.chat_message("user", avatar="👤"):
-                    st.markdown(prompt)
-                with st.chat_message("assistant", avatar=URL_AVATAR_HALLEY):
-                    with st.spinner("Processando..."):
-                        resp = responder_chat_mr_halley(prompt, emp_id)
-                        st.markdown(resp)
-            st.session_state.mensagens_chat_halley.append({"role": "assistant", "content": resp})
-            
-            components.html("""
-                <script>
-                    const doc = window.parent.document;
-                    const chatContainers = doc.querySelectorAll('div[data-testid="stVerticalBlock"]');
-                    chatContainers.forEach(container => {
-                        if (container.scrollTop !== undefined) {
-                            container.scrollTop = container.scrollHeight;
-                        }
-                    });
-                </script>
-            """, height=0)
-            st.rerun()
+                for msg in st.session_state.mensagens_chat_halley:
+                    avatar = URL_AVATAR_HALLEY if msg["role"] == "assistant" else "👤"
+                    with st.chat_message(msg["role"], avatar=avatar):
+                        st.markdown(msg["content"])
+
+            if prompt := st.chat_input("Dúvida técnica ou agendar OS...", key="chat_flutuante_input"):
+                st.session_state.chat_aberto_usuario = True
+                st.session_state.mensagens_chat_halley.append({"role": "user", "content": prompt})
+                with chat_box:
+                    with st.chat_message("user", avatar="👤"):
+                        st.markdown(prompt)
+                    with st.chat_message("assistant", avatar=URL_AVATAR_HALLEY):
+                        with st.spinner("Processando..."):
+                            resp = responder_chat_mr_halley(prompt, emp_id)
+                            st.markdown(resp)
+                st.session_state.mensagens_chat_halley.append({"role": "assistant", "content": resp})
+                
+                components.html("""
+                    <script>
+                        const doc = window.parent.document;
+                        const chatContainers = doc.querySelectorAll('div[data-testid="stVerticalBlock"]');
+                        chatContainers.forEach(container => {
+                            if (container.scrollTop !== undefined) {
+                                container.scrollTop = container.scrollHeight;
+                            }
+                        });
+                    </script>
+                """, height=0)
+                st.rerun()
             
 def gerar_pdf_manual_oficial_pro():
     class PDF(FPDF):
@@ -2409,7 +2411,7 @@ else:
 
         with sub_aba_cad2:
             st.markdown("### 📚 Gestão de Planos Master e Serviços")
-            st.info("💡 Cadastre o plano informando a periodicidade e os veículos. Expanda os planos abaixo para gerenciar seus serviços.")
+            st.info("💡 Cadastre o plano informando a periodicidade e os veículos. Os detalhes dos planos aparecem abaixo no fluxo normal da página.")
             
             # --- FORMULÁRIO 1: CRIAR O PLANO MASTER ---
             with st.form("form_novo_plano", clear_on_submit=True):
@@ -2488,9 +2490,9 @@ else:
                 st.info("Cadastre um Plano Master acima para poder inserir serviços nele.")
 
             st.divider()
-            st.subheader("📋 Planos Cadastrados (Clique para Expandir e Ver Serviços/Veículos)")
+            st.subheader("📋 Planos Cadastrados (Serviços e Veículos)")
             
-            # --- LISTAGEM COM EXPANDER (SEM A LISTA GERAL DE SERVIÇOS AQUI) ---
+            # --- LISTAGEM COM CONTAINER FIXO COM BORDA (ELIMINA QUALQUER RISCO DE FLUTUAÇÃO) ---
             df_planos_master = pd.read_sql(text("SELECT id, nome_plano, tipo_os, prefixo, tipo_criterio, intervalo_valor FROM planos_master WHERE empresa_id = :eid ORDER BY id DESC"), engine, params={"eid": str(emp_id)})
             
             if not df_planos_master.empty:
@@ -2509,12 +2511,12 @@ else:
                     else:
                         texto_periodicidade = f"A cada {p_ival} dias"
 
-                    with st.expander(f"📦 {p_nome} — [{p_tipo}] | {texto_periodicidade}"):
-                        c_inf1, c_inf2 = st.columns([0.75, 0.25])
-                        with c_inf1:
-                            st.markdown(f"**Veículos / Equipamentos Vinculados:** `{p_veiculos}`")
-                        with c_inf2:
-                            if st.button("🗑️ Excluir Plano", key=f"del_plano_{pid}"):
+                    with st.container(border=True):
+                        c_t1, c_t2 = st.columns([0.75, 0.25])
+                        with c_t1:
+                            st.markdown(f"📦 **{p_nome}** — `[{p_tipo}]` | *{texto_periodicidade}*")
+                        with c_t2:
+                            if st.button("🗑️ Excluir Plano", key=f"del_plano_{pid}", use_container_width=True):
                                 with engine.connect() as conn:
                                     conn.execute(text("DELETE FROM servicos_plano WHERE plano_id = :pid"), {"pid": int(pid)})
                                     conn.execute(text("DELETE FROM planos_master WHERE id = :pid"), {"pid": int(pid)})
@@ -2522,9 +2524,12 @@ else:
                                 st.warning("Plano excluído com sucesso!")
                                 st.rerun()
                         
+                        st.markdown(f"**Veículos / Equipamentos Vinculados:** `{p_veiculos}`")
+                        
                         df_servicos_vinculados = pd.read_sql(text("SELECT id, descricao_servico, retorna_valor, min_toleravel, max_toleravel FROM servicos_plano WHERE plano_id = :pid"), engine, params={"pid": int(pid)})
                         
-                        st.markdown("#### 🛠️ Serviços deste Plano:")
+                        st.markdown("---")
+                        st.markdown("**🛠️ Serviços deste Plano:**")
                         if not df_servicos_vinculados.empty:
                             for _, serv in df_servicos_vinculados.iterrows():
                                 info_extra = ""
@@ -2535,7 +2540,7 @@ else:
                             st.info("⚠️ Nenhum serviço foi vinculado a este plano ainda.")
             else:
                 st.info("Nenhum plano cadastrado.")
-
+                
     elif "Alimentar Horímetros" in aba_ativa:
         st.subheader("⚡ Alimentação de Horímetros e Odômetros da Frota")
         st.info("💡 Alimente regularmente as leituras para que o sistema cruze com as datas de realização das OSs. Você também pode extrair a lista em Excel abaixo.")
