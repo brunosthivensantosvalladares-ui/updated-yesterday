@@ -1503,7 +1503,6 @@ else:
 
         for indice, opcao in enumerate(opcoes):
             if opcao == "🗎  Cadastro Direto":
-                # Botão principal que ativa a seção
                 st.button(
                     traduzir_nav(opcao),
                     key=f"nav_btn_{indice}_{st.session_state.radio_key}",
@@ -1512,7 +1511,6 @@ else:
                     on_click=set_nav,
                     args=(opcao,)
                 )
-                # Expander embutido logo abaixo do botão de Cadastro Direto sem rótulos extras
                 with st.expander("📂 Sub-opções", expanded=(st.session_state.opcao_selecionada == "🗎  Cadastro Direto")):
                     sub_opcoes = [
                         ("📝 Agendamento Direto", 0), 
@@ -1523,23 +1521,6 @@ else:
                         if st.button(so_label, key=f"sub_nav_{so_idx}", use_container_width=True, type="primary" if st.session_state.get("sub_aba_idx", 0) == so_idx and st.session_state.opcao_selecionada == "🗎  Cadastro Direto" else "secondary"):
                             st.session_state.opcao_selecionada = "🗎  Cadastro Direto"
                             st.session_state.sub_aba_idx = so_idx
-                            st.rerun()
-            else:
-                st.button(
-                    traduzir_nav(opcao),
-                    key=f"nav_btn_{indice}_{st.session_state.radio_key}",
-                    type="primary" if opcao == st.session_state.opcao_selecionada else "secondary",
-                    use_container_width=True,
-                    on_click=set_nav,
-                    args=(opcao,)
-                )
-                # Menu expansível na barra lateral para as 3 sub-abas de Cadastro Direto
-                with st.expander("📂 Opções de Cadastro", expanded=(st.session_state.opcao_selecionada == "🗎  Cadastro Direto")):
-                    sub_opcoes = ["📝 Agendamento Direto", "📚 Gerenciar Planos Master", "⚡ Gerar OS em Lote (Planos)"]
-                    for so in sub_opcoes:
-                        if st.button(so, key=f"sub_nav_{so}", use_container_width=True, type="primary" if st.session_state.get("sub_aba_selecionada") == so else "secondary"):
-                            st.session_state.opcao_selecionada = "🗎  Cadastro Direto"
-                            st.session_state.sub_aba_selecionada = so
                             st.rerun()
             else:
                 st.button(
@@ -2420,23 +2401,10 @@ else:
         if "sub_aba_idx" not in st.session_state:
             st.session_state.sub_aba_idx = 0
             
-        # Radio horizontal superior espelhado com o estado da barra lateral para garantir a aba correta
-        abas_nomes = ["📝 Agendamento Direto", "📚 Gerenciar Planos Master", "⚡ Gerar OS em Lote (Planos)"]
-        sub_escolhida = st.radio(
-            "Navegação interna", 
-            abas_nomes, 
-            index=st.session_state.sub_aba_idx, 
-            horizontal=True, 
-            label_visibility="collapsed",
-            key="radio_abas_cadastro_direto"
-        )
+        sub_aba_escolhida = st.session_state.sub_aba_idx
         
-        # Atualiza o índice caso o usuário clique diretamente nos botões das abas superiores
-        st.session_state.sub_aba_idx = abas_nomes.index(sub_escolhida)
-        
-        st.divider()
-
-        if st.session_state.sub_aba_idx == 0:
+        if sub_aba_escolhida == 0:
+            st.markdown("### 📝 Agendamento Direto")
             with st.popover("💡 Como usar o Cadastro Direto?"):
                 st.markdown("""
                     ### 📝 Guia Rápido - Cadastro
@@ -2519,7 +2487,7 @@ else:
                         conn.commit()
                     st.rerun()
 
-        elif st.session_state.sub_aba_idx == 1:
+        elif sub_aba_escolhida == 1:
             st.markdown("### 📚 Gestão de Planos Master e Serviços")
             st.info("💡 Cadastre o plano, defina a periodicidade, a área e adicione os serviços.")
             
