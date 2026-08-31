@@ -2494,55 +2494,55 @@ else:
             st.divider()
             
             # --- SEÇÃO PRINCIPAL DE PLANOS CADASTRADOS ---
-            st.subheader("📋 Planos Cadastrados (Clique para Expandir e Ver Serviços/Veículos)")
+            st.subheader("📋 Planos Cadastrados (Serviços e Veículos)")
             
-            # Busca os planos no banco
+            # Busca os planos no banco filtrando pela empresa ativa
             df_planos_master = pd.read_sql(text("SELECT id, nome_plano, tipo_os, prefixo, tipo_criterio, intervalo_valor FROM planos_master WHERE empresa_id = :eid ORDER BY id DESC"), engine, params={"eid": str(emp_id)})
             
             if not df_planos_master.empty:
-                # Contêiner dedicado para manter os planos estritamente na posição correta
-                container_planos = st.container()
-                with container_planos:
-                    for _, plano in df_planos_master.iterrows():
-                        pid = plano['id']
-                        p_nome = plano['nome_plano']
-                        p_tipo = plano['tipo_os']
-                        p_crit = plano['tipo_criterio']
-                        p_ival = plano['intervalo_valor']
-                        p_veiculos = plano['prefixo']
-                        
-                        if p_crit == "Odômetro":
-                            texto_periodicidade = f"A cada {p_ival:,} km".replace(",", ".")
-                        elif p_crit == "Horímetro":
-                            texto_periodicidade = f"A cada {p_ival} horas"
-                        else:
-                            texto_periodicidade = f"A cada {p_ival} dias"
+                for _, plano in df_planos_master.iterrows():
+                    pid = plano['id']
+                    p_nome = plano['nome_plano']
+                    p_tipo = plano['tipo_os']
+                    p_crit = plano['tipo_criterio']
+                    p_ival = plano['intervalo_valor']
+                    p_veiculos = plano['prefixo']
+                    
+                    if p_crit == "Odômetro":
+                        texto_periodicidade = f"A cada {p_ival:,} km".replace(",", ".")
+                    elif p_crit == "Horímetro":
+                        texto_periodicidade = f"A cada {p_ival} horas"
+                    else:
+                        texto_periodicidade = f"A cada {p_ival} dias"
 
-                        # Cada expander é gerado dentro do fluxo normal da página
-                        with st.expander(f"📦 {p_nome} — [{p_tipo}] | {texto_periodicidade}"):
-                            c_inf1, c_inf2 = st.columns([0.75, 0.25])
-                            with c_inf1:
-                                st.markdown(f"**Veículos / Equipamentos Vinculados:** `{p_veiculos}`")
-                            with c_inf2:
-                                if st.button("🗑️ Excluir Plano", key=f"del_plano_{pid}"):
-                                    with engine.connect() as conn:
-                                        conn.execute(text("DELETE FROM servicos_plano WHERE plano_id = :pid"), {"pid": int(pid)})
-                                        conn.execute(text("DELETE FROM planos_master WHERE id = :pid"), {"pid": int(pid)})
-                                        conn.commit()
-                                    st.warning("Plano excluído com sucesso!")
-                                    st.rerun()
-                            
-                            df_servicos_vinculados = pd.read_sql(text("SELECT id, descricao_servico, retorna_valor, min_toleravel, max_toleravel FROM servicos_plano WHERE plano_id = :pid"), engine, params={"pid": int(pid)})
-                            
-                            st.markdown("#### 🛠️ Serviços deste Plano:")
-                            if not df_servicos_vinculados.empty:
-                                for _, serv in df_servicos_vinculados.iterrows():
-                                    info_extra = ""
-                                    if serv['retorna_valor']:
-                                        info_extra = f" *(Retorna Valor | Mín: {serv['min_toleravel']} | Máx: {serv['max_toleravel']})*"
-                                    st.markdown(f"- {serv['descricao_servico']}{info_extra}")
-                            else:
-                                st.info("⚠️ Nenhum serviço foi vinculado a este plano ainda.")
+                    # Utiliza um container fixo com borda em vez do expander flutuante
+                    with st.container(border=True):
+                        c_t1, c_t2 = st.columns([0.75, 0.25])
+                        with c_t1:
+                            st.markdown(f"📦 **{p_nome}** — `[{p_tipo}]` | *{texto_periodicidade}*")
+                        with c_t2:
+                            if st.button("🗑️ Excluir Plano", key=f"del_plano_{pid}", use_container_width=True):
+                                with engine.connect() as conn:
+                                    conn.execute(text("DELETE FROM servicos_plano WHERE plano_id = :pid"), {"pid": int(pid)})
+                                    conn.execute(text("DELETE FROM planos_master WHERE id = :pid"), {"pid": int(pid)})
+                                    conn.commit()
+                                st.warning("Plano excluído com sucesso!")
+                                st.rerun()
+                        
+                        st.markdown(f"**Veículos / Equipamentos Vinculados:** `{p_veiculos}`")
+                        
+                        df_servicos_vinculados = pd.read_sql(text("SELECT id, descricao_servico, retorna_valor, min_toleravel, max_toleravel FROM servicos_plano WHERE plano_id = :pid"), engine, params={"pid": int(pid)})
+                        
+                        st.markdown("---")
+                        st.markdown("**🛠️ Serviços deste Plano:**")
+                        if not df_servicos_vinculados.empty:
+                            for _, serv in df_servicos_vinculados.iterrows():
+                                info_extra = ""
+                                if serv['retorna_valor']:
+                                    info_extra = f" *(Retorna Valor | Mín: {serv['min_toleravel']} | Máx: {serv['max_toleravel']})*"
+                                st.markdown(f"- {serv['descricao_servico']}{info_extra}")
+                        else:
+                            st.info("⚠️ Nenhum serviço foi vinculado a este plano ainda.")
             else:
                 st.info("Nenhum plano cadastrado.")
         
