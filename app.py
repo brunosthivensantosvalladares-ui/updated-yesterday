@@ -2377,7 +2377,7 @@ else:
                     st.success(f"✅ SERVIÇO AGENDADO! Nº {nova_os} (Horímetro ref: {h_prox}h | Odômetro ref: {o_prox}km)")
                     st.rerun()
 
-            # --- LISTA GERAL DE SERVIÇOS EXCLUSIVA DA ABA DE AGENDAMENTO DIRETO ---
+            # --- LISTA GERAL DE SERVIÇOS (APARECE APENAS AQUI NA SUB-ABA 1) ---
             st.divider()
             st.subheader("📋 Lista geral de serviços")
             df_lista = pd.read_sql(text("SELECT * FROM tarefas WHERE empresa_id = :eid ORDER BY data DESC, id DESC"), engine, params={"eid": str(emp_id)})
@@ -2385,8 +2385,6 @@ else:
             if not df_lista.empty:
                 df_lista['data'] = pd.to_datetime(df_lista['data']).dt.date
                 df_lista['Exc'] = False
-                
-                # Chave modificada para evitar conflito de duplicidade
                 ed_l = st.data_editor(df_lista[['Exc', 'data', 'turno', 'executor', 'prefixo', 'inicio_disp', 'fim_disp', 'descricao', 'area', 'id']], hide_index=True, use_container_width=True, key="ed_lista_servicos_direto")
                 
                 if st.button("🗑️ Excluir Selecionados", key="btn_excluir_servicos_direto"):
@@ -2410,19 +2408,16 @@ else:
 
         with sub_aba_cad2:
             st.markdown("### 📚 Gestão de Planos Master e Serviços")
-            st.info("💡 Cadastre o plano informando a periodicidade e os veículos. Depois, expanda os planos abaixo para gerenciar seus serviços e equipamentos.")
+            st.info("💡 Cadastre o plano informando a periodicidade e os veículos. Expanda os planos abaixo para gerenciar seus serviços.")
             
-            # --- FORMULÁRIO 1: CRIAR O PLANO MASTER (PADRÃO ODÔMETRO) ---
+            # --- FORMULÁRIO 1: CRIAR O PLANO MASTER ---
             with st.form("form_novo_plano", clear_on_submit=True):
                 st.markdown("#### ➕ Criar Novo Plano Master")
                 p_nome = st.text_input("Nome do Plano (Ex: Revisão 10.000 km - Caminhão)")
                 p_tipo = st.selectbox("Tipo de Plano / OS", ["Preventiva", "Preditiva", "Checklist"])
                 
                 c_p1, c_p2 = st.columns(2)
-                # Define "Odômetro" como o índice 2 (padrão inicial)
                 p_criterio = c_p1.selectbox("Critério de Periodicidade", ["Dias", "Horímetro", "Odômetro"], index=2)
-                
-                # Altera o texto de exemplo e o valor padrão para 10000
                 label_intervalo = f"Valor do Intervalo (Ex: 10.000 km)" if p_criterio == "Odômetro" else f"Valor do Intervalo (Ex: 250 para {p_criterio.lower()})"
                 p_intervalo = c_p2.number_input(label_intervalo, min_value=1, value=10000)
                 
@@ -2492,11 +2487,9 @@ else:
                 st.info("Cadastre um Plano Master acima para poder inserir serviços nele.")
 
             st.divider()
+            st.subheader("📋 Planos Cadastrados (Clique para Expandir e Ver Serviços/Veículos)")
             
-            # --- SEÇÃO PRINCIPAL DE PLANOS CADASTRADOS ---
-            st.subheader("📋 Planos Cadastrados (Serviços e Veículos)")
-            
-            # Busca os planos no banco filtrando pela empresa ativa
+            # --- LISTAGEM COM EXPANDER ESTABELECIDO NO FLUXO CORRETO (SEM DUPLICAÇÃO DA LISTA GERAL) ---
             df_planos_master = pd.read_sql(text("SELECT id, nome_plano, tipo_os, prefixo, tipo_criterio, intervalo_valor FROM planos_master WHERE empresa_id = :eid ORDER BY id DESC"), engine, params={"eid": str(emp_id)})
             
             if not df_planos_master.empty:
@@ -2515,13 +2508,13 @@ else:
                     else:
                         texto_periodicidade = f"A cada {p_ival} dias"
 
-                    # Utiliza um container fixo com borda em vez do expander flutuante
-                    with st.container(border=True):
-                        c_t1, c_t2 = st.columns([0.75, 0.25])
-                        with c_t1:
-                            st.markdown(f"📦 **{p_nome}** — `[{p_tipo}]` | *{texto_periodicidade}*")
-                        with c_t2:
-                            if st.button("🗑️ Excluir Plano", key=f"del_plano_{pid}", use_container_width=True):
+                    # Retorna ao uso do st.expander posicionado perfeitamente na página
+                    with st.expander(f"📦 {p_nome} — [{p_tipo}] | {texto_periodicidade}"):
+                        c_inf1, c_inf2 = st.columns([0.75, 0.25])
+                        with c_inf1:
+                            st.markdown(f"**Veículos / Equipamentos Vinculados:** `{p_veiculos}`")
+                        with c_inf2:
+                            if st.button("🗑️ Excluir Plano", key=f"del_plano_{pid}"):
                                 with engine.connect() as conn:
                                     conn.execute(text("DELETE FROM servicos_plano WHERE plano_id = :pid"), {"pid": int(pid)})
                                     conn.execute(text("DELETE FROM planos_master WHERE id = :pid"), {"pid": int(pid)})
@@ -2529,12 +2522,9 @@ else:
                                 st.warning("Plano excluído com sucesso!")
                                 st.rerun()
                         
-                        st.markdown(f"**Veículos / Equipamentos Vinculados:** `{p_veiculos}`")
-                        
                         df_servicos_vinculados = pd.read_sql(text("SELECT id, descricao_servico, retorna_valor, min_toleravel, max_toleravel FROM servicos_plano WHERE plano_id = :pid"), engine, params={"pid": int(pid)})
                         
-                        st.markdown("---")
-                        st.markdown("**🛠️ Serviços deste Plano:**")
+                        st.markdown("#### 🛠️ Serviços deste Plano:")
                         if not df_servicos_vinculados.empty:
                             for _, serv in df_servicos_vinculados.iterrows():
                                 info_extra = ""
