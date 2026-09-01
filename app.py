@@ -2091,6 +2091,14 @@ else:
                 with st.form("form_baixa_exclusiva"):
                     servico_realizado = st.text_area("O que foi feito de fato / Observações gerais?")
                     
+                    st.markdown("---")
+                    st.markdown("#### ⏱️ Dados de Encerramento e Medidores (Para controle de Planos)")
+                    
+                    col_b1, col_b2, col_b3 = st.columns(3)
+                    data_realizacao_baixa = col_b1.date_input("Data de Realização", datetime.now())
+                    horimetro_baixa = col_b2.number_input("Horímetro Atual (Opcional)", min_value=0.0, step=1.0, value=0.0)
+                    odometro_baixa = col_b3.number_input("Odômetro Atual (Opcional)", min_value=0.0, step=1.0, value=0.0)
+                    
                     # --- CAMPOS DINÂMICOS CONFORME O TIPO DE OS ---
                     respostas_tecnicas = ""
                     if tipo_os_atual == "Preditiva":
@@ -2111,23 +2119,64 @@ else:
                         if not servico_realizado:
                             st.error("A descrição do serviço é obrigatória.")
                         else:
-                            relato = f"Execução: {servico_realizado}{respostas_tecnicas}; Mecânico: {executor}; Horário: {h_ini}-{h_fim}"
+                            pref_veiculo = str(os_data['prefixo']).strip()
+                            
+                            # PRIORIDADE 1 & 2: Tratamento e Gravação dos Medidores
+                            h_final_gravacao = horimetro_baixa
+                            o_final_gravacao = odometro_baixa
+                            
                             with engine.begin() as conn:
+                                # Se o usuário não preencheu os medidores na baixa (Prioridade 2), tenta buscar na base com base na data
+                                if h_final_gravacao == 0.0 and o_final_gravacao == 0.0:
+                                    med_fallback = conn.execute(
+                                        text("""
+                                            SELECT horimetro, odometro, ABS(data_leitura - CAST(:dt AS DATE)) as diff_dias
+                                            FROM medidores_frota 
+                                            WHERE empresa_id = :eid AND prefixo = :pref
+                                            ORDER BY diff_dias ASC, data_leitura DESC
+                                            LIMIT 1
+                                        """),
+                                        {"eid": str(emp_id), "pref": pref_veiculo, "dt": str(data_realizacao_baixa)}
+                                    ).fetchone()
+                                    
+                                    if med_fallback:
+                                        h_final_gravacao = float(med_fallback[0] or 0.0)
+                                        o_final_gravacao = float(med_fallback[1] or 0.0)
+
+                                # Salva ou atualiza a leitura oficial do medidor vinculada a esta data de baixa
+                                if h_final_gravacao > 0 or o_final_gravacao > 0:
+                                    conn.execute(
+                                        text("""
+                                            INSERT INTO medidores_frota (empresa_id, prefixo, data_leitura, horimetro, odometro)
+                                            VALUES (:eid, :pref, :dt, :hor, :odo)
+                                        """),
+                                        {
+                                            "eid": str(emp_id), "pref": pref_veiculo, 
+                                            "dt": str(data_realizacao_baixa), 
+                                            "hor": h_final_gravacao, "odo": o_final_gravacao
+                                        }
+                                    )
+
+                                relato = f"Execução: {servico_realizado}{respostas_tecnicas}; Mecânico: {executor}; Horário: {h_ini}-{h_fim} | [Baixa - Horímetro: {h_final_gravacao}h, Odômetro: {o_final_gravacao}km]"
+                                
                                 query_update = text("""
                                     UPDATE tarefas 
                                     SET realizado = True, 
+                                        data = :dt_baixa,
                                         descricao = 'OS: ' || :os || '; Prefixo: ' || :pref || '; ' || COALESCE(descricao, '') || '; ' || :relato
                                     WHERE id = :id_banco 
                                     AND empresa_id = :eid
                                 """)
                                 conn.execute(query_update, {
+                                    "dt_baixa": str(data_realizacao_baixa),
                                     "relato": str(relato), "os": str(os_num),
-                                    "pref": str(os_data['prefixo']), "id_banco": int(os_data['id']),
+                                    "pref": pref_veiculo, "id_banco": int(os_data['id']),
                                     "eid": str(emp_id)
                                 })
+                                
                             st.cache_data.clear()
                             st.session_state.os_em_baixa = None
-                            st.success(f"✅ OS {os_num} finalizada com sucesso!")
+                            st.success(f"✅ OS {os_num} finalizada e métricas de controle atualizadas com sucesso!")
                             st.rerun()
 
         else:
