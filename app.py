@@ -947,6 +947,95 @@ st.markdown(f"""
         text-align: left !important;
         justify-content: flex-start !important;
     }}
+
+    button, 
+    button[kind="primary"], 
+    button[kind="secondary"], 
+    [data-testid="stBaseButton-primary"], 
+    [data-testid="stBaseButton-secondary"] {{
+        background-color: {COR_BRONZE} !important;
+        border: 1.5px solid {COR_OURO} !important;
+        border-radius: 6px !important;
+        color: #FFFFFF !important;
+    }}
+
+    button p, button span, button div,
+    [data-testid="stBaseButton-primary"] p, [data-testid="stBaseButton-primary"] span,
+    [data-testid="stBaseButton-secondary"] p, [data-testid="stBaseButton-secondary"] span {{
+        color: #FFFFFF !important;
+        -webkit-text-fill-color: #FFFFFF !important;
+    }}
+
+    div.stHorizontalBlock button[kind="primary"] {{
+        background-color: {COR_OURO} !important;
+        border: 2px solid {COR_BRONZE} !important;
+    }}
+
+    div.stHorizontalBlock button[kind="primary"] p, 
+    div.stHorizontalBlock button[kind="primary"] span, 
+    div.stHorizontalBlock button[kind="primary"] div {{
+        color: {COR_TEXTO} !important;
+        -webkit-text-fill-color: {COR_TEXTO} !important;
+    }}
+
+    .top-fixed-section {{
+        position: -webkit-sticky !important;
+        position: sticky !important;
+        top: 0px !important;
+        z-index: 99999 !important;
+        background-color: #F7F5F0 !important;
+        padding-top: 0px !important; 
+        padding-bottom: 2px !important;
+        border-bottom: 1.5px solid #E2D9CB !important;
+        box-shadow: 0 4px 16px rgba(35, 31, 32, 0.06) !important;
+        margin-left: -1.5rem !important;
+        margin-right: -1.5rem !important;
+        padding-left: 1.5rem !important;
+        padding-right: 1.5rem !important;
+        margin-bottom: 10px !important;
+        transform: translateY(-115px) !important; 
+    }}
+    
+    .top-fixed-section div[data-testid="stTextInput"] {{
+        margin-top: -2px !important;
+    }}
+    .top-fixed-section div[data-testid="stPopover"] button {{
+        padding: 4px 10px !important;
+        min-height: 38px !important;
+        font-size: 0.85rem !important;
+    }}
+
+    .metric-card {{
+        background: #FFFFFF;
+        border-radius: 18px;
+        padding: 22px;
+        border: 1px solid #EFEAE1;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.03);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }}
+    .metric-icon-box {{
+        width: 58px;
+        height: 58px;
+        border-radius: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.9rem;
+    }}
+    .metric-value {{
+        font-size: 2.2rem;
+        font-weight: 800;
+        color: #1F1915;
+        line-height: 1;
+        margin-top: 4px;
+    }}
+    .metric-label {{
+        font-size: 0.9rem;
+        color: #8F847B;
+        font-weight: 600;
+    }}
     </style>
 """, unsafe_allow_html=True)
 
