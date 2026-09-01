@@ -774,269 +774,269 @@ st.set_page_config(page_title=f"{NOME_SISTEMA} - Painel de Controle", layout="wi
 puxar_topo_para_cima()
 
 st.markdown(f"""
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&display=swap');
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&display=swap');
 
-    html, body, [data-testid="stAppViewContainer"], .stApp {{ 
-        background-color: {COR_CHAPA} !important; 
-        font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif !important;
-    }}
+html, body, [data-testid="stAppViewContainer"], .stApp {{ 
+    background-color: {COR_CHAPA} !important; 
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif !important;
+}}
 
-    header[data-testid="stHeader"] {{
-        background: transparent !important;
-        visibility: visible !important;
-        display: block !important;
-        height: 3rem !important;
-    }}
-    
-    .main, .main .block-container, div[data-testid="stMainBlockContainer"], div[data-testid="stAppViewBlockContainer"] {{
-        padding-top: 0rem !important;
-        margin-top: 0rem !important; 
-    }}
-    
-    section[data-testid="stSidebar"] {{ 
-        background: linear-gradient(180deg, #2A211B 0%, #1D1612 100%) !important; 
-        border-right: 1px solid #3D3128 !important;
-        overflow: hidden !important;
-    }}
-    section[data-testid="stSidebar"] > div:first-child {{
-        overflow: hidden !important;
-        padding-top: 0rem !important;
-        padding-bottom: 0.4rem !important;
-        padding-left: 0.6rem !important;
-        padding-right: 0.6rem !important;
-        display: flex !important;
-        flex-direction: column !important;
-        height: 100vh !important;
-    }}
-    section[data-testid="stSidebar"] * {{
-        color: #F0EDE6 !important;
-    }}
+header[data-testid="stHeader"] {{
+    background: transparent !important;
+    visibility: visible !important;
+    display: block !important;
+    height: 3rem !important;
+}}
 
-    section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] {{
-        gap: 0 !important;
-    }}
-    section[data-testid="stSidebar"] hr {{
-        margin: 2px 0 20px 0 !important;
-        border-color: rgba(197, 160, 89, 0.25) !important;
-    }}
+.main, .main .block-container, div[data-testid="stMainBlockContainer"], div[data-testid="stAppViewBlockContainer"] {{
+    padding-top: 0rem !important;
+    margin-top: 0rem !important; 
+}}
 
-    .logo-container-circular {{
-        margin: 0 auto !important;
-        border-radius: 50%;
-        overflow: hidden;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-    }}
-    .logo-img-crop {{
-        width: 100%;
-        height: 100%;
-        object-fit: cover !important;
-        display: block;
-        margin: 0 auto;
-        border-radius: 50%;
-    }}
-    
-    .brand-title-gold, .login-brand-title {{
-        font-family: 'Cinzel', serif !important;
-        font-weight: 800 !important;
-        font-size: 0.92rem !important;
-        letter-spacing: 1.2px !important;
-        background: linear-gradient(135deg, #E6C875 0%, #C5A059 50%, #9B783E 100%) !important;
-        -webkit-background-clip: text !important;
-        -webkit-text-fill-color: transparent !important;
-        margin: 3px auto 0 auto !important;
-        text-align: center !important;
-        text-transform: uppercase !important;
-        white-space: nowrap !important;
-        display: block !important;
-        width: 100% !important;
-    }}
+section[data-testid="stSidebar"] {{ 
+    background: linear-gradient(180deg, #2A211B 0%, #1D1612 100%) !important; 
+    border-right: 1px solid #3D3128 !important;
+    overflow: hidden !important;
+}}
+section[data-testid="stSidebar"] > div:first-child {{
+    overflow: hidden !important;
+    padding-top: 0rem !important;
+    padding-bottom: 0.4rem !important;
+    padding-left: 0.6rem !important;
+    padding-right: 0.6rem !important;
+    display: flex !important;
+    flex-direction: column !important;
+    height: 100vh !important;
+}}
+section[data-testid="stSidebar"] * {{
+    color: #F0EDE6 !important;
+}}
 
-    .sidebar-nav-title {{
-        margin: 10px 0 20px 0 !important;
-        padding: 0 !important;
-        font-size: 0.82rem !important;
-        line-height: 1.15 !important;
-        color: #F0EDE6 !important;
-    }}
+section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] {{
+    gap: 0 !important;
+}}
+section[data-testid="stSidebar"] hr {{
+    margin: 2px 0 20px 0 !important;
+    border-color: rgba(197, 160, 89, 0.25) !important;
+}}
 
-    section[data-testid="stSidebar"] button[kind="secondary"],
-    section[data-testid="stSidebar"] button[data-testid="stBaseButton-secondary"],
-    section[data-testid="stSidebar"] div[data-testid="stButton"] button[kind="secondary"] {{
-        width: 100% !important;
-        min-height: 30px !important;
-        height: 30px !important;
-        margin: 0 !important;
-        padding: 2px 8px !important;
-        border-radius: 8px !important;
-        font-size: 0.90rem !important;
-        line-height: 1 !important;
-        justify-content: flex-start !important;
-        text-align: left !important;
-        box-sizing: border-box !important;
-        background: transparent !important;
-        border-color: transparent !important;
-    }}
+.logo-container-circular {{
+    margin: 0 auto !important;
+    border-radius: 50%;
+    overflow: hidden;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}}
+.logo-img-crop {{
+    width: 100%;
+    height: 100%;
+    object-fit: cover !important;
+    display: block;
+    margin: 0 auto;
+    border-radius: 50%;
+}}
 
-    section[data-testid="stSidebar"] button[kind="secondary"] p,
-    section[data-testid="stSidebar"] button[kind="secondary"] span,
-    section[data-testid="stSidebar"] button[kind="secondary"] div,
-    section[data-testid="stSidebar"] button[data-testid="stBaseButton-secondary"] p,
-    section[data-testid="stSidebar"] button[data-testid="stBaseButton-secondary"] span,
-    section[data-testid="stSidebar"] button[data-testid="stBaseButton-secondary"] div {{
-        font-size: 0.90rem !important;
-        line-height: 1 !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        color: #FFFFFF !important;
-        -webkit-text-fill-color: #FFFFFF !important;
-        text-align: left !important;
-        justify-content: flex-start !important;
-    }}
+.brand-title-gold, .login-brand-title {{
+    font-family: 'Cinzel', serif !important;
+    font-weight: 800 !important;
+    font-size: 0.92rem !important;
+    letter-spacing: 1.2px !important;
+    background: linear-gradient(135deg, #E6C875 0%, #C5A059 50%, #9B783E 100%) !important;
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+    margin: 3px auto 0 auto !important;
+    text-align: center !important;
+    text-transform: uppercase !important;
+    white-space: nowrap !important;
+    display: block !important;
+    width: 100% !important;
+}}
 
-    section[data-testid="stSidebar"] button[kind="secondary"]:hover,
-    section[data-testid="stSidebar"] button[data-testid="stBaseButton-secondary"]:hover,
-    section[data-testid="stSidebar"] button[kind="primary"]:hover,
-    section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"]:hover {{
-        background: rgba(0, 0, 0, 0.38) !important;
-        border-color: rgba(197, 160, 89, 0.55) !important;
-        box-shadow: inset 0 0 0 1px rgba(197, 160, 89, 0.18), 0 2px 8px rgba(0, 0, 0, 0.22) !important;
-    }}
+.sidebar-nav-title {{
+    margin: 10px 0 20px 0 !important;
+    padding: 0 !important;
+    font-size: 0.82rem !important;
+    line-height: 1.15 !important;
+    color: #F0EDE6 !important;
+}}
 
-    section[data-testid="stSidebar"] button[kind="primary"],
-    section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"],
-    section[data-testid="stSidebar"] div[data-testid="stButton"] button[kind="primary"] {{
-        width: 100% !important;
-        min-height: 30px !important;
-        height: 30px !important;
-        margin: 0 !important;
-        padding: 2px 8px !important;
-        border-radius: 8px !important;
-        font-size: 0.90rem !important;
-        line-height: 1 !important;
-        justify-content: flex-start !important;
-        text-align: left !important;
-        box-sizing: border-box !important;
-        background: rgba(197, 160, 89, 0.32) !important;
-        border-color: rgba(197, 160, 89, 0.6) !important;
-        font-weight: 700 !important;
-    }}
+section[data-testid="stSidebar"] button[kind="secondary"],
+section[data-testid="stSidebar"] button[data-testid="stBaseButton-secondary"],
+section[data-testid="stSidebar"] div[data-testid="stButton"] button[kind="secondary"] {{
+    width: 100% !important;
+    min-height: 30px !important;
+    height: 30px !important;
+    margin: 0 !important;
+    padding: 2px 8px !important;
+    border-radius: 8px !important;
+    font-size: 0.90rem !important;
+    line-height: 1 !important;
+    justify-content: flex-start !important;
+    text-align: left !important;
+    box-sizing: border-box !important;
+    background: transparent !important;
+    border-color: transparent !important;
+}}
 
-    section[data-testid="stSidebar"] button[kind="primary"] p,
-    section[data-testid="stSidebar"] button[kind="primary"] span,
-    section[data-testid="stSidebar"] button[kind="primary"] div,
-    section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"] p,
-    section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"] span,
-    section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"] div {{
-        font-size: 0.90rem !important;
-        line-height: 1 !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        color: #FFFFFF !important;
-        -webkit-text-fill-color: #FFFFFF !important;
-        text-align: left !important;
-        justify-content: flex-start !important;
-    }}
+section[data-testid="stSidebar"] button[kind="secondary"] p,
+section[data-testid="stSidebar"] button[kind="secondary"] span,
+section[data-testid="stSidebar"] button[kind="secondary"] div,
+section[data-testid="stSidebar"] button[data-testid="stBaseButton-secondary"] p,
+section[data-testid="stSidebar"] button[data-testid="stBaseButton-secondary"] span,
+section[data-testid="stSidebar"] button[data-testid="stBaseButton-secondary"] div {{
+    font-size: 0.90rem !important;
+    line-height: 1 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    color: #FFFFFF !important;
+    -webkit-text-fill-color: #FFFFFF !important;
+    text-align: left !important;
+    justify-content: flex-start !important;
+}}
 
-    section[data-testid="stSidebar"] button:not([key^="nav_btn_"]) {{
-        padding: 0.30rem 0.6rem !important;
-        min-height: 30px !important;
-        font-size: 0.84rem !important;
-        text-align: left !important;
-        justify-content: flex-start !important;
-    }}
+section[data-testid="stSidebar"] button[kind="secondary"]:hover,
+section[data-testid="stSidebar"] button[data-testid="stBaseButton-secondary"]:hover,
+section[data-testid="stSidebar"] button[kind="primary"]:hover,
+section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"]:hover {{
+    background: rgba(0, 0, 0, 0.38) !important;
+    border-color: rgba(197, 160, 89, 0.55) !important;
+    box-shadow: inset 0 0 0 1px rgba(197, 160, 89, 0.18), 0 2px 8px rgba(0, 0, 0, 0.22) !important;
+}}
 
-    button, 
-    button[kind="primary"], 
-    button[kind="secondary"], 
-    [data-testid="stBaseButton-primary"], 
-    [data-testid="stBaseButton-secondary"] {{
-        background-color: {COR_BRONZE} !important;
-        border: 1.5px solid {COR_OURO} !important;
-        border-radius: 6px !important;
-        color: #FFFFFF !important;
-    }}
+section[data-testid="stSidebar"] button[kind="primary"],
+section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"],
+section[data-testid="stSidebar"] div[data-testid="stButton"] button[kind="primary"] {{
+    width: 100% !important;
+    min-height: 30px !important;
+    height: 30px !important;
+    margin: 0 !important;
+    padding: 2px 8px !important;
+    border-radius: 8px !important;
+    font-size: 0.90rem !important;
+    line-height: 1 !important;
+    justify-content: flex-start !important;
+    text-align: left !important;
+    box-sizing: border-box !important;
+    background: rgba(197, 160, 89, 0.32) !important;
+    border-color: rgba(197, 160, 89, 0.6) !important;
+    font-weight: 700 !important;
+}}
 
-    button p, button span, button div,
-    [data-testid="stBaseButton-primary"] p, [data-testid="stBaseButton-primary"] span,
-    [data-testid="stBaseButton-secondary"] p, [data-testid="stBaseButton-secondary"] span {{
-        color: #FFFFFF !important;
-        -webkit-text-fill-color: #FFFFFF !important;
-    }}
+section[data-testid="stSidebar"] button[kind="primary"] p,
+section[data-testid="stSidebar"] button[kind="primary"] span,
+section[data-testid="stSidebar"] button[kind="primary"] div,
+section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"] p,
+section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"] span,
+section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"] div {{
+    font-size: 0.90rem !important;
+    line-height: 1 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    color: #FFFFFF !important;
+    -webkit-text-fill-color: #FFFFFF !important;
+    text-align: left !important;
+    justify-content: flex-start !important;
+}}
 
-    div.stHorizontalBlock button[kind="primary"] {{
-        background-color: {COR_OURO} !important;
-        border: 2px solid {COR_BRONZE} !important;
-    }}
+section[data-testid="stSidebar"] button:not([key^="nav_btn_"]) {{
+    padding: 0.30rem 0.6rem !important;
+    min-height: 30px !important;
+    font-size: 0.84rem !important;
+    text-align: left !important;
+    justify-content: flex-start !important;
+}}
 
-    div.stHorizontalBlock button[kind="primary"] p, 
-    div.stHorizontalBlock button[kind="primary"] span, 
-    div.stHorizontalBlock button[kind="primary"] div {{
-        color: {COR_TEXTO} !important;
-        -webkit-text-fill-color: {COR_TEXTO} !important;
-    }}
+button, 
+button[kind="primary"], 
+button[kind="secondary"], 
+[data-testid="stBaseButton-primary"], 
+[data-testid="stBaseButton-secondary"] {{
+    background-color: {COR_BRONZE} !important;
+    border: 1.5px solid {COR_OURO} !important;
+    border-radius: 6px !important;
+    color: #FFFFFF !important;
+}}
 
-    .top-fixed-section {{
-        position: -webkit-sticky !important;
-        position: sticky !important;
-        top: 0px !important;
-        z-index: 99999 !important;
-        background-color: #F7F5F0 !important;
-        padding-top: 0px !important; 
-        padding-bottom: 2px !important;
-        border-bottom: 1.5px solid #E2D9CB !important;
-        box-shadow: 0 4px 16px rgba(35, 31, 32, 0.06) !important;
-        margin-left: -1.5rem !important;
-        margin-right: -1.5rem !important;
-        padding-left: 1.5rem !important;
-        padding-right: 1.5rem !important;
-        margin-bottom: 10px !important;
-        transform: translateY(-115px) !important; 
-    }}
-    
-    .top-fixed-section div[data-testid="stTextInput"] {{
-        margin-top: -2px !important;
-    }}
-    .top-fixed-section div[data-testid="stPopover"] button {{
-        padding: 4px 10px !important;
-        min-height: 38px !important;
-        font-size: 0.85rem !important;
-    }}
+button p, button span, button div,
+[data-testid="stBaseButton-primary"] p, [data-testid="stBaseButton-primary"] span,
+[data-testid="stBaseButton-secondary"] p, [data-testid="stBaseButton-secondary"] span {{
+    color: #FFFFFF !important;
+    -webkit-text-fill-color: #FFFFFF !important;
+}}
 
-    .metric-card {{
-        background: #FFFFFF;
-        border-radius: 18px;
-        padding: 22px;
-        border: 1px solid #EFEAE1;
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.03);
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-    }}
-    .metric-icon-box {{
-        width: 58px;
-        height: 58px;
-        border-radius: 14px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.9rem;
-    }}
-    .metric-value {{
-        font-size: 2.2rem;
-        font-weight: 800;
-        color: #1F1915;
-        line-height: 1;
-        margin-top: 4px;
-    }}
-    .metric-label {{
-        font-size: 0.9rem;
-        color: #8F847B;
-        font-weight: 600;
-    }}
-    </style>
+div.stHorizontalBlock button[kind="primary"] {{
+    background-color: {COR_OURO} !important;
+    border: 2px solid {COR_BRONZE} !important;
+}}
+
+div.stHorizontalBlock button[kind="primary"] p, 
+div.stHorizontalBlock button[kind="primary"] span, 
+div.stHorizontalBlock button[kind="primary"] div {{
+    color: {COR_TEXTO} !important;
+    -webkit-text-fill-color: {COR_TEXTO} !important;
+}}
+
+.top-fixed-section {{
+    position: -webkit-sticky !important;
+    position: sticky !important;
+    top: 0px !important;
+    z-index: 99999 !important;
+    background-color: #F7F5F0 !important;
+    padding-top: 0px !important; 
+    padding-bottom: 2px !important;
+    border-bottom: 1.5px solid #E2D9CB !important;
+    box-shadow: 0 4px 16px rgba(35, 31, 32, 0.06) !important;
+    margin-left: -1.5rem !important;
+    margin-right: -1.5rem !important;
+    padding-left: 1.5rem !important;
+    padding-right: 1.5rem !important;
+    margin-bottom: 10px !important;
+    transform: translateY(-115px) !important; 
+}}
+
+.top-fixed-section div[data-testid="stTextInput"] {{
+    margin-top: -2px !important;
+}}
+.top-fixed-section div[data-testid="stPopover"] button {{
+    padding: 4px 10px !important;
+    min-height: 38px !important;
+    font-size: 0.85rem !important;
+}}
+
+.metric-card {{
+    background: #FFFFFF;
+    border-radius: 18px;
+    padding: 22px;
+    border: 1px solid #EFEAE1;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.03);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}}
+.metric-icon-box {{
+    width: 58px;
+    height: 58px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.9rem;
+}}
+.metric-value {{
+    font-size: 2.2rem;
+    font-weight: 800;
+    color: #1F1915;
+    line-height: 1;
+    margin-top: 4px;
+}}
+.metric-label {{
+    font-size: 0.9rem;
+    color: #8F847B;
+    font-weight: 600;
+}}
+</style>
 """, unsafe_allow_html=True)
 
     button, 
