@@ -1511,15 +1511,16 @@ else:
                 args=(opcao,)
             )
             
-            # Se for Cadastro Direto e estiver selecionado, exibe as sub-opções diretamente em lista limpa (sem pasta)
+            # Se for Cadastro Direto e estiver selecionado, exibe os subitens com recuo e setinha orientadora
             if opcao == "🗎  Cadastro Direto" and st.session_state.opcao_selecionada == "🗎  Cadastro Direto":
                 sub_opcoes_sidebar = [
-                    ("📝 Agendamento Direto", 0), 
-                    ("📚 Gerenciar Planos Master", 1), 
-                    ("⚡ Gerar OS em Lote (Planos)", 2)
+                    ("↳ 📝 Agendamento Direto", 0), 
+                    ("↳ 📚 Gerenciar Planos Master", 1), 
+                    ("↳ ⚡ Gerar OS em Lote (Planos)", 2)
                 ]
                 for so_label, so_idx in sub_opcoes_sidebar:
                     is_active_sub = st.session_state.get("sub_aba_idx", 0) == so_idx
+                    # Usamos HTML/Markdown customizado simulando recuo e destaque com a cor de bronze/ouro da paleta
                     if st.button(so_label, key=f"sidebar_sub_nav_{so_idx}", use_container_width=True, type="primary" if is_active_sub else "secondary"):
                         st.session_state.sub_aba_idx = so_idx
                         st.rerun()
@@ -2395,11 +2396,11 @@ else:
             
         abas_nomes = ["📝 Agendamento Direto", "📚 Gerenciar Planos Master", "⚡ Gerar OS em Lote (Planos)"]
         
-        # O rádio lê o estado atual e atualiza a seleção perfeitamente em sincronia com os botões
+        # Sincroniza o rádio com o índice atual guardado no session_state
         sub_escolhida = st.radio(
             "Navegação interna", 
             abas_nomes, 
-            index=st.session_state.sub_aba_idx, 
+            index=int(st.session_state.sub_aba_idx), 
             horizontal=True, 
             label_visibility="collapsed",
             key="radio_abas_cadastro_direto"
