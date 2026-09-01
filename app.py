@@ -892,6 +892,8 @@ st.markdown(f"""
         padding: 0 !important;
         color: #FFFFFF !important;
         -webkit-text-fill-color: #FFFFFF !important;
+        text-align: left !important;
+        justify-content: flex-start !important;
     }}
 
     section[data-testid="stSidebar"] button[kind="secondary"]:hover,
@@ -934,13 +936,19 @@ st.markdown(f"""
         padding: 0 !important;
         color: #FFFFFF !important;
         -webkit-text-fill-color: #FFFFFF !important;
+        text-align: left !important;
+        justify-content: flex-start !important;
     }}
 
     section[data-testid="stSidebar"] button:not([key^="nav_btn_"]) {{
         padding: 0.30rem 0.6rem !important;
         min-height: 30px !important;
         font-size: 0.84rem !important;
+        text-align: left !important;
+        justify-content: flex-start !important;
     }}
+    </style>
+""", unsafe_allow_html=True)
 
     button, 
     button[kind="primary"], 
