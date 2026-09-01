@@ -1511,19 +1511,22 @@ else:
                 args=(opcao,)
             )
             
-            # Se for Cadastro Direto e estiver selecionado, exibe os subitens com recuo e setinha orientadora
-            if opcao == "🗎  Cadastro Direto" and st.session_state.opcao_selecionada == "🗎  Cadastro Direto":
-                sub_opcoes_sidebar = [
-                    ("↳ 📝 Agendamento Direto", 0), 
-                    ("↳ 📚 Gerenciar Planos Master", 1), 
-                    ("↳ ⚡ Gerar OS em Lote (Planos)", 2)
-                ]
-                for so_label, so_idx in sub_opcoes_sidebar:
-                    is_active_sub = st.session_state.get("sub_aba_idx", 0) == so_idx
-                    # Usamos HTML/Markdown customizado simulando recuo e destaque com a cor de bronze/ouro da paleta
-                    if st.button(so_label, key=f"sidebar_sub_nav_{so_idx}", use_container_width=True, type="primary" if is_active_sub else "secondary"):
-                        st.session_state.sub_aba_idx = so_idx
-                        st.rerun()
+            # Expander nativo limpo na barra lateral para abrir/fechar com a setinha
+            if opcao == "🗎  Cadastro Direto":
+                # Controla se expande automaticamente caso a opção esteja ativa
+                is_cadastro_ativo = (st.session_state.opcao_selecionada == "🗎  Cadastro Direto")
+                with st.expander("▾ Sub-opções", expanded=is_cadastro_ativo):
+                    sub_opcoes_sidebar = [
+                        ("📝 Agendamento Direto", 0), 
+                        ("📚 Gerenciar Planos Master", 1), 
+                        ("⚡ Gerar OS em Lote (Planos)", 2)
+                    ]
+                    for so_label, so_idx in sub_opcoes_sidebar:
+                        is_active_sub = (is_cadastro_ativo and st.session_state.get("sub_aba_idx", 0) == so_idx)
+                        if st.button(so_label, key=f"sidebar_sub_nav_{so_idx}", use_container_width=True, type="primary" if is_active_sub else "secondary"):
+                            st.session_state.opcao_selecionada = "🗎  Cadastro Direto"
+                            st.session_state.sub_aba_idx = so_idx
+                            st.rerun()
         
         st.markdown("""
             <div style='margin-top: 3px; background: rgba(197, 160, 89, 0.08); border: 1px solid #C5A059; border-radius: 8px; padding: 8px 10px; margin-bottom: 4px;'>
