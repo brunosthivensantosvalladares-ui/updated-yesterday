@@ -118,6 +118,17 @@ def get_engine():
         st.stop()
     return create_engine(db_url.replace("postgres://", "postgresql://", 1), pool_pre_ping=True)
 
+# --- FUNÇÕES OTIMIZADAS COM CACHE DE CURTA DURAÇÃO PARA NAVEGAÇÃO INSTANTÂNEA ---
+@st.cache_data(ttl=30, show_spinner=False)
+def carregar_tarefas_empresa(emp_id):
+    engine = get_engine()
+    return pd.read_sql(text("SELECT * FROM tarefas WHERE empresa_id = :eid ORDER BY data DESC, id DESC"), engine, params={"eid": str(emp_id)})
+
+@st.cache_data(ttl=30, show_spinner=False)
+def carregar_planos_master_empresa(emp_id):
+    engine = get_engine()
+    return pd.read_sql(text("SELECT id, nome_plano, tipo_os, area, prefixo, tipo_criterio, intervalo_valor FROM planos_master WHERE empresa_id = :eid ORDER BY id DESC"), engine, params={"eid": str(emp_id)})
+
 # --- CONFIGURAÇÃO DO MODELO LLAMA 3 (GROQ) & BUSCA WEB ---
 def obter_llm():
     api_key = st.secrets.get("GROQ_API_KEY") or os.environ.get("GROQ_API_KEY")
@@ -1511,22 +1522,19 @@ else:
                 args=(opcao,)
             )
             
-            # Expander nativo limpo na barra lateral para abrir/fechar com a setinha
-            if opcao == "🗎  Cadastro Direto":
-                # Controla se expande automaticamente caso a opção esteja ativa
-                is_cadastro_ativo = (st.session_state.opcao_selecionada == "🗎  Cadastro Direto")
-                with st.expander("▾ Sub-opções", expanded=is_cadastro_ativo):
-                    sub_opcoes_sidebar = [
-                        ("📝 Agendamento Direto", 0), 
-                        ("📚 Gerenciar Planos Master", 1), 
-                        ("⚡ Gerar OS em Lote (Planos)", 2)
-                    ]
-                    for so_label, so_idx in sub_opcoes_sidebar:
-                        is_active_sub = (is_cadastro_ativo and st.session_state.get("sub_aba_idx", 0) == so_idx)
-                        if st.button(so_label, key=f"sidebar_sub_nav_{so_idx}", use_container_width=True, type="primary" if is_active_sub else "secondary"):
-                            st.session_state.opcao_selecionada = "🗎  Cadastro Direto"
-                            st.session_state.sub_aba_idx = so_idx
-                            st.rerun()
+            # Se for Cadastro Direto e estiver selecionado, exibe os subitens com recuo e setinha orientadora
+            if opcao == "🗎  Cadastro Direto" and st.session_state.opcao_selecionada == "🗎  Cadastro Direto":
+                sub_opcoes_sidebar = [
+                    ("↳ 📝 Agendamento Direto", 0), 
+                    ("↳ 📚 Gerenciar Planos Master", 1), 
+                    ("↳ ⚡ Gerar OS em Lote (Planos)", 2)
+                ]
+                for so_label, so_idx in sub_opcoes_sidebar:
+                    is_active_sub = st.session_state.get("sub_aba_idx", 0) == so_idx
+                    if st.button(so_label, key=f"sidebar_sub_nav_{so_idx}", use_container_width=True, type="primary" if is_active_sub else "secondary"):
+                        st.session_state.opcao_selecionada = "🗎  Cadastro Direto"
+                        st.session_state.sub_aba_idx = so_idx
+                        st.rerun()
         
         st.markdown("""
             <div style='margin-top: 3px; background: rgba(197, 160, 89, 0.08); border: 1px solid #C5A059; border-radius: 8px; padding: 8px 10px; margin-bottom: 4px;'>
@@ -2203,8 +2211,7 @@ else:
             st.stop()
 
         try:
-            query = text("SELECT numero_os, data, prefixo, descricao, realizado FROM tarefas WHERE empresa_id = :eid ORDER BY data DESC")
-            df_agenda = pd.read_sql(query, engine, params={"eid": str(emp_id)})
+            df_agenda = carregar_tarefas_empresa(emp_id)
             if not df_agenda.empty:
                 df_agenda['Nº OS'] = df_agenda['numero_os'].astype(str).replace(['None', 'nan', 'None.0'], '')
                 df_agenda['Nº OS'] = df_agenda['Nº OS'].str.replace('.0', '', regex=False)
@@ -2315,7 +2322,7 @@ else:
         st.divider()
         st.info("✍️ **Logística:** Clique nas colunas de **Início** ou **Fim** para preencher. **PCM:** Clique em **Área** ou **Executor** para definir. O salvamento é automático.")
         
-        df_a = pd.read_sql(text("SELECT * FROM tarefas WHERE empresa_id = :eid ORDER BY data DESC"), engine, params={"eid": str(emp_id)})
+        df_a = carregar_tarefas_empresa(emp_id)
         hoje_input, amanha = datetime.now().date(), datetime.now().date() + timedelta(days=1)
         
         c_per, c_area, c_turno = st.columns([0.4, 0.3, 0.3])
@@ -2399,7 +2406,6 @@ else:
             
         abas_nomes = ["📝 Agendamento Direto", "📚 Gerenciar Planos Master", "⚡ Gerar OS em Lote (Planos)"]
         
-        # Substitui o radio por colunas de botões customizados para sincronia perfeita e visual limpo
         cols_abas = st.columns(3)
         for idx_aba, nome_aba in enumerate(abas_nomes):
             ativo = (st.session_state.sub_aba_idx == idx_aba)
@@ -2467,7 +2473,7 @@ else:
             # --- LISTA GERAL DE SERVIÇOS EXCLUSIVA DA ABA DE AGENDAMENTO DIRETO ---
             st.divider()
             st.subheader("📋 Lista geral de serviços")
-            df_lista = pd.read_sql(text("SELECT * FROM tarefas WHERE empresa_id = :eid ORDER BY data DESC, id DESC"), engine, params={"eid": str(emp_id)})
+            df_lista = carregar_tarefas_empresa(emp_id)
             
             if not df_lista.empty:
                 df_lista['data'] = pd.to_datetime(df_lista['data']).dt.date
@@ -2588,7 +2594,7 @@ else:
             st.subheader("📋 Planos Cadastrados (Clique para Expandir e Gerenciar)")
             
             # --- LISTAGEM COM ACORDEÃO SEGURO ---
-            df_planos_master = pd.read_sql(text("SELECT id, nome_plano, tipo_os, area, prefixo, tipo_criterio, intervalo_valor FROM planos_master WHERE empresa_id = :eid ORDER BY id DESC"), engine, params={"eid": str(emp_id)})
+            df_planos_master = carregar_planos_master_empresa(emp_id)
             
             if not df_planos_master.empty:
                 with st.container(key="container_lista_planos_master"):
@@ -2721,7 +2727,7 @@ else:
             st.markdown("### ⚡ Geração de Ordens de Serviço em Lote via Planos Master")
             st.info("💡 Selecione um plano cadastrado, escolha a data de execução, os horários (opcionais) e os veículos para gerar as OSs.")
 
-            df_planos_lote = pd.read_sql(text("SELECT id, nome_plano, tipo_os, area, prefixo, tipo_criterio, intervalo_valor FROM planos_master WHERE empresa_id = :eid"), engine, params={"eid": str(emp_id)})
+            df_planos_lote = carregar_planos_master_empresa(emp_id)
 
             if not df_planos_lote.empty:
                 mapa_p_lote = {f"{row['nome_plano']} ({row['tipo_os']} - Cada {row['intervalo_valor']} {row['tipo_criterio'].lower()})": row['id'] for _, row in df_planos_lote.iterrows()}
