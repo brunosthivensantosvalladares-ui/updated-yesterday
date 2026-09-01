@@ -1927,56 +1927,102 @@ else:
                 """)
 
         # --- PAINEL DE MONITORAMENTO DE VENCIMENTOS DE PLANOS NO DASHBOARD ---
-        st.divider()
-        st.markdown("<h4 style='color: #2D241E; font-weight: 700; margin-bottom: 12px;'>⏳ Controle de Vencimentos de Planos por Veículo</h4>", unsafe_allow_html=True)
-        st.caption("Acompanhamento preditivo e preventivo do saldo restante (Horas, Quilômetros ou Dias) para a próxima manutenção.")
+    st.divider()
+    st.markdown("<h4 style='color: #2D241E; font-weight: 700; margin-bottom: 12px;'>⏳ Controle de Vencimentos de Planos por Veículo</h4>", unsafe_allow_html=True)
+    st.caption("Acompanhamento preditivo e preventivo do saldo restante (Horas, Quilômetros ou Dias) para a próxima manutenção. Ordenado por urgência.")
 
-        try:
-            df_planos_dash = pd.read_sql(text("SELECT id, nome_plano, tipo_os, prefixo, tipo_criterio, intervalo_valor FROM planos_master WHERE empresa_id = :eid"), engine, params={"eid": str(emp_id)})
+    try:
+        df_planos_dash = pd.read_sql(text("SELECT id, nome_plano, tipo_os, prefixo, tipo_criterio, intervalo_valor FROM planos_master WHERE empresa_id = :eid"), engine, params={"eid": str(emp_id)})
 
-            if not df_planos_dash.empty:
-                lista_status_frota = []
-                
-                with engine.connect() as conn:
-                    for _, p in df_planos_dash.iterrows():
-                        prefs = [x.strip() for x in str(p['prefixo']).split(",") if x.strip()]
-                        crit = p['tipo_criterio']
-                        intervalo_limite = float(p['intervalo_valor'])
+        if not df_planos_dash.empty:
+            lista_status_frota = []
+            
+            with engine.connect() as conn:
+                for _, p in df_planos_dash.iterrows():
+                    prefs = [x.strip() for x in str(p['prefixo']).split(",") if x.strip()]
+                    crit = p['tipo_criterio']
+                    intervalo_limite = float(p['intervalo_valor'])
+                    
+                    for pref in prefs:
+                        # 1. Pega a última leitura oficial cadastrada na tabela medidores_frota
+                        med = conn.execute(
+                            text("SELECT data_leitura, horimetro, odometro FROM medidores_frota WHERE empresa_id = :eid AND prefixo = :pref ORDER BY data_leitura DESC LIMIT 1"),
+                            {"eid": str(emp_id), "pref": pref}
+                        ).fetchone()
                         
-                        for pref in prefs:
-                            med = conn.execute(
-                                text("SELECT data_leitura, horimetro, odometro FROM medidores_frota WHERE empresa_id = :eid AND prefixo = :pref ORDER BY data_leitura DESC LIMIT 1"),
-                                {"eid": str(emp_id), "pref": pref}
-                            ).fetchone()
-                            
-                            atual_val = 0.0
-                            if med:
-                                if crit == "Horímetro":
-                                    atual_val = float(med[1] or 0)
-                                elif crit == "Odômetro":
-                                    atual_val = float(med[2] or 0)
-                            
-                            saldo_restante = intervalo_limite - (atual_val % intervalo_limite) if crit in ["Horímetro", "Odômetro"] else intervalo_limite
-                            
-                            lista_status_frota.append({
-                                "Plano": p['nome_plano'],
-                                "Tipo": p['tipo_os'],
-                                "Veículo": pref,
-                                "Critério": crit,
-                                "Intervalo Padrão": intervalo_limite,
-                                "Leitura Atual": atual_val if crit != "Dias" else "-",
-                                "Saldo Restante Estimado": f"{saldo_restante:,.0f} {'km' if crit=='Odômetro' else 'h' if crit=='Horímetro' else 'dias'}"
-                            })
+                        med_hor_reg = float(med[1] or 0) if med else 0.0
+                        med_odo_reg = float(med[2] or 0) if med else 0.0
+                        data_med_reg = str(med[0]) if med and med[0] else "-"
 
-                df_status_final = pd.DataFrame(lista_status_frota)
-                if not df_status_final.empty:
-                    st.dataframe(df_status_final, use_container_width=True, hide_index=True)
-                else:
-                    st.info("Nenhum veículo vinculado aos planos cadastrados.")
+                        # 2. Pega também a última leitura registrada nas OSs concluídas (caso exista no texto da baixa)
+                        os_recente = conn.execute(
+                            text("""
+                                SELECT data, descricao FROM tarefas 
+                                WHERE empresa_id = :eid AND prefixo = :pref AND realizado = TRUE 
+                                ORDER BY data DESC LIMIT 1
+                            """),
+                            {"eid": str(emp_id), "pref": pref}
+                        ).fetchone()
+                        
+                        os_hor_reg = 0.0
+                        os_odo_reg = 0.0
+                        data_os_reg = "-"
+                        
+                        if os_recente:
+                            data_os_reg = str(os_recente[0])
+                            desc_os = str(os_recente[1])
+                            # Extrai os valores de horímetro/odômetro gravados na string da baixa se houver
+                            try:
+                                if "Horímetro:" in desc_os:
+                                    h_str = desc_os.split("Horímetro:")[1].split("h")[0].strip()
+                                    os_hor_reg = float(h_str)
+                                if "Odômetro:" in desc_os:
+                                    o_str = desc_os.split("Odômetro:")[1].split("km")[0].strip()
+                                    os_odo_reg = float(o_str)
+                            except Exception:
+                                pass
+
+                        # 3. Compara e define o maior valor e a data mais recente entre medidores e OS
+                        atual_val = 0.0
+                        data_ref = data_med_reg if data_med_reg != "-" else data_os_reg
+                        
+                        if crit == "Horímetro":
+                            atual_val = max(med_hor_reg, os_hor_reg)
+                        elif crit == "Odômetro":
+                            atual_val = max(med_odo_reg, os_odo_reg)
+                        
+                        # Cálculo do saldo restante para o vencimento
+                        if crit in ["Horímetro", "Odômetro"]:
+                            # Saldo até o próximo múltiplo do intervalo padrão
+                            saldo_restante = intervalo_limite - (atual_val % intervalo_limite)
+                            if saldo_restante == 0:
+                                saldo_restante = intervalo_limite
+                        else:
+                            saldo_restante = intervalo_limite # Para dias, mantém padrão ou base de tempo
+                        
+                        lista_status_frota.append({
+                            "Plano": p['nome_plano'],
+                            "Tipo": p['tipo_os'],
+                            "Veículo": pref,
+                            "Critério": crit,
+                            "Intervalo Padrão": intervalo_limite,
+                            "Última Leitura": f"{atual_val:,.1f}".replace(",", ".") if crit != "Dias" else "-",
+                            "Data Ref.": data_ref,
+                            "_saldo_ordem": saldo_restante, # Coluna oculta para ordenação
+                            "Saldo Restante Estimado": f"{saldo_restante:,.1f} {'km' if crit=='Odômetro' else 'h' if crit=='Horímetro' else 'dias'}".replace(",", ".")
+                        })
+
+            df_status_final = pd.DataFrame(lista_status_frota)
+            if not df_status_final.empty:
+                # Ordena por urgência: veículos com menor saldo restante aparecem no topo
+                df_status_final = df_status_final.sort_values(by="_saldo_ordem", ascending=True).drop(columns=["_saldo_ordem"])
+                st.dataframe(df_status_final, use_container_width=True, hide_index=True)
             else:
-                st.info("Nenhum plano master cadastrado para monitoramento.")
-        except Exception as e:
-            st.info("Cadastre leituras de medidores e planos master para ativar o painel preditivo de vencimentos.")
+                st.info("Nenhum veículo vinculado aos planos cadastrados.")
+        else:
+            st.info("Nenhum plano master cadastrado para monitoramento.")
+    except Exception as e:
+        st.info("Cadastre leituras de medidores e planos master para ativar o painel preditivo de vencimentos.")
 
     elif "Gestão Master" in aba_ativa and usuario_ativo == "bruno":
         st.subheader("👑 Painel de Controle Master")
