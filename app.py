@@ -2396,20 +2396,14 @@ else:
             
         abas_nomes = ["📝 Agendamento Direto", "📚 Gerenciar Planos Master", "⚡ Gerar OS em Lote (Planos)"]
         
-        # Sincroniza o rádio com o índice atual guardado no session_state
-        sub_escolhida = st.radio(
-            "Navegação interna", 
-            abas_nomes, 
-            index=int(st.session_state.sub_aba_idx), 
-            horizontal=True, 
-            label_visibility="collapsed",
-            key="radio_abas_cadastro_direto"
-        )
-        
-        novo_idx = abas_nomes.index(sub_escolhida)
-        if st.session_state.sub_aba_idx != novo_idx:
-            st.session_state.sub_aba_idx = novo_idx
-            st.rerun()
+        # Substitui o radio por colunas de botões customizados para sincronia perfeita e visual limpo
+        cols_abas = st.columns(3)
+        for idx_aba, nome_aba in enumerate(abas_nomes):
+            ativo = (st.session_state.sub_aba_idx == idx_aba)
+            tipo_botao = "primary" if ativo else "secondary"
+            if cols_abas[idx_aba].button(nome_aba, key=f"topo_aba_btn_{idx_aba}", use_container_width=True, type=tipo_botao):
+                st.session_state.sub_aba_idx = idx_aba
+                st.rerun()
             
         sub_aba_escolhida = st.session_state.sub_aba_idx
         st.divider()
