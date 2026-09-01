@@ -1510,6 +1510,19 @@ else:
                 on_click=set_nav,
                 args=(opcao,)
             )
+            
+            # Se a opção atual for Cadastro Direto e estiver selecionada, mostra o menu expansível logo abaixo
+            if opcao == "🗎  Cadastro Direto" and st.session_state.opcao_selecionada == "🗎  Cadastro Direto":
+                with st.expander("📂 Opções de Cadastro", expanded=True):
+                    sub_opcoes_sidebar = [
+                        ("📝 Agendamento Direto", 0), 
+                        ("📚 Gerenciar Planos Master", 1), 
+                        ("⚡ Gerar OS em Lote (Planos)", 2)
+                    ]
+                    for so_label, so_idx in sub_opcoes_sidebar:
+                        if st.button(so_label, key=f"sidebar_sub_nav_{so_idx}", use_container_width=True, type="primary" if st.session_state.get("sub_aba_idx", 0) == so_idx else "secondary"):
+                            st.session_state.sub_aba_idx = so_idx
+                            st.rerun()
         
         st.markdown("""
             <div style='margin-top: 3px; background: rgba(197, 160, 89, 0.08); border: 1px solid #C5A059; border-radius: 8px; padding: 8px 10px; margin-bottom: 4px;'>
@@ -2377,13 +2390,25 @@ else:
     elif "Cadastro Direto" in aba_ativa:
         st.subheader("📝 Agendamento Direto & Planos Master")
         
-        sub_aba_cad1, sub_aba_cad2, sub_aba_cad3 = st.tabs([
-            "📝 Agendamento Direto", 
-            "📚 Gerenciar Planos Master", 
-            "⚡ Gerar OS em Lote (Planos)"
-        ])
+        if "sub_aba_idx" not in st.session_state:
+            st.session_state.sub_aba_idx = 0
+            
+        abas_nomes = ["📝 Agendamento Direto", "📚 Gerenciar Planos Master", "⚡ Gerar OS em Lote (Planos)"]
         
-        with sub_aba_cad1:
+        # Abas superiores interativas conforme a sua imagem circulada em vermelho
+        sub_escolhida = st.radio(
+            "Navegação interna", 
+            abas_nomes, 
+            index=st.session_state.sub_aba_idx, 
+            horizontal=True, 
+            label_visibility="collapsed",
+            key="radio_abas_cadastro_direto"
+        )
+        
+        st.session_state.sub_aba_idx = abas_nomes.index(sub_escolhida)
+        st.divider()
+
+        if st.session_state.sub_aba_idx == 0:
             with st.popover("💡 Como usar o Cadastro Direto?"):
                 st.markdown("""
                     ### 📝 Guia Rápido - Cadastro
@@ -2466,7 +2491,7 @@ else:
                         conn.commit()
                     st.rerun()
 
-        with sub_aba_cad2:
+        elif st.session_state.sub_aba_idx == 1:
             st.markdown("### 📚 Gestão de Planos Master e Serviços")
             st.info("💡 Cadastre o plano, defina a periodicidade, a área e adicione os serviços.")
             
@@ -2689,7 +2714,7 @@ else:
             else:
                 st.info("Nenhum plano cadastrado.")
 
-        with sub_aba_cad3:
+        else:
             st.markdown("### ⚡ Geração de Ordens de Serviço em Lote via Planos Master")
             st.info("💡 Selecione um plano cadastrado, escolha a data de execução, os horários (opcionais) e os veículos para gerar as OSs.")
 
