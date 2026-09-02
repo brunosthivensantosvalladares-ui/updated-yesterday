@@ -129,6 +129,11 @@ def carregar_planos_master_empresa(emp_id):
     engine = get_engine()
     return pd.read_sql(text("SELECT id, nome_plano, tipo_os, area, prefixo, tipo_criterio, intervalo_valor FROM planos_master WHERE empresa_id = :eid ORDER BY id DESC"), engine, params={"eid": str(emp_id)})
 
+@st.cache_data(ttl=30, show_spinner=False)
+def carregar_medidores_empresa(emp_id):
+    engine = get_engine()
+    return pd.read_sql(text("SELECT prefixo, data_leitura, horimetro, odometro FROM medidores_frota WHERE empresa_id = :eid ORDER BY data_leitura DESC"), engine, params={"eid": str(emp_id)})
+
 # --- CONFIGURAÇÃO DO MODELO LLAMA 3 (GROQ) & BUSCA WEB ---
 def obter_llm():
     api_key = st.secrets.get("GROQ_API_KEY") or os.environ.get("GROQ_API_KEY")
@@ -1862,7 +1867,7 @@ else:
     if "Dashboard" in aba_ativa:
         st.markdown("<h4 style='color: #2D241E; font-weight: 700; margin-bottom: 16px;'>Cronograma Geral de Manutenção</h4>", unsafe_allow_html=True)
         
-        df_dash_stats = pd.read_sql(text("SELECT data, realizado FROM tarefas WHERE empresa_id = :eid"), engine, params={"eid": str(emp_id)})
+        df_dash_stats = carregar_tarefas_empresa(emp_id)
         agendados_hoje, concluidos_total, pendentes_total = 0, 0, 0
         
         if not df_dash_stats.empty:
@@ -1938,152 +1943,154 @@ else:
         st.caption("Acompanhamento preditivo e preventivo do saldo restante, exibindo a próxima meta de preventiva. Ordenado por urgência.")
 
         try:
-            df_planos_dash = pd.read_sql(text("SELECT id, nome_plano, tipo_os, area, prefixo, tipo_criterio, intervalo_valor FROM planos_master WHERE empresa_id = :eid"), engine, params={"eid": str(emp_id)})
+            df_planos_dash = carregar_planos_master_empresa(emp_id)
 
             if not df_planos_dash.empty:
                 lista_status_frota = []
                 avisos_pendencia_medidor = set()
                 
-                with engine.connect() as conn:
-                    for _, p in df_planos_dash.iterrows():
-                        prefs = [x.strip() for x in str(p['prefixo']).split(",") if x.strip()]
-                        crit = p['tipo_criterio']
-                        intervalo_limite = float(p['intervalo_valor'])
+                # Carrega lotes de dados cacheados para máxima performance
+                df_medidores_all = carregar_medidores_empresa(emp_id)
+                df_tarefas_all = carregar_tarefas_empresa(emp_id)
+                
+                for _, p in df_planos_dash.iterrows():
+                    prefs = [x.strip() for x in str(p['prefixo']).split(",") if x.strip()]
+                    crit = p['tipo_criterio']
+                    intervalo_limite = float(p['intervalo_valor'])
+                    
+                    for pref in prefs:
+                        # 1. Filtra a última leitura avulsa de medidor para este veículo
+                        med_veiculo = df_medidores_all[df_medidores_all['prefixo'].astype(str).str.lower() == str(pref).lower()]
+                        med_hor_reg = 0.0
+                        med_odo_reg = 0.0
+                        data_med_reg = "-"
+                        if not med_veiculo.empty:
+                            primeira_med = med_veiculo.iloc[0]
+                            med_hor_reg = float(primeira_med.get('horimetro') or 0.0)
+                            med_odo_reg = float(primeira_med.get('odometro') or 0.0)
+                            data_med_reg = str(primeira_med.get('data_leitura') or "-")
+
+                        # 2. Filtra a última OS concluída para este veículo
+                        tarefas_veiculo = df_tarefas_all[
+                            (df_tarefas_all['prefixo'].astype(str).str.lower() == str(pref).lower()) & 
+                            (df_tarefas_all['realizado'] == True)
+                        ]
                         
-                        for pref in prefs:
-                            # 1. Tenta buscar a última leitura avulsa/geral na tabela medidores_frota
-                            med = conn.execute(
-                                text("SELECT data_leitura, horimetro, odometro FROM medidores_frota WHERE empresa_id = :eid AND prefixo = :pref ORDER BY data_leitura DESC LIMIT 1"),
-                                {"eid": str(emp_id), "pref": pref}
-                            ).fetchone()
-                            
-                            med_hor_reg = float(med[1] or 0) if med else 0.0
-                            med_odo_reg = float(med[2] or 0) if med else 0.0
-                            data_med_reg = str(med[0]) if med and med[0] else "-"
+                        os_hor_reg = 0.0
+                        os_odo_reg = 0.0
+                        data_os_reg = "-"
+                        numero_os_recente = "-"
+                        
+                        if not tarefas_veiculo.empty:
+                            primeira_tarefa = tarefas_veiculo.iloc[0]
+                            data_os_reg = str(primeira_tarefa.get('data') or "-")
+                            numero_os_recente = str(primeira_tarefa.get('numero_os') or "").replace('.0', '')
+                            desc_os = str(primeira_tarefa.get('descricao') or "")
+                            try:
+                                if "Horímetro:" in desc_os:
+                                    h_str = desc_os.split("Horímetro:")[1].split("h")[0].strip()
+                                    os_hor_reg = float(h_str)
+                                if "Odômetro:" in desc_os:
+                                    o_str = desc_os.split("Odômetro:")[1].split("km")[0].strip()
+                                    os_odo_reg = float(o_str)
+                            except Exception:
+                                pass
 
-                            # 2. Última OS concluída (para puxar os dados específicos da última preventiva)
-                            os_recente = conn.execute(
-                                text("""
-                                    SELECT data, descricao FROM tarefas 
-                                    WHERE empresa_id = :eid AND prefixo = :pref AND realizado = TRUE 
-                                    ORDER BY data DESC LIMIT 1
-                                """),
-                                {"eid": str(emp_id), "pref": pref}
-                            ).fetchone()
-                            
-                            os_hor_reg = 0.0
-                            os_odo_reg = 0.0
-                            data_os_reg = "-"
-                            
-                            if os_recente:
-                                data_os_reg = str(os_recente[0])
-                                desc_os = str(os_recente[1])
-                                try:
-                                    if "Horímetro:" in desc_os:
-                                        h_str = desc_os.split("Horímetro:")[1].split("h")[0].strip()
-                                        os_hor_reg = float(h_str)
-                                    if "Odômetro:" in desc_os:
-                                        o_str = desc_os.split("Odômetro:")[1].split("km")[0].strip()
-                                        os_odo_reg = float(o_str)
-                                except Exception:
-                                    pass
-
-                            # Se a OS concluída não tiver medidor gravado no texto, busca o medidor mais próximo da data da OS na tabela medidores_frota
-                            if os_recente and data_os_reg != "-":
-                                if (crit == "Horímetro" and os_hor_reg == 0.0) or (crit == "Odômetro" and os_odo_reg == 0.0):
-                                    fallback_os_med = conn.execute(
-                                        text("""
-                                            SELECT horimetro, odometro, ABS(data_leitura - CAST(:dt AS DATE)) as diff_dias
-                                            FROM medidores_frota 
-                                            WHERE empresa_id = :eid AND prefixo = :pref
-                                            ORDER BY diff_dias ASC, data_leitura DESC
-                                            LIMIT 1
-                                        """),
-                                        {"eid": str(emp_id), "pref": pref, "dt": data_os_reg}
-                                    ).fetchone()
-                                    if fallback_os_med:
+                        # Fallback inteligente por proximidade de data caso a OS não tenha gravado medidor no texto
+                        if data_os_reg != "-" and ((crit == "Horímetro" and os_hor_reg == 0.0) or (crit == "Odômetro" and os_odo_reg == 0.0)):
+                            if not med_veiculo.empty:
+                                # Converte data da OS para datetime para comparar diferença de dias com o DataFrame de medidores
+                                dt_os_dt = pd.to_datetime(data_os_reg, errors='coerce')
+                                if pd.notnull(dt_os_dt):
+                                    med_veiculo_copy = med_veiculo.copy()
+                                    med_veiculo_copy['dt_obj'] = pd.to_datetime(med_veiculo_copy['data_leitura'], errors='coerce')
+                                    med_veiculo_copy['diff_dias'] = (med_veiculo_copy['dt_obj'] - dt_os_dt).abs().dt.days
+                                    med_veiculo_copy = med_veiculo_copy.sort_values(by='diff_dias')
+                                    if not med_veiculo_copy.empty:
+                                        closest = med_veiculo_copy.iloc[0]
                                         if crit == "Horímetro":
-                                            os_hor_reg = float(fallback_os_med[0] or 0.0)
+                                            os_hor_reg = float(closest.get('horimetro') or 0.0)
                                         elif crit == "Odômetro":
-                                            os_odo_reg = float(fallback_os_med[1] or 0.0)
+                                            os_odo_reg = float(closest.get('odometro') or 0.0)
 
-                            # Validação de existência de dados para critérios baseados em medidor
-                            tem_leitura_sistema = False
-                            if crit == "Dias":
+                        # Validação de existência de dados para critérios baseados em medidor
+                        tem_leitura_sistema = False
+                        if crit == "Dias":
+                            tem_leitura_sistema = True
+                        elif crit == "Horímetro":
+                            if med_hor_reg > 0 or os_hor_reg > 0:
                                 tem_leitura_sistema = True
-                            elif crit == "Horímetro":
-                                if med_hor_reg > 0 or os_hor_reg > 0:
-                                    tem_leitura_sistema = True
-                            elif crit == "Odômetro":
-                                if med_odo_reg > 0 or os_odo_reg > 0:
-                                    tem_leitura_sistema = True
+                        elif crit == "Odômetro":
+                            if med_odo_reg > 0 or os_odo_reg > 0:
+                                tem_leitura_sistema = True
 
-                            if not tem_leitura_sistema and crit in ["Horímetro", "Odômetro"]:
-                                avisos_pendencia_medidor.add(pref)
+                        if not tem_leitura_sistema and crit in ["Horímetro", "Odômetro"]:
+                            avisos_pendencia_medidor.add(pref)
 
-                            # 3. Determina a "Última Leitura Geral"
-                            if crit == "Horímetro":
-                                if med_hor_reg >= os_hor_reg:
-                                    ultima_leitura_geral = med_hor_reg
-                                    data_leitura_geral = data_med_reg
-                                else:
-                                    ultima_leitura_geral = os_hor_reg
-                                    data_leitura_geral = data_os_reg
-                            elif crit == "Odômetro":
-                                if med_odo_reg >= os_odo_reg:
-                                    ultima_leitura_geral = med_odo_reg
-                                    data_leitura_geral = data_med_reg
-                                else:
-                                    ultima_leitura_geral = os_odo_reg
-                                    data_leitura_geral = data_os_reg
+                        # 3. Determina a "Última Leitura Geral"
+                        if crit == "Horímetro":
+                            if med_hor_reg >= os_hor_reg:
+                                ultima_leitura_geral = med_hor_reg
+                                data_leitura_geral = data_med_reg
                             else:
-                                ultima_leitura_geral = 0.0
-                                data_leitura_geral = data_med_reg if data_med_reg != "-" else data_os_reg
-
-                            # 4. Dados específicos da Última Preventiva
-                            if crit == "Horímetro":
-                                ultima_preventiva_val = os_hor_reg
-                            elif crit == "Odômetro":
-                                ultima_preventiva_val = os_odo_reg
+                                ultima_leitura_geral = os_hor_reg
+                                data_leitura_geral = data_os_reg
+                        elif crit == "Odômetro":
+                            if med_odo_reg >= os_odo_reg:
+                                ultima_leitura_geral = med_odo_reg
+                                data_leitura_geral = data_med_reg
                             else:
-                                ultima_preventiva_val = 0.0
+                                ultima_leitura_geral = os_odo_reg
+                                data_leitura_geral = data_os_reg
+                        else:
+                            ultima_leitura_geral = 0.0
+                            data_leitura_geral = data_med_reg if data_med_reg != "-" else data_os_reg
 
-                            # 5. Cálculo correto do saldo restante e da Próxima Preventiva (Meta)
-                            atual_val = ultima_leitura_geral
-                            if crit in ["Horímetro", "Odômetro"]:
-                                if not tem_leitura_sistema:
-                                    saldo_restante = 0.0
-                                    proxima_preventiva_val = 0.0
-                                elif ultima_preventiva_val > 0 and atual_val >= ultima_preventiva_val:
-                                    rodado_desde_ultima = atual_val - ultima_preventiva_val
-                                    saldo_restante = intervalo_limite - (rodado_desde_ultima % intervalo_limite)
-                                    if saldo_restante <= 0:
-                                        saldo_restante = intervalo_limite
-                                    blocos = int(rodado_desde_ultima // intervalo_limite) + 1
-                                    proxima_preventiva_val = ultima_preventiva_val + (blocos * intervalo_limite)
-                                else:
-                                    saldo_restante = intervalo_limite - (atual_val % intervalo_limite)
-                                    if saldo_restante == 0:
-                                        saldo_restante = intervalo_limite
-                                    proxima_preventiva_val = atual_val + saldo_restante
-                            else:
-                                saldo_restante = intervalo_limite
+                        # 4. Dados específicos da Última Preventiva
+                        if crit == "Horímetro":
+                            ultima_preventiva_val = os_hor_reg
+                        elif crit == "Odômetro":
+                            ultima_preventiva_val = os_odo_reg
+                        else:
+                            ultima_preventiva_val = 0.0
+
+                        # 5. Cálculo correto do saldo restante e da Próxima Preventiva (Meta)
+                        atual_val = ultima_leitura_geral
+                        if crit in ["Horímetro", "Odômetro"]:
+                            if not tem_leitura_sistema:
+                                saldo_restante = 0.0
                                 proxima_preventiva_val = 0.0
-                            
-                            lista_status_frota.append({
-                                "Plano": p['nome_plano'],
-                                "Tipo": p['tipo_os'],
-                                "Veículo": pref,
-                                "Critério": crit,
-                                "Intervalo Padrão": intervalo_limite,
-                                "Última Leitura": f"{ultima_leitura_geral:,.1f}".replace(",", ".") if (crit != "Dias" and ultima_leitura_geral > 0) else ("-" if crit == "Dias" else "⚠️ Sem Leitura"),
-                                "Data Ref.": data_leitura_geral if (crit == "Dias" or ultima_leitura_geral > 0) else "-",
-                                "Última Preventiva (Leitura)": f"{ultima_preventiva_val:,.1f}".replace(",", ".") if (crit != "Dias" and ultima_preventiva_val > 0) else "-",
-                                "Data da Preventiva": data_os_reg if (crit == "Dias" or ultima_preventiva_val > 0) else "-",
-                                "Próxima Preventiva": f"{proxima_preventiva_val:,.1f} {'km' if crit=='Odômetro' else 'h'}".replace(",", ".") if (crit != "Dias" and proxima_preventiva_val > 0) else "-",
-                                "_saldo_ordem": saldo_restante,
-                                "Saldo Restante Estimado": f"{saldo_restante:,.1f} {'km' if crit=='Odômetro' else 'h' if crit=='Horímetro' else 'dias'}".replace(",", ".") if (crit == "Dias" or tem_leitura_sistema) else "Aguardando Leitura"
-                            })
+                            elif ultima_preventiva_val > 0 and atual_val >= ultima_preventiva_val:
+                                rodado_desde_ultima = atual_val - ultima_preventiva_val
+                                saldo_restante = intervalo_limite - (rodado_desde_ultima % intervalo_limite)
+                                if saldo_restante <= 0:
+                                    saldo_restante = intervalo_limite
+                                blocos = int(rodado_desde_ultima // intervalo_limite) + 1
+                                proxima_preventiva_val = ultima_preventiva_val + (blocos * intervalo_limite)
+                            else:
+                                saldo_restante = intervalo_limite - (atual_val % intervalo_limite)
+                                if saldo_restante == 0:
+                                    saldo_restante = intervalo_limite
+                                proxima_preventiva_val = atual_val + saldo_restante
+                        else:
+                            saldo_restante = intervalo_limite
+                            proxima_preventiva_val = 0.0
+                        
+                        lista_status_frota.append({
+                            "Plano": p['nome_plano'],
+                            "Tipo": p['tipo_os'],
+                            "Nº OS": numero_os_recente if numero_os_recente != "" else "-",
+                            "Veículo": pref,
+                            "Critério": crit,
+                            "Intervalo Padrão": intervalo_limite,
+                            "Última Leitura": f"{ultima_leitura_geral:,.1f}".replace(",", ".") if (crit != "Dias" and ultima_leitura_geral > 0) else ("-" if crit == "Dias" else "⚠️ Sem Leitura"),
+                            "Data Ref.": data_leitura_geral if (crit == "Dias" or ultima_leitura_geral > 0) else "-",
+                            "Última Preventiva (Leitura)": f"{ultima_preventiva_val:,.1f}".replace(",", ".") if (crit != "Dias" and ultima_preventiva_val > 0) else "-",
+                            "Data da Preventiva": data_os_reg if (crit == "Dias" or ultima_preventiva_val > 0) else "-",
+                            "Próxima Preventiva": f"{proxima_preventiva_val:,.1f} {'km' if crit=='Odômetro' else 'h'}".replace(",", ".") if (crit != "Dias" and proxima_preventiva_val > 0) else "-",
+                            "_saldo_ordem": saldo_restante,
+                            "Saldo Restante Estimado": f"{saldo_restante:,.1f} {'km' if crit=='Odômetro' else 'h' if crit=='Horímetro' else 'dias'}".replace(",", ".") if (crit == "Dias" or tem_leitura_sistema) else "Aguardando Leitura"
+                        })
 
                 # Exibe aviso customizado orientado por diretrizes de telemetria
                 if avisos_pendencia_medidor:
@@ -2378,6 +2385,14 @@ else:
             if not df_agenda.empty:
                 df_agenda['Nº OS'] = df_agenda['numero_os'].astype(str).replace(['None', 'nan', 'None.0'], '')
                 df_agenda['Nº OS'] = df_agenda['Nº OS'].str.replace('.0', '', regex=False)
+                # Reorganiza as colunas para colocar 'Nº OS' logo no início
+                cols_ordenadas_agenda = [c for c in df_agenda.columns if c not in ['Nº OS', 'id', 'empresa_id']]
+                cols_agenda_final = ['Nº OS'] + cols_ordenadas_agenda
+                if 'id' in df_agenda.columns:
+                    cols_agenda_final.append('id')
+                if 'empresa_id' in df_agenda.columns:
+                    cols_agenda_final.append('empresa_id')
+                df_agenda = df_agenda[[c for c in cols_agenda_final if c in df_agenda.columns]]
             else:
                 st.info("Agenda vazia.")
         except Exception as e:
@@ -2521,10 +2536,12 @@ else:
                         st.markdown(f"<p class='area-header'>📍 {area}</p>", unsafe_allow_html=True)
                         df_editor_base = df_area_f.set_index('id')
                         
+                        cols_para_editor = [c for c in ['realizado', 'Nº OS', 'area', 'turno', 'prefixo', 'inicio_disp', 'fim_disp', 'executor', 'descricao', 'id_chamado'] if c in df_editor_base.columns]
                         edited_df = st.data_editor(
-                            df_editor_base[['realizado', 'area', 'turno', 'prefixo', 'inicio_disp', 'fim_disp', 'executor', 'descricao', 'id_chamado']], 
+                            df_editor_base[cols_para_editor], 
                             column_config={
                                 "realizado": st.column_config.CheckboxColumn("OK", width="small"),
+                                "Nº OS": st.column_config.TextColumn("Nº OS", disabled=True),
                                 "area": st.column_config.SelectboxColumn("Área", options=ORDEM_AREAS),
                                 "turno": st.column_config.SelectboxColumn("Turno", options=LISTA_TURNOS),
                                 "inicio_disp": st.column_config.TextColumn("Início (Preencher)"),
@@ -2535,7 +2552,7 @@ else:
                             hide_index=False, use_container_width=True, key=f"ed_ted_{d}_{area}"
                         )
 
-                        if not edited_df.equals(df_editor_base[['realizado', 'area', 'turno', 'prefixo', 'inicio_disp', 'fim_disp', 'executor', 'descricao', 'id_chamado']]):
+                        if not edited_df[cols_para_editor].equals(df_editor_base[cols_para_editor]):
                             with engine.connect() as conn:
                                 for row_id, row in edited_df.iterrows():
                                     conn.execute(text("""
@@ -2558,6 +2575,7 @@ else:
                                         except Exception: 
                                             pass
                                 conn.commit()
+                            st.cache_data.clear()
                             st.toast("Alteração salva com isolamento de segurança!", icon="✅")
                             time_module.sleep(0.5); st.rerun()
 
@@ -2631,6 +2649,7 @@ else:
                         )
                         conn.commit()
                     st.success(f"✅ SERVIÇO AGENDADO! Nº {nova_os} (Horímetro ref: {h_prox}h | Odômetro ref: {o_prox}km)")
+                    st.cache_data.clear()
                     st.rerun()
 
             # --- LISTA GERAL DE SERVIÇOS EXCLUSIVA DA ABA DE AGENDAMENTO DIRETO ---
@@ -2649,6 +2668,7 @@ else:
                         for i in ed_l[ed_l['Exc']==True]['id'].tolist(): 
                             conn.execute(text("DELETE FROM tarefas WHERE id = :id AND empresa_id = :eid"), {"id": int(i), "eid": str(emp_id)})
                         conn.commit()
+                    st.cache_data.clear()
                     st.warning("🗑️ Itens excluídos.")
                     st.rerun()
                     
@@ -2661,6 +2681,7 @@ else:
                                 if col in COLUNAS_PERMITIDAS_TAREFAS: 
                                     conn.execute(text(f"UPDATE tarefas SET {col} = :v WHERE id = :i AND empresa_id = :eid"), {"v": str(val), "i": rid, "eid": str(emp_id)})
                         conn.commit()
+                    st.cache_data.clear()
                     st.rerun()
 
         elif sub_aba_escolhida == 1:
@@ -2704,6 +2725,7 @@ else:
                                 }
                             )
                             conn.commit()
+                        st.cache_data.clear()
                         st.success("✅ Plano Master criado com sucesso!")
                         st.rerun()
                     else:
@@ -2746,6 +2768,7 @@ else:
                                     {"pid": id_plano_ativo, "desc": s_desc, "ret": retorna_val, "minv": min_tol, "maxv": max_tol}
                                 )
                                 conn.commit()
+                            st.cache_data.clear()
                             st.success("✅ Serviço adicionado com sucesso ao plano!")
                             st.rerun()
                         else:
@@ -2791,6 +2814,7 @@ else:
                                     conn.execute(text("DELETE FROM servicos_plano WHERE plano_id = :pid"), {"pid": int(pid)})
                                     conn.execute(text("DELETE FROM planos_master WHERE id = :pid"), {"pid": int(pid)})
                                     conn.commit()
+                                st.cache_data.clear()
                                 st.warning("Plano excluído com sucesso!")
                                 st.rerun()
 
@@ -2815,6 +2839,7 @@ else:
                                             )
                                             conn.commit()
                                         st.session_state[f"editando_{pid}"] = False
+                                        st.cache_data.clear()
                                         st.success("✅ Plano atualizado com sucesso!")
                                         st.rerun()
                                     if c_cancelar.form_submit_button("❌ Cancelar"):
@@ -2850,6 +2875,7 @@ else:
                                             with engine.connect() as conn:
                                                 conn.execute(text("DELETE FROM servicos_plano WHERE id = :sid"), {"sid": int(sid)})
                                                 conn.commit()
+                                            st.cache_data.clear()
                                             st.success("Serviço removido do plano!")
                                             st.rerun()
                                             
@@ -2876,6 +2902,7 @@ else:
                                                         )
                                                         conn.commit()
                                                     st.session_state[f"editando_serv_{sid}"] = False
+                                                    st.cache_data.clear()
                                                     st.success("✅ Serviço atualizado!")
                                                     st.rerun()
                                                 if bs_cancel.form_submit_button("❌ Cancelar"):
@@ -2945,6 +2972,7 @@ else:
                                         )
                                         contador_gerados += 1
                                     conn.commit()
+                                st.cache_data.clear()
                                 st.success(f"✅ {contador_gerados} Ordens de Serviço geradas e enviadas para a Agenda Principal com sucesso!")
                                 st.rerun()
                             else:
@@ -2973,6 +3001,7 @@ else:
                             {"eid": str(emp_id), "pref": m_pref, "dt": str(m_data), "hor": m_hor, "odo": m_odo}
                         )
                         conn.commit()
+                    st.cache_data.clear()
                     st.success("✅ Leitura de medidor salva com sucesso!")
                     st.rerun()
                 else:
@@ -2981,7 +3010,7 @@ else:
         st.divider()
         st.subheader("📋 Lista de Leituras Acumuladas")
         
-        df_med = pd.read_sql(text("SELECT id, prefixo, data_leitura, horimetro, odometro FROM medidores_frota WHERE empresa_id = :eid ORDER BY data_leitura DESC"), engine, params={"eid": str(emp_id)})
+        df_med = carregar_medidores_empresa(emp_id)
         if not df_med.empty:
             st.dataframe(df_med, use_container_width=True, hide_index=True)
             
@@ -3121,6 +3150,7 @@ else:
                     if 'df_ap_work' in st.session_state: del st.session_state.df_ap_work
                     if 'analises_halley' in st.session_state: del st.session_state.analises_halley
                         
+                    st.cache_data.clear()
                     st.success("✅ Agendamentos processados e enviados à Agenda Principal!")
                     st.rerun()
                 else:
