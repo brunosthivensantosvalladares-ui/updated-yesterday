@@ -174,12 +174,21 @@ def chamar_groq_direto(prompt_texto, api_key):
     except Exception as e:
         return f"Erro de conexão: {str(e)}"
 
+import unicodedata
+
+def remover_acentos(texto):
+    """Remove acentos e normaliza o texto para garantir comparações precisas."""
+    if not texto:
+        return ""
+    nfkd = unicodedata.normalize('NFKD', str(texto))
+    return "".join([c for c in nfkd if not unicodedata.combining(c)]).lower()
+
 # --- BUSCA DE HISTÓRICO GERAL NA FROTA POR SIMILARIDADE DE SINTOMA ---
 def buscar_historico_relevante(sintoma, emp_id, prefixo=None):
-    """Busca ordens de serviço em toda a frota que contenham relação com o sintoma relatado."""
+    """Busca ordens de serviço em toda a frota considerando o sentido e ignorando variações de acentuação."""
     engine = get_engine()
     
-    # Consulta o banco inteiro para garantir que nenhum histórico relevante seja ignorado
+    # Consulta o banco inteiro para garantir cobertura total do histórico
     query_geral_frota = text("""
         SELECT data, prefixo, descricao, COALESCE(executor, 'Não informado') as executor, numero_os, realizado 
         FROM tarefas 
@@ -191,8 +200,9 @@ def buscar_historico_relevante(sintoma, emp_id, prefixo=None):
         historico_formatado = []
         vistos = set()
         
-        # Considera todas as palavras significativas do sintoma (sem travas arbitrárias de tamanho)
-        palavras_chave = [p.lower() for p in sintoma.split() if p.lower() not in ['de', 'da', 'do', 'em', 'um', 'uma', 'para', 'com']]
+        # Normaliza o sintoma removendo acentos e filtrando palavras vazias
+        sintoma_limpo = remover_acentos(sintoma)
+        palavras_chave = [p for p in sintoma_limpo.split() if p not in ['de', 'da', 'do', 'em', 'um', 'uma', 'para', 'com', 'o', 'a', 'os', 'as']]
         
         with engine.connect() as conn:
             resultados = conn.execute(query_geral_frota, {"eid": str(emp_id)}).fetchall()
@@ -205,13 +215,14 @@ def buscar_historico_relevante(sintoma, emp_id, prefixo=None):
                 num_os = f"OS {r[4]}" if r[4] else "Sem Nº"
                 realizado = r[5]
                 
-                desc_lower = desc.lower()
-                relevante = (prefixo and str(pref).lower() == str(prefixo).lower()) or any(kw in desc_lower for kw in palavras_chave)
+                # Normaliza a descrição do banco para comparar sem conflito de acentos
+                desc_norm = remover_acentos(desc)
+                relevante = (prefixo and str(pref).lower() == str(prefixo).lower()) or any(kw in desc_norm for kw in palavras_chave)
                 
                 if relevante:
                     status_os = "Concluída" if realizado else "Pendente / Sem retorno de execução"
                     linha = f"[Veículo {pref}] Data: {dt} | {num_os} | Status: {status_os} | Descrição/Serviço: {desc} | Mecânico: {execut}"
-                    chave = (dt, pref, desc_lower)
+                    chave = (dt, pref, desc_norm)
                     if chave not in vistos:
                         vistos.add(chave)
                         historico_formatado.append(linha)
