@@ -2043,7 +2043,7 @@ else:
                                 "Última Leitura": f"{ultima_leitura_geral:,.1f}".replace(",", ".") if crit != "Dias" else "-",
                                 "Data Ref.": data_leitura_geral,
                                 "Última Preventiva (Leitura)": f"{ultima_preventiva_val:,.1f}".replace(",", ".") if (crit != "Dias" and ultima_preventiva_val > 0) else "-",
-                                "Data da Preventiva": data_os_reg if ultima_preventiva_val > 0 else "-",
+                                "Data Últ. Preventiva": data_os_reg if ultima_preventiva_val > 0 else "-",
                                 "Próxima Preventiva": f"{proxima_preventiva_val:,.1f} {'km' if crit=='Odômetro' else 'h'}".replace(",", ".") if crit != "Dias" else "-",
                                 "_saldo_ordem": saldo_restante,
                                 "Saldo Restante Estimado": f"{saldo_restante:,.1f} {'km' if crit=='Odômetro' else 'h' if crit=='Horímetro' else 'dias'}".replace(",", ".")
