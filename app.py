@@ -176,21 +176,23 @@ def chamar_groq_direto(prompt_texto, api_key):
 
 # --- BUSCA DE HISTÓRICO GERAL NA FROTA POR SIMILARIDADE DE SINTOMA ---
 def buscar_historico_relevante(sintoma, emp_id, prefixo=None):
-    """Busca ordens de serviço em toda a frota que contenham relação com o sintoma relatado."""
+    """Busca ordens de serviço em toda a frota focando no sentido técnico da falha, ignorando variações de intensidade."""
     engine = get_engine()
     
     query_geral_frota = text("""
         SELECT data, prefixo, descricao, COALESCE(executor, 'Não informado') as executor, numero_os, realizado 
         FROM tarefas 
         WHERE empresa_id = :eid
-        ORDER BY id DESC LIMIT 50
+        ORDER BY id DESC
     """)
     
     try:
         historico_formatado = []
         vistos = set()
         
-        palavras_chave = [p.lower() for p in sintoma.split() if len(p) > 3]
+        # Ignora palavras irrelevantes e advérbios de intensidade (como 'muita', 'pouca', 'bem') para focar no núcleo do sintoma
+        palavras_ignoradas = {'de', 'da', 'do', 'em', 'um', 'uma', 'para', 'com', 'muita', 'muito', 'pouco', 'pouca', 'bem', 'mal', 'carro', 'veiculo', 'caminhao'}
+        palavras_chave = [p.lower() for p in sintoma.split() if len(p) > 2 and p.lower() not in palavras_ignoradas]
         
         with engine.connect() as conn:
             resultados = conn.execute(query_geral_frota, {"eid": str(emp_id)}).fetchall()
@@ -204,7 +206,13 @@ def buscar_historico_relevante(sintoma, emp_id, prefixo=None):
                 realizado = r[5]
                 
                 desc_lower = desc.lower()
-                relevante = (prefixo and str(pref).lower() == str(prefixo).lower()) or any(kw in desc_lower for kw in palavras_chave)
+                
+                # É considerado relevante se o histórico contiver as palavras-core essenciais do problema (ex: fumaça + preta)
+                # Se não houver palavras-chave longas suficientes, faz a busca pelo texto limpo
+                if palavras_chave:
+                    relevante = (prefixo and str(pref).lower() == str(prefixo).lower()) or all(kw in desc_lower for kw in palavras_chave)
+                else:
+                    relevante = True
                 
                 if relevante:
                     status_os = "Concluída" if realizado else "Pendente / Sem retorno de execução"
