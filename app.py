@@ -450,7 +450,7 @@ Se for continuação do preenchimento da OS:
     except Exception:
         return None
         
-# --- RESPOSTAS GERAIS, CONSULTAS DE OS E MANUAL DA PLATAFORMA ---
+# --- RESPOSTAS GERAIS, CONSULTAS DE OS E MANUAL DA PLATAFORMA ATUALIZADOS ---
 def responder_chat_mr_halley(mensagem_usuario, emp_id):
     texto_baixo = mensagem_usuario.lower().strip()
 
@@ -487,15 +487,16 @@ def responder_chat_mr_halley(mensagem_usuario, emp_id):
         "\n".join(historicos_banco) if historicos_banco else "Nenhum registro anterior no banco."
     )
 
+    # Manual atualizado e corrigido integrando corretamente o Cadastro Direto de OS
     manual_plataforma = """
 FUNCIONALIDADES E PASSO A PASSO DA PLATAFORMA UP 2 TODAY:
 1. Dashboard: Visão geral da operação e métricas principais.
 2. Agenda Principal: Centro operacional para controle de janelas de box e manutenções.
-3. Cadastro Direto: Agendamento direto de preventivas e revisões periódicas pelo gestor.
+3. Cadastro Direto: Aba onde o gestor pode cadastrar e abrir Ordens de Serviço (OS) diretamente, além de gerenciar preventivas e revisões periódicas.
 4. Chamados Oficina: Espaço do administrador para visualizar, avaliar, aprovar e processar os chamados enviados pela ponta.
 5. OSs Pendentes (Baixa Técnica): Aba onde o gestor clica na linha da OS para preencher a execução e dar a baixa técnica.
 6. OSs Concluídas: Histórico e relatórios exportáveis de serviços finalizados.
-7. Perfil Motorista / Abrir Solicitação: Aba onde o motorista preenche o prefixo e a descrição para **abrir novos chamados** de manutenção de forma remota.
+7. Perfil Motorista / Abrir Solicitação: Aba onde o motorista preenche o prefixo e a descrição para abrir novos chamados de forma remota.
 8. Chat Mr. Halley: Assistente virtual integrado para triagem de falhas, consulta de histórico e abertura conversacional de Ordens de Serviço (OS).
 """
 
@@ -512,7 +513,7 @@ Pergunta do Usuário: "{mensagem_usuario}"
 
 DIRETRIZES DE RESPOSTA:
 1. Responda de forma direta, clara e baseada estritamente no manual da plataforma acima.
-2. Se o usuário perguntar onde abrir chamados, explique que os motoristas abrem na aba **Abrir Solicitação** (no perfil de motorista), e o gestor gerencia e aprova esses chamados na aba **Chamados Oficina**.
+2. Se o usuário perguntar onde abrir chamados, explique que os motoristas abrem na aba **Abrir Solicitação** (no perfil de motorista), o gestor aprova em **Chamados Oficina**, ou pode abrir OS diretamente na aba **Cadastro Direto**.
 3. Se o usuário perguntar sobre baixa de OS, indique a aba **OSs Pendentes**.
 4. Mantenha um tom profissional e técnico (máximo de 4 frases).
 """
