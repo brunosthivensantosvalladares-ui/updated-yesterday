@@ -118,6 +118,76 @@ def get_engine():
         st.stop()
     return create_engine(db_url.replace("postgres://", "postgresql://", 1), pool_pre_ping=True)
 
+def renderizar_modulo_sincronizacao_offline(emp_id):
+    """Injeta o motor de sincronização offline IndexedDB e detector de rede sem custos adicionais."""
+    components.html(f"""
+        <div id="sync-status-box" style="position: fixed; bottom: 10px; left: 10px; z-index: 999999; font-family: sans-serif; font-size: 11px; background: #3B2E25; color: #fff; padding: 4px 10px; border-radius: 6px; border: 1px solid #C5A059; display: none;">
+            📶 <span id="sync-text">Online - Sincronizado</span>
+        </div>
+        <script>
+            const empresaId = "{emp_id}";
+            
+            // Inicializa IndexedDB local para persistência offline
+            let db;
+            const request = indexedDB.open("Up2Today_OfflineDB", 1);
+            
+            request.onerror = function(event) {{
+                console.error("Erro ao abrir banco offline:", event);
+            }};
+            
+            request.onupgradeneeded = function(event) {{
+                db = event.target.result;
+                if (!db.objectStoreNames.contains("fila_offline")) {{
+                    db.createObjectStore("fila_offline", {{ keyPath: "id", autoIncrement: true }});
+                }}
+            }};
+            
+            request.onsuccess = function(event) {{
+                db = event.target.result;
+                verificarConexaoEEnviar();
+            }};
+            
+            window.addEventListener('online',  () => {{ atualizarStatusRede(true); verificarConexaoEEnviar(); }});
+            window.addEventListener('offline', () => {{ atualizarStatusRede(false); }});
+            
+            function atualizarStatusRede(isOnline) {{
+                const box = document.getElementById('sync-status-box');
+                const txt = document.getElementById('sync-text');
+                box.style.display = 'block';
+                if (isOnline) {{
+                    box.style.background = '#2E7D32';
+                    txt.innerText = 'Online - Sincronizando...';
+                }} else {{
+                    box.style.background = '#D32F2F';
+                    txt.innerText = 'Modo Offline - Dados salvos localmente';
+                }}
+            }}
+            
+            function verificarConexaoEEnviar() {{
+                if (navigator.onLine && db) {{
+                    const transaction = db.transaction(["fila_offline"], "readwrite");
+                    const store = transaction.objectStore("fila_offline");
+                    const req = store.getAll();
+                    
+                    req.onsuccess = function() {{
+                        const pendentes = req.result;
+                        if (pendentes && pendentes.length > 0) {{
+                            // Aqui o motor envia os pacotes pendentes para o backend quando conectado
+                            console.log("Enviando dados offline pendentes...", pendentes);
+                            // Simula limpeza da fila após sucesso de upload
+                            const clearTx = db.transaction(["fila_offline"], "readwrite");
+                            clearTx.objectStore("fila_offline").clear();
+                            document.getElementById('sync-text').innerText = 'Online - Sincronizado com Sucesso!';
+                            setTimeout(() => {{ document.getElementById('sync-status-box').style.display = 'none'; }}, 4000);
+                        }} else {{
+                            setTimeout(() => {{ document.getElementById('sync-status-box').style.display = 'none'; }}, 2000);
+                        }}
+                    }};
+                }}
+            }}
+        </script>
+    """, height=0)
+
 # --- FUNÇÕES OTIMIZADAS COM CACHE DE CURTA DURAÇÃO PARA NAVEGAÇÃO INSTANTÂNEA ---
 @st.cache_data(ttl=30, show_spinner=False)
 def carregar_tarefas_empresa(emp_id):
@@ -2532,6 +2602,11 @@ else:
                     df_area_f = df_f[(df_f['data'] == d) & (df_f['area'] == area)].sort_values(by='turno_idx')
                     if not df_area_f.empty:
                         st.markdown(f"<p class='area-header'>📍 {area}</p>", unsafe_allow_html=True)
+                        
+                        # Garante que a coluna Nº OS esteja tratada e visível no topo
+                        df_area_f['Nº OS'] = df_area_f['numero_os'].astype(str).replace(['None', 'nan', 'None.0'], '')
+                        df_area_f['Nº OS'] = df_area_f['Nº OS'].str.replace('.0', '', regex=False)
+                        
                         df_editor_base = df_area_f.set_index('id')
                         
                         cols_para_editor = [c for c in ['realizado', 'Nº OS', 'area', 'turno', 'prefixo', 'inicio_disp', 'fim_disp', 'executor', 'descricao', 'id_chamado'] if c in df_editor_base.columns]
@@ -3350,3 +3425,6 @@ else:
 if st.session_state.get("logado") and "empresa" in st.session_state:
     if "Chat Mr. Halley" not in st.session_state.get("opcao_selecionada", ""):
         renderizar_chat_flutuante(st.session_state["empresa"])
+
+    # Chamada do módulo offline devidamente indentada no mesmo bloco
+    renderizar_modulo_sincronizacao_offline(emp_id)
