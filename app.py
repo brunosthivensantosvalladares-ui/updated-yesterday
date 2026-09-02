@@ -1950,6 +1950,7 @@ else:
                         intervalo_limite = float(p['intervalo_valor'])
                         
                         for pref in prefs:
+                            # 1. Pega a última leitura oficial cadastrada na tabela medidores_frota para este veículo
                             med = conn.execute(
                                 text("SELECT data_leitura, horimetro, odometro FROM medidores_frota WHERE empresa_id = :eid AND prefixo = :pref ORDER BY data_leitura DESC LIMIT 1"),
                                 {"eid": str(emp_id), "pref": pref}
@@ -1959,6 +1960,7 @@ else:
                             med_odo_reg = float(med[2] or 0) if med else 0.0
                             data_med_reg = str(med[0]) if med and med[0] else "-"
 
+                            # 2. Pega também a última leitura registrada nas OSs concluídas (caso exista no texto da baixa)
                             os_recente = conn.execute(
                                 text("""
                                     SELECT data, descricao FROM tarefas 
@@ -1985,20 +1987,36 @@ else:
                                 except Exception:
                                     pass
 
+                            # 3. Compara e define o valor e a data correta conforme o critério (Horímetro, Odômetro ou Dias)
                             atual_val = 0.0
-                            data_ref = data_med_reg if data_med_reg != "-" else data_os_reg
+                            data_ref = "-"
                             
                             if crit == "Horímetro":
-                                atual_val = max(med_hor_reg, os_hor_reg)
+                                if med_hor_reg >= os_hor_reg:
+                                    atual_val = med_hor_reg
+                                    data_ref = data_med_reg
+                                else:
+                                    atual_val = os_hor_reg
+                                    data_ref = data_os_reg
                             elif crit == "Odômetro":
-                                atual_val = max(med_odo_reg, os_odo_reg)
-                            
+                                if med_odo_reg >= os_odo_reg:
+                                    atual_val = med_odo_reg
+                                    data_ref = data_med_reg
+                                else:
+                                    atual_val = os_odo_reg
+                                    data_ref = data_os_reg
+                            else:
+                                data_ref = data_os_reg if data_os_reg != "-" else data_med_reg
+
+                            # Cálculo do saldo restante para o vencimento
                             if crit in ["Horímetro", "Odômetro"]:
                                 saldo_restante = intervalo_limite - (atual_val % intervalo_limite)
                                 if saldo_restante == 0:
                                     saldo_restante = intervalo_limite
+                                texto_ultima_leitura = f"{atual_val:,.1f} {'km' if crit=='Odômetro' else 'h'}".replace(",", ".")
                             else:
                                 saldo_restante = intervalo_limite
+                                texto_ultima_leitura = "-"
                             
                             lista_status_frota.append({
                                 "Plano": p['nome_plano'],
@@ -2006,7 +2024,7 @@ else:
                                 "Veículo": pref,
                                 "Critério": crit,
                                 "Intervalo Padrão": intervalo_limite,
-                                "Última Leitura": f"{atual_val:,.1f}".replace(",", ".") if crit != "Dias" else "-",
+                                "Última Leitura": texto_ultima_leitura,
                                 "Data Ref.": data_ref,
                                 "_saldo_ordem": saldo_restante,
                                 "Saldo Restante Estimado": f"{saldo_restante:,.1f} {'km' if crit=='Odômetro' else 'h' if crit=='Horímetro' else 'dias'}".replace(",", ".")
