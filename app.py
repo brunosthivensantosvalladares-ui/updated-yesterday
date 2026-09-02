@@ -490,14 +490,13 @@ def responder_chat_mr_halley(mensagem_usuario, emp_id):
         "\n".join(historicos_banco) if historicos_banco else "Nenhum registro anterior no banco."
     )
 
-    # Manual otimizado e compacto para economizar tokens mantendo a precisão das instruções
+    # Manual compacto para otimização de tokens nas chamadas da API
     manual_plataforma = """
-MAPA RÁPIDO DO UP 2 TODAY:
-1. Abrir Chamados: Aba 'Abrir Solicitação' (Perfil Motorista).
+MAPA DO UP 2 TODAY:
+1. Abrir Chamados: Aba 'Abrir Solicitação' (Motorista).
 2. Aprovar Chamados: Aba 'Chamados Oficina' (Gestor).
 3. Baixa de OS: Aba 'OSs Pendentes'.
 4. Agenda: Aba 'Agenda Principal'.
-5. Cadastro de Preventivas: Aba 'Cadastro Direto'.
 """
 
     template_geral = f"""
@@ -511,11 +510,11 @@ Você é o Mr. Halley, assistente técnico de manutenção, telemetria e suporte
 
 Pergunta do Usuário: "{mensagem_usuario}"
 
-DIRETRIZES DE RESPOSTA (ECONOMIA DE TOKENS):
-1. Seja extremamente direto, objetivo e claro.
-2. Responda em NO MÁXIMO 2 frases curtas, indicando o caminho exato da aba se for dúvida de uso.
-3. Se o usuário perguntar onde abrir chamados, indique a aba 'Abrir Solicitação'. Se for sobre baixa de OS, indique 'OSs Pendentes'.
-4. Mantenha um tom profissional e técnico.
+DIRETRIZES DE RESPOSTA:
+1. Responda de forma direta, clara e baseada estritamente no manual acima.
+2. Se o usuário perguntar onde abrir chamados, explique que os motoristas abrem na aba **Abrir Solicitação** (no perfil de motorista), e o gestor gerencia e aprova esses chamados na aba **Chamados Oficina**.
+3. Se o usuário perguntar sobre baixa de OS, indique a aba **OSs Pendentes**.
+4. Mantenha um tom profissional, técnico e conciso (máximo de 3 frases para economizar tokens).
 """
 
     try:
