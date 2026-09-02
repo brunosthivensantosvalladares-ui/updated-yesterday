@@ -182,16 +182,16 @@ def remover_acentos(texto):
     nfkd = unicodedata.normalize('NFKD', str(texto))
     return "".join([c for c in nfkd if not unicodedata.combining(c)]).lower()
 
-# --- BUSCA DE HISTÓRICO GERAL NA FROTA (ENVIA O CONTEXTO BRUTO PARA A IA DECIDIR) ---
+# --- BUSCA DE HISTÓRICO GERAL NO BANCO INTEIRO (SEM LIMITES) ---
 def buscar_historico_relevante(sintoma, emp_id, prefixo=None):
     engine = get_engine()
     
-    # Busca os registros mais recentes da frota para a IA analisar o contexto completo
+    # Consulta o banco inteiro (sem LIMIT) para garantir cobertura total de todas as manutenções concluídas
     query_geral_frota = text("""
         SELECT data, prefixo, descricao, COALESCE(executor, 'Não informado') as executor, numero_os, realizado 
         FROM tarefas 
-        WHERE empresa_id = :eid
-        ORDER BY id DESC LIMIT 100
+        WHERE empresa_id = :eid AND realizado = TRUE
+        ORDER BY id DESC
     """)
     
     try:
@@ -207,45 +207,41 @@ def buscar_historico_relevante(sintoma, emp_id, prefixo=None):
                 desc = str(r[2]).strip() if r[2] else ""
                 execut = str(r[3]) if r[3] else "Não informado"
                 num_os = f"OS {r[4]}" if r[4] else "Sem Nº"
-                realizado = r[5]
                 
-                status_os = "Concluída" if realizado else "Pendente"
-                linha = f"[Veículo {pref}] Data: {dt} | {num_os} | Status: {status_os} | Descrição: {desc} | Mecânico: {execut}"
-                
+                linha = f"[Veículo {pref}] Data: {dt} | {num_os} | Descrição/Serviço: {desc} | Mecânico: {execut}"
                 if linha not in vistos:
                     vistos.add(linha)
                     historico_formatado.append(linha)
 
-        return historico_formatado[:30] if historico_formatado else []
+        return historico_formatado if historico_formatado else []
     except Exception as e:
         return []
 
-# --- TRIAGEM INTELIGENTE DO MR. HALLEY (DECISÃO SEMÂNTICA PURA PELO LLM) ---
+# --- TRIAGEM INTELIGENTE DO MR. HALLEY (DECISÃO SEMÂNTICA 100% PELO LLM) ---
 def triagem_mr_halley(sintoma, emp_id, prefixo=None, incluir_saudacao=False):
     try:
         api_key = obter_llm()
         if not api_key:
             return "Erro: Chave da API Groq não configurada."
 
-        # Traz o histórico recente da frota para o modelo avaliar semanticamente
+        # Pega todo o histórico real concluído de todo o banco da frota
         historicos = buscar_historico_relevante(sintoma, emp_id, prefixo=prefixo)
-        historico_formatado = "\n".join(historicos) if historicos else "Nenhum registro no banco."
+        historico_formatado = "\n".join(historicos) if historicos else "Nenhum registro anterior na frota."
 
-        # Prompt unificado inteligente: a IA cruza o sentido do sintoma com o histórico de forma autônoma
         prompt_inteligente = f"""
 Você é o Mr. Halley, assistente técnico de manutenção da plataforma Up 2 Today.
 Veículo em análise: {prefixo if prefixo else "Não informado"}
-Sintoma Relatado pelo Usuário: "{sintoma}"
+Sintoma Relatado: "{sintoma}"
 
-Histórico de Ordens de Serviço da Frota:
+Histórico de Ordens de Serviço Concluídas na Frota (Banco Inteiro):
 {historico_formatado}
 
-INSTRUÇÕES DE ANÁLISE E DECISÃO:
-1. Analise criticamente o histórico da frota acima. Existe ALGUM registro anterior cujo problema seja EXATAMENTE o mesmo ou diretamente correlato ao sintoma relatado ("{sintoma}")?
-2. CRITÉRIO DE FONTE (OBRIGATÓRIO):
-   - SE houver um histórico idêntico ou diretamente correspondente no banco: Utilize-o e inicie a resposta exatamente com a frase: "Baseado no histórico local da frota, recomenda-se"
-   - SE NÃO houver nenhum histórico compatível (ou se o histórico disponível for sobre outro componente completamente diferente, como freio/direção para um problema de motor/fumaça): Ignore totalmente o histórico e use seu conhecimento técnico externo, iniciando a resposta exatamente com a frase: "Não identificamos registros de falhas semelhantes. Mas com base em pesquisas externas, recomenda‑se"
-3. Nunca misture as duas fontes. Seja direto e conciso (máximo de 30 palavras).
+INSTRUÇÕES OBRIGATÓRIAS DE ANÁLISE E RESPOSTA:
+1. Analise semanticamente a lista de histórico da frota acima. Existe algum registro anterior cujo problema e solução correspondam de forma lógica e verdadeira ao sintoma atual ("{sintoma}")?
+2. REGRAS DE OURO PARA A FONTE:
+   - SE houver um histórico correspondente e útil na lista: Utilize-o e inicie a resposta obrigatoriamente com a frase exata: "Baseado no histórico local da frota, recomenda-se"
+   - SE NÃO houver nenhum histórico compatível na lista (ou se os registros forem de componentes totalmente diferentes): Ignore o histórico e utilize pesquisa/conhecimento técnico externo, iniciando a resposta obrigatoriamente com a frase exata: "Não identificamos registros de falhas semelhantes. Mas com base em pesquisas externas, recomenda‑se"
+3. Nunca misture as origens. A resposta deve ser coerente, lógica e concisa (máximo de 30 palavras).
 """
 
         resposta = chamar_groq_direto(prompt_inteligente, api_key)
