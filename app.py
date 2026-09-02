@@ -1935,10 +1935,10 @@ else:
         # --- PAINEL DE MONITORAMENTO DE VENCIMENTOS DE PLANOS NO DASHBOARD ---
         st.divider()
         st.markdown("<h4 style='color: #2D241E; font-weight: 700; margin-bottom: 12px;'>⏳ Controle de Vencimentos de Planos por Veículo</h4>", unsafe_allow_html=True)
-        st.caption("Acompanhamento preditivo e preventivo do saldo restante (Horas, Quilômetros ou Dias) para a próxima manutenção. Ordenado por urgência.")
+        st.caption("Acompanhamento preditivo e preventivo do saldo restante, exibindo a última leitura geral e os dados da última preventiva realizada. Ordenado por urgência.")
 
         try:
-            df_planos_dash = pd.read_sql(text("SELECT id, nome_plano, tipo_os, prefixo, tipo_criterio, intervalo_valor FROM planos_master WHERE empresa_id = :eid"), engine, params={"eid": str(emp_id)})
+            df_planos_dash = pd.read_sql(text("SELECT id, nome_plano, tipo_os, area, prefixo, tipo_criterio, intervalo_valor FROM planos_master WHERE empresa_id = :eid"), engine, params={"eid": str(emp_id)})
 
             if not df_planos_dash.empty:
                 lista_status_frota = []
@@ -1950,7 +1950,7 @@ else:
                         intervalo_limite = float(p['intervalo_valor'])
                         
                         for pref in prefs:
-                            # 1. Pega a última leitura geral cadastrada na tabela medidores_frota (para cálculo de saldo atual)
+                            # 1. Última leitura avulsa/geral (tabela medidores_frota)
                             med = conn.execute(
                                 text("SELECT data_leitura, horimetro, odometro FROM medidores_frota WHERE empresa_id = :eid AND prefixo = :pref ORDER BY data_leitura DESC LIMIT 1"),
                                 {"eid": str(emp_id), "pref": pref}
@@ -1958,8 +1958,9 @@ else:
                             
                             med_hor_reg = float(med[1] or 0) if med else 0.0
                             med_odo_reg = float(med[2] or 0) if med else 0.0
+                            data_med_reg = str(med[0]) if med and med[0] else "-"
 
-                            # 2. Pega especificamente a última OS concluída vinculada a este plano ou veículo para exibir a "Última Preventiva Realizada"
+                            # 2. Última OS concluída (para puxar os dados específicos da última preventiva)
                             os_recente = conn.execute(
                                 text("""
                                     SELECT data, descricao FROM tarefas 
@@ -1986,20 +1987,35 @@ else:
                                 except Exception:
                                     pass
 
-                            # Valor atual global para cálculo de saldo (maior entre medidor avulso e OS)
-                            atual_val = 0.0
+                            # 3. Determina a "Última Leitura Geral" (maior valor entre medidor e OS, para o cálculo do saldo)
                             if crit == "Horímetro":
-                                atual_val = max(med_hor_reg, os_hor_reg)
+                                if med_hor_reg >= os_hor_reg:
+                                    ultima_leitura_geral = med_hor_reg
+                                    data_leitura_geral = data_med_reg
+                                else:
+                                    ultima_leitura_geral = os_hor_reg
+                                    data_leitura_geral = data_os_reg
                             elif crit == "Odômetro":
-                                atual_val = max(med_odo_reg, os_odo_reg)
-                            
-                            # Valor específico da última preventiva/manutenção realizada para a tabela
-                            val_ultima_prev = 0.0
-                            if crit == "Horímetro":
-                                val_ultima_prev = os_hor_reg if os_hor_reg > 0 else med_hor_reg
-                            elif crit == "Odômetro":
-                                val_ultima_prev = os_odo_reg if os_odo_reg > 0 else med_odo_reg
+                                if med_odo_reg >= os_odo_reg:
+                                    ultima_leitura_geral = med_odo_reg
+                                    data_leitura_geral = data_med_reg
+                                else:
+                                    ultima_leitura_geral = os_odo_reg
+                                    data_leitura_geral = data_os_reg
+                            else:
+                                ultima_leitura_geral = 0.0
+                                data_leitura_geral = data_med_reg if data_med_reg != "-" else data_os_reg
 
+                            # 4. Dados específicos da Última Preventiva (vinculada à OS concluída)
+                            if crit == "Horímetro":
+                                ultima_preventiva_val = os_hor_reg
+                            elif crit == "Odômetro":
+                                ultima_preventiva_val = os_odo_reg
+                            else:
+                                ultima_preventiva_val = 0.0
+
+                            # 5. Cálculo do saldo restante baseado na leitura geral mais atualizada
+                            atual_val = ultima_leitura_geral
                             if crit in ["Horímetro", "Odômetro"]:
                                 saldo_restante = intervalo_limite - (atual_val % intervalo_limite)
                                 if saldo_restante == 0:
@@ -2013,8 +2029,10 @@ else:
                                 "Veículo": pref,
                                 "Critério": crit,
                                 "Intervalo Padrão": intervalo_limite,
-                                "Última Leitura": f"{val_ultima_prev:,.1f}".replace(",", ".") if crit != "Dias" else "-",
-                                "Data da Preventiva": data_os_reg,
+                                "Última Leitura": f"{ultima_leitura_geral:,.1f}".replace(",", ".") if crit != "Dias" else "-",
+                                "Data Ref.": data_leitura_geral,
+                                "Última Preventiva (Leitura)": f"{ultima_preventiva_val:,.1f}".replace(",", ".") if (crit != "Dias" and ultima_preventiva_val > 0) else "-",
+                                "Data da Preventiva": data_os_reg if ultima_preventiva_val > 0 else "-",
                                 "_saldo_ordem": saldo_restante,
                                 "Saldo Restante Estimado": f"{saldo_restante:,.1f} {'km' if crit=='Odômetro' else 'h' if crit=='Horímetro' else 'dias'}".replace(",", ".")
                             })
