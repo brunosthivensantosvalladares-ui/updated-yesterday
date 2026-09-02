@@ -118,6 +118,17 @@ def get_engine():
         st.stop()
     return create_engine(db_url.replace("postgres://", "postgresql://", 1), pool_pre_ping=True)
 
+# --- FUNÇÕES OTIMIZADAS COM CACHE DE CURTA DURAÇÃO PARA NAVEGAÇÃO INSTANTÂNEA ---
+@st.cache_data(ttl=30, show_spinner=False)
+def carregar_tarefas_empresa(emp_id):
+    engine = get_engine()
+    return pd.read_sql(text("SELECT * FROM tarefas WHERE empresa_id = :eid ORDER BY data DESC, id DESC"), engine, params={"eid": str(emp_id)})
+
+@st.cache_data(ttl=30, show_spinner=False)
+def carregar_planos_master_empresa(emp_id):
+    engine = get_engine()
+    return pd.read_sql(text("SELECT id, nome_plano, tipo_os, area, prefixo, tipo_criterio, intervalo_valor FROM planos_master WHERE empresa_id = :eid ORDER BY id DESC"), engine, params={"eid": str(emp_id)})
+
 # --- CONFIGURAÇÃO DO MODELO LLAMA 3 (GROQ) & BUSCA WEB ---
 def obter_llm():
     api_key = st.secrets.get("GROQ_API_KEY") or os.environ.get("GROQ_API_KEY")
@@ -763,263 +774,269 @@ st.set_page_config(page_title=f"{NOME_SISTEMA} - Painel de Controle", layout="wi
 puxar_topo_para_cima()
 
 st.markdown(f"""
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&display=swap');
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&display=swap');
 
-    html, body, [data-testid="stAppViewContainer"], .stApp {{ 
-        background-color: {COR_CHAPA} !important; 
-        font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif !important;
-    }}
+html, body, [data-testid="stAppViewContainer"], .stApp {{ 
+    background-color: {COR_CHAPA} !important; 
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif !important;
+}}
 
-    header[data-testid="stHeader"] {{
-        background: transparent !important;
-        visibility: visible !important;
-        display: block !important;
-        height: 3rem !important;
-    }}
-    
-    .main, .main .block-container, div[data-testid="stMainBlockContainer"], div[data-testid="stAppViewBlockContainer"] {{
-        padding-top: 0rem !important;
-        margin-top: 0rem !important; 
-    }}
-    
-    section[data-testid="stSidebar"] {{ 
-        background: linear-gradient(180deg, #2A211B 0%, #1D1612 100%) !important; 
-        border-right: 1px solid #3D3128 !important;
-        overflow: hidden !important;
-    }}
-    section[data-testid="stSidebar"] > div:first-child {{
-        overflow: hidden !important;
-        padding-top: 0rem !important;
-        padding-bottom: 0.4rem !important;
-        padding-left: 0.6rem !important;
-        padding-right: 0.6rem !important;
-        display: flex !important;
-        flex-direction: column !important;
-        height: 100vh !important;
-    }}
-    section[data-testid="stSidebar"] * {{
-        color: #F0EDE6 !important;
-    }}
+header[data-testid="stHeader"] {{
+    background: transparent !important;
+    visibility: visible !important;
+    display: block !important;
+    height: 3rem !important;
+}}
 
-    section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] {{
-        gap: 0 !important;
-    }}
-    section[data-testid="stSidebar"] hr {{
-        margin: 2px 0 20px 0 !important;
-        border-color: rgba(197, 160, 89, 0.25) !important;
-    }}
+.main, .main .block-container, div[data-testid="stMainBlockContainer"], div[data-testid="stAppViewBlockContainer"] {{
+    padding-top: 0rem !important;
+    margin-top: 0rem !important; 
+}}
 
-    .logo-container-circular {{
-        margin: 0 auto !important;
-        border-radius: 50%;
-        overflow: hidden;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-    }}
-    .logo-img-crop {{
-        width: 100%;
-        height: 100%;
-        object-fit: cover !important;
-        display: block;
-        margin: 0 auto;
-        border-radius: 50%;
-    }}
-    
-    .brand-title-gold, .login-brand-title {{
-        font-family: 'Cinzel', serif !important;
-        font-weight: 800 !important;
-        font-size: 0.92rem !important;
-        letter-spacing: 1.2px !important;
-        background: linear-gradient(135deg, #E6C875 0%, #C5A059 50%, #9B783E 100%) !important;
-        -webkit-background-clip: text !important;
-        -webkit-text-fill-color: transparent !important;
-        margin: 3px auto 0 auto !important;
-        text-align: center !important;
-        text-transform: uppercase !important;
-        white-space: nowrap !important;
-        display: block !important;
-        width: 100% !important;
-    }}
+section[data-testid="stSidebar"] {{ 
+    background: linear-gradient(180deg, #2A211B 0%, #1D1612 100%) !important; 
+    border-right: 1px solid #3D3128 !important;
+    overflow: hidden !important;
+}}
+section[data-testid="stSidebar"] > div:first-child {{
+    overflow: hidden !important;
+    padding-top: 0rem !important;
+    padding-bottom: 0.4rem !important;
+    padding-left: 0.6rem !important;
+    padding-right: 0.6rem !important;
+    display: flex !important;
+    flex-direction: column !important;
+    height: 100vh !important;
+}}
+section[data-testid="stSidebar"] * {{
+    color: #F0EDE6 !important;
+}}
 
-    .sidebar-nav-title {{
-        margin: 10px 0 20px 0 !important;
-        padding: 0 !important;
-        font-size: 0.82rem !important;
-        line-height: 1.15 !important;
-        color: #F0EDE6 !important;
-    }}
+section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] {{
+    gap: 0 !important;
+}}
+section[data-testid="stSidebar"] hr {{
+    margin: 2px 0 20px 0 !important;
+    border-color: rgba(197, 160, 89, 0.25) !important;
+}}
 
-    section[data-testid="stSidebar"] button[kind="secondary"],
-    section[data-testid="stSidebar"] button[data-testid="stBaseButton-secondary"],
-    section[data-testid="stSidebar"] div[data-testid="stButton"] button[kind="secondary"] {{
-        width: 100% !important;
-        min-height: 30px !important;
-        height: 30px !important;
-        margin: 0 !important;
-        padding: 2px 8px !important;
-        border-radius: 8px !important;
-        font-size: 0.90rem !important;
-        line-height: 1 !important;
-        justify-content: flex-start !important;
-        text-align: left !important;
-        box-sizing: border-box !important;
-        background: transparent !important;
-        border-color: transparent !important;
-    }}
+.logo-container-circular {{
+    margin: 0 auto !important;
+    border-radius: 50%;
+    overflow: hidden;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}}
+.logo-img-crop {{
+    width: 100%;
+    height: 100%;
+    object-fit: cover !important;
+    display: block;
+    margin: 0 auto;
+    border-radius: 50%;
+}}
 
-    section[data-testid="stSidebar"] button[kind="secondary"] p,
-    section[data-testid="stSidebar"] button[kind="secondary"] span,
-    section[data-testid="stSidebar"] button[kind="secondary"] div,
-    section[data-testid="stSidebar"] button[data-testid="stBaseButton-secondary"] p,
-    section[data-testid="stSidebar"] button[data-testid="stBaseButton-secondary"] span,
-    section[data-testid="stSidebar"] button[data-testid="stBaseButton-secondary"] div {{
-        font-size: 0.90rem !important;
-        line-height: 1 !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        color: #FFFFFF !important;
-        -webkit-text-fill-color: #FFFFFF !important;
-    }}
+.brand-title-gold, .login-brand-title {{
+    font-family: 'Cinzel', serif !important;
+    font-weight: 800 !important;
+    font-size: 0.92rem !important;
+    letter-spacing: 1.2px !important;
+    background: linear-gradient(135deg, #E6C875 0%, #C5A059 50%, #9B783E 100%) !important;
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+    margin: 3px auto 0 auto !important;
+    text-align: center !important;
+    text-transform: uppercase !important;
+    white-space: nowrap !important;
+    display: block !important;
+    width: 100% !important;
+}}
 
-    section[data-testid="stSidebar"] button[kind="secondary"]:hover,
-    section[data-testid="stSidebar"] button[data-testid="stBaseButton-secondary"]:hover,
-    section[data-testid="stSidebar"] button[kind="primary"]:hover,
-    section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"]:hover {{
-        background: rgba(0, 0, 0, 0.38) !important;
-        border-color: rgba(197, 160, 89, 0.55) !important;
-        box-shadow: inset 0 0 0 1px rgba(197, 160, 89, 0.18), 0 2px 8px rgba(0, 0, 0, 0.22) !important;
-    }}
+.sidebar-nav-title {{
+    margin: 10px 0 20px 0 !important;
+    padding: 0 !important;
+    font-size: 0.82rem !important;
+    line-height: 1.15 !important;
+    color: #F0EDE6 !important;
+}}
 
-    section[data-testid="stSidebar"] button[kind="primary"],
-    section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"],
-    section[data-testid="stSidebar"] div[data-testid="stButton"] button[kind="primary"] {{
-        width: 100% !important;
-        min-height: 30px !important;
-        height: 30px !important;
-        margin: 0 !important;
-        padding: 2px 8px !important;
-        border-radius: 8px !important;
-        font-size: 0.90rem !important;
-        line-height: 1 !important;
-        justify-content: flex-start !important;
-        text-align: left !important;
-        box-sizing: border-box !important;
-        background: rgba(197, 160, 89, 0.32) !important;
-        border-color: rgba(197, 160, 89, 0.6) !important;
-        font-weight: 700 !important;
-    }}
+section[data-testid="stSidebar"] button[kind="secondary"],
+section[data-testid="stSidebar"] button[data-testid="stBaseButton-secondary"],
+section[data-testid="stSidebar"] div[data-testid="stButton"] button[kind="secondary"] {{
+    width: 100% !important;
+    min-height: 30px !important;
+    height: 30px !important;
+    margin: 0 !important;
+    padding: 2px 8px !important;
+    border-radius: 8px !important;
+    font-size: 0.90rem !important;
+    line-height: 1 !important;
+    justify-content: flex-start !important;
+    text-align: left !important;
+    box-sizing: border-box !important;
+    background: transparent !important;
+    border-color: transparent !important;
+}}
 
-    section[data-testid="stSidebar"] button[kind="primary"] p,
-    section[data-testid="stSidebar"] button[kind="primary"] span,
-    section[data-testid="stSidebar"] button[kind="primary"] div,
-    section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"] p,
-    section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"] span,
-    section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"] div {{
-        font-size: 0.90rem !important;
-        line-height: 1 !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        color: #FFFFFF !important;
-        -webkit-text-fill-color: #FFFFFF !important;
-    }}
+section[data-testid="stSidebar"] button[kind="secondary"] p,
+section[data-testid="stSidebar"] button[kind="secondary"] span,
+section[data-testid="stSidebar"] button[kind="secondary"] div,
+section[data-testid="stSidebar"] button[data-testid="stBaseButton-secondary"] p,
+section[data-testid="stSidebar"] button[data-testid="stBaseButton-secondary"] span,
+section[data-testid="stSidebar"] button[data-testid="stBaseButton-secondary"] div {{
+    font-size: 0.90rem !important;
+    line-height: 1 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    color: #FFFFFF !important;
+    -webkit-text-fill-color: #FFFFFF !important;
+    text-align: left !important;
+    justify-content: flex-start !important;
+}}
 
-    section[data-testid="stSidebar"] button:not([key^="nav_btn_"]) {{
-        padding: 0.30rem 0.6rem !important;
-        min-height: 30px !important;
-        font-size: 0.84rem !important;
-    }}
+section[data-testid="stSidebar"] button[kind="secondary"]:hover,
+section[data-testid="stSidebar"] button[data-testid="stBaseButton-secondary"]:hover,
+section[data-testid="stSidebar"] button[kind="primary"]:hover,
+section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"]:hover {{
+    background: rgba(0, 0, 0, 0.38) !important;
+    border-color: rgba(197, 160, 89, 0.55) !important;
+    box-shadow: inset 0 0 0 1px rgba(197, 160, 89, 0.18), 0 2px 8px rgba(0, 0, 0, 0.22) !important;
+}}
 
-    button, 
-    button[kind="primary"], 
-    button[kind="secondary"], 
-    [data-testid="stBaseButton-primary"], 
-    [data-testid="stBaseButton-secondary"] {{
-        background-color: {COR_BRONZE} !important;
-        border: 1.5px solid {COR_OURO} !important;
-        border-radius: 6px !important;
-        color: #FFFFFF !important;
-    }}
+section[data-testid="stSidebar"] button[kind="primary"],
+section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"],
+section[data-testid="stSidebar"] div[data-testid="stButton"] button[kind="primary"] {{
+    width: 100% !important;
+    min-height: 30px !important;
+    height: 30px !important;
+    margin: 0 !important;
+    padding: 2px 8px !important;
+    border-radius: 8px !important;
+    font-size: 0.90rem !important;
+    line-height: 1 !important;
+    justify-content: flex-start !important;
+    text-align: left !important;
+    box-sizing: border-box !important;
+    background: rgba(197, 160, 89, 0.32) !important;
+    border-color: rgba(197, 160, 89, 0.6) !important;
+    font-weight: 700 !important;
+}}
 
-    button p, button span, button div,
-    [data-testid="stBaseButton-primary"] p, [data-testid="stBaseButton-primary"] span,
-    [data-testid="stBaseButton-secondary"] p, [data-testid="stBaseButton-secondary"] span {{
-        color: #FFFFFF !important;
-        -webkit-text-fill-color: #FFFFFF !important;
-    }}
+section[data-testid="stSidebar"] button[kind="primary"] p,
+section[data-testid="stSidebar"] button[kind="primary"] span,
+section[data-testid="stSidebar"] button[kind="primary"] div,
+section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"] p,
+section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"] span,
+section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"] div {{
+    font-size: 0.90rem !important;
+    line-height: 1 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    color: #FFFFFF !important;
+    -webkit-text-fill-color: #FFFFFF !important;
+    text-align: left !important;
+    justify-content: flex-start !important;
+}}
 
-    div.stHorizontalBlock button[kind="primary"] {{
-        background-color: {COR_OURO} !important;
-        border: 2px solid {COR_BRONZE} !important;
-    }}
+section[data-testid="stSidebar"] button:not([key^="nav_btn_"]) {{
+    padding: 0.30rem 0.6rem !important;
+    min-height: 30px !important;
+    font-size: 0.84rem !important;
+    text-align: left !important;
+    justify-content: flex-start !important;
+}}
 
-    div.stHorizontalBlock button[kind="primary"] p, 
-    div.stHorizontalBlock button[kind="primary"] span, 
-    div.stHorizontalBlock button[kind="primary"] div {{
-        color: {COR_TEXTO} !important;
-        -webkit-text-fill-color: {COR_TEXTO} !important;
-    }}
+button, 
+button[kind="primary"], 
+button[kind="secondary"], 
+[data-testid="stBaseButton-primary"], 
+[data-testid="stBaseButton-secondary"] {{
+    background-color: {COR_BRONZE} !important;
+    border: 1.5px solid {COR_OURO} !important;
+    border-radius: 6px !important;
+    color: #FFFFFF !important;
+}}
 
-    .top-fixed-section {{
-        position: -webkit-sticky !important;
-        position: sticky !important;
-        top: 0px !important;
-        z-index: 99999 !important;
-        background-color: #F7F5F0 !important;
-        padding-top: 0px !important; 
-        padding-bottom: 2px !important;
-        border-bottom: 1.5px solid #E2D9CB !important;
-        box-shadow: 0 4px 16px rgba(35, 31, 32, 0.06) !important;
-        margin-left: -1.5rem !important;
-        margin-right: -1.5rem !important;
-        padding-left: 1.5rem !important;
-        padding-right: 1.5rem !important;
-        margin-bottom: 10px !important;
-        transform: translateY(-115px) !important; 
-    }}
-    
-    .top-fixed-section div[data-testid="stTextInput"] {{
-        margin-top: -2px !important;
-    }}
-    .top-fixed-section div[data-testid="stPopover"] button {{
-        padding: 4px 10px !important;
-        min-height: 38px !important;
-        font-size: 0.85rem !important;
-    }}
+button p, button span, button div,
+[data-testid="stBaseButton-primary"] p, [data-testid="stBaseButton-primary"] span,
+[data-testid="stBaseButton-secondary"] p, [data-testid="stBaseButton-secondary"] span {{
+    color: #FFFFFF !important;
+    -webkit-text-fill-color: #FFFFFF !important;
+}}
 
-    .metric-card {{
-        background: #FFFFFF;
-        border-radius: 18px;
-        padding: 22px;
-        border: 1px solid #EFEAE1;
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.03);
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-    }}
-    .metric-icon-box {{
-        width: 58px;
-        height: 58px;
-        border-radius: 14px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.9rem;
-    }}
-    .metric-value {{
-        font-size: 2.2rem;
-        font-weight: 800;
-        color: #1F1915;
-        line-height: 1;
-        margin-top: 4px;
-    }}
-    .metric-label {{
-        font-size: 0.9rem;
-        color: #8F847B;
-        font-weight: 600;
-    }}
-    </style>
+div.stHorizontalBlock button[kind="primary"] {{
+    background-color: {COR_OURO} !important;
+    border: 2px solid {COR_BRONZE} !important;
+}}
+
+div.stHorizontalBlock button[kind="primary"] p, 
+div.stHorizontalBlock button[kind="primary"] span, 
+div.stHorizontalBlock button[kind="primary"] div {{
+    color: {COR_TEXTO} !important;
+    -webkit-text-fill-color: {COR_TEXTO} !important;
+}}
+
+.top-fixed-section {{
+    position: -webkit-sticky !important;
+    position: sticky !important;
+    top: 0px !important;
+    z-index: 99999 !important;
+    background-color: #F7F5F0 !important;
+    padding-top: 0px !important; 
+    padding-bottom: 2px !important;
+    border-bottom: 1.5px solid #E2D9CB !important;
+    box-shadow: 0 4px 16px rgba(35, 31, 32, 0.06) !important;
+    margin-left: -1.5rem !important;
+    margin-right: -1.5rem !important;
+    padding-left: 1.5rem !important;
+    padding-right: 1.5rem !important;
+    margin-bottom: 10px !important;
+    transform: translateY(-115px) !important; 
+}}
+
+.top-fixed-section div[data-testid="stTextInput"] {{
+    margin-top: -2px !important;
+}}
+.top-fixed-section div[data-testid="stPopover"] button {{
+    padding: 4px 10px !important;
+    min-height: 38px !important;
+    font-size: 0.85rem !important;
+}}
+
+.metric-card {{
+    background: #FFFFFF;
+    border-radius: 18px;
+    padding: 22px;
+    border: 1px solid #EFEAE1;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.03);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}}
+.metric-icon-box {{
+    width: 58px;
+    height: 58px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.9rem;
+}}
+.metric-value {{
+    font-size: 2.2rem;
+    font-weight: 800;
+    color: #1F1915;
+    line-height: 1;
+    margin-top: 4px;
+}}
+.metric-label {{
+    font-size: 0.9rem;
+    color: #8F847B;
+    font-weight: 600;
+}}
+</style>
 """, unsafe_allow_html=True)
 
 def exibir_painel_pagamento_pro(origem):
@@ -1520,8 +1537,8 @@ else:
                 ]
                 for so_label, so_idx in sub_opcoes_sidebar:
                     is_active_sub = st.session_state.get("sub_aba_idx", 0) == so_idx
-                    # Usamos HTML/Markdown customizado simulando recuo e destaque com a cor de bronze/ouro da paleta
                     if st.button(so_label, key=f"sidebar_sub_nav_{so_idx}", use_container_width=True, type="primary" if is_active_sub else "secondary"):
+                        st.session_state.opcao_selecionada = "🗎  Cadastro Direto"
                         st.session_state.sub_aba_idx = so_idx
                         st.rerun()
         
@@ -1918,7 +1935,7 @@ else:
         # --- PAINEL DE MONITORAMENTO DE VENCIMENTOS DE PLANOS NO DASHBOARD ---
         st.divider()
         st.markdown("<h4 style='color: #2D241E; font-weight: 700; margin-bottom: 12px;'>⏳ Controle de Vencimentos de Planos por Veículo</h4>", unsafe_allow_html=True)
-        st.caption("Acompanhamento preditivo e preventivo do saldo restante (Horas, Quilômetros ou Dias) para a próxima manutenção.")
+        st.caption("Acompanhamento preditivo e preventivo do saldo restante (Horas, Quilômetros ou Dias) para a próxima manutenção. Ordenado por urgência.")
 
         try:
             df_planos_dash = pd.read_sql(text("SELECT id, nome_plano, tipo_os, prefixo, tipo_criterio, intervalo_valor FROM planos_master WHERE empresa_id = :eid"), engine, params={"eid": str(emp_id)})
@@ -1938,14 +1955,50 @@ else:
                                 {"eid": str(emp_id), "pref": pref}
                             ).fetchone()
                             
-                            atual_val = 0.0
-                            if med:
-                                if crit == "Horímetro":
-                                    atual_val = float(med[1] or 0)
-                                elif crit == "Odômetro":
-                                    atual_val = float(med[2] or 0)
+                            med_hor_reg = float(med[1] or 0) if med else 0.0
+                            med_odo_reg = float(med[2] or 0) if med else 0.0
+                            data_med_reg = str(med[0]) if med and med[0] else "-"
+
+                            os_recente = conn.execute(
+                                text("""
+                                    SELECT data, descricao FROM tarefas 
+                                    WHERE empresa_id = :eid AND prefixo = :pref AND realizado = TRUE 
+                                    ORDER BY data DESC LIMIT 1
+                                """),
+                                {"eid": str(emp_id), "pref": pref}
+                            ).fetchone()
                             
-                            saldo_restante = intervalo_limite - (atual_val % intervalo_limite) if crit in ["Horímetro", "Odômetro"] else intervalo_limite
+                            os_hor_reg = 0.0
+                            os_odo_reg = 0.0
+                            data_os_reg = "-"
+                            
+                            if os_recente:
+                                data_os_reg = str(os_recente[0])
+                                desc_os = str(os_recente[1])
+                                try:
+                                    if "Horímetro:" in desc_os:
+                                        h_str = desc_os.split("Horímetro:")[1].split("h")[0].strip()
+                                        os_hor_reg = float(h_str)
+                                    if "Odômetro:" in desc_os:
+                                        o_str = desc_os.split("Odômetro:")[1].split("km")[0].strip()
+                                        os_odo_reg = float(o_str)
+                                except Exception:
+                                    pass
+
+                            atual_val = 0.0
+                            data_ref = data_med_reg if data_med_reg != "-" else data_os_reg
+                            
+                            if crit == "Horímetro":
+                                atual_val = max(med_hor_reg, os_hor_reg)
+                            elif crit == "Odômetro":
+                                atual_val = max(med_odo_reg, os_odo_reg)
+                            
+                            if crit in ["Horímetro", "Odômetro"]:
+                                saldo_restante = intervalo_limite - (atual_val % intervalo_limite)
+                                if saldo_restante == 0:
+                                    saldo_restante = intervalo_limite
+                            else:
+                                saldo_restante = intervalo_limite
                             
                             lista_status_frota.append({
                                 "Plano": p['nome_plano'],
@@ -1953,12 +2006,15 @@ else:
                                 "Veículo": pref,
                                 "Critério": crit,
                                 "Intervalo Padrão": intervalo_limite,
-                                "Leitura Atual": atual_val if crit != "Dias" else "-",
-                                "Saldo Restante Estimado": f"{saldo_restante:,.0f} {'km' if crit=='Odômetro' else 'h' if crit=='Horímetro' else 'dias'}"
+                                "Última Leitura": f"{atual_val:,.1f}".replace(",", ".") if crit != "Dias" else "-",
+                                "Data Ref.": data_ref,
+                                "_saldo_ordem": saldo_restante,
+                                "Saldo Restante Estimado": f"{saldo_restante:,.1f} {'km' if crit=='Odômetro' else 'h' if crit=='Horímetro' else 'dias'}".replace(",", ".")
                             })
 
                 df_status_final = pd.DataFrame(lista_status_frota)
                 if not df_status_final.empty:
+                    df_status_final = df_status_final.sort_values(by="_saldo_ordem", ascending=True).drop(columns=["_saldo_ordem"])
                     st.dataframe(df_status_final, use_container_width=True, hide_index=True)
                 else:
                     st.info("Nenhum veículo vinculado aos planos cadastrados.")
@@ -2080,6 +2136,14 @@ else:
                 with st.form("form_baixa_exclusiva"):
                     servico_realizado = st.text_area("O que foi feito de fato / Observações gerais?")
                     
+                    st.markdown("---")
+                    st.markdown("#### ⏱️ Dados de Encerramento e Medidores (Para controle de Planos)")
+                    
+                    col_b1, col_b2, col_b3 = st.columns(3)
+                    data_realizacao_baixa = col_b1.date_input("Data de Realização", datetime.now())
+                    horimetro_baixa = col_b2.number_input("Horímetro Atual (Opcional)", min_value=0.0, step=1.0, value=0.0)
+                    odometro_baixa = col_b3.number_input("Odômetro Atual (Opcional)", min_value=0.0, step=1.0, value=0.0)
+                    
                     # --- CAMPOS DINÂMICOS CONFORME O TIPO DE OS ---
                     respostas_tecnicas = ""
                     if tipo_os_atual == "Preditiva":
@@ -2100,23 +2164,64 @@ else:
                         if not servico_realizado:
                             st.error("A descrição do serviço é obrigatória.")
                         else:
-                            relato = f"Execução: {servico_realizado}{respostas_tecnicas}; Mecânico: {executor}; Horário: {h_ini}-{h_fim}"
+                            pref_veiculo = str(os_data['prefixo']).strip()
+                            
+                            # PRIORIDADE 1 & 2: Tratamento e Gravação dos Medidores
+                            h_final_gravacao = horimetro_baixa
+                            o_final_gravacao = odometro_baixa
+                            
                             with engine.begin() as conn:
+                                # Se o usuário não preencheu os medidores na baixa (Prioridade 2), tenta buscar na base com base na data
+                                if h_final_gravacao == 0.0 and o_final_gravacao == 0.0:
+                                    med_fallback = conn.execute(
+                                        text("""
+                                            SELECT horimetro, odometro, ABS(data_leitura - CAST(:dt AS DATE)) as diff_dias
+                                            FROM medidores_frota 
+                                            WHERE empresa_id = :eid AND prefixo = :pref
+                                            ORDER BY diff_dias ASC, data_leitura DESC
+                                            LIMIT 1
+                                        """),
+                                        {"eid": str(emp_id), "pref": pref_veiculo, "dt": str(data_realizacao_baixa)}
+                                    ).fetchone()
+                                    
+                                    if med_fallback:
+                                        h_final_gravacao = float(med_fallback[0] or 0.0)
+                                        o_final_gravacao = float(med_fallback[1] or 0.0)
+
+                                # Salva ou atualiza a leitura oficial do medidor vinculada a esta data de baixa
+                                if h_final_gravacao > 0 or o_final_gravacao > 0:
+                                    conn.execute(
+                                        text("""
+                                            INSERT INTO medidores_frota (empresa_id, prefixo, data_leitura, horimetro, odometro)
+                                            VALUES (:eid, :pref, :dt, :hor, :odo)
+                                        """),
+                                        {
+                                            "eid": str(emp_id), "pref": pref_veiculo, 
+                                            "dt": str(data_realizacao_baixa), 
+                                            "hor": h_final_gravacao, "odo": o_final_gravacao
+                                        }
+                                    )
+
+                                relato = f"Execução: {servico_realizado}{respostas_tecnicas}; Mecânico: {executor}; Horário: {h_ini}-{h_fim} | [Baixa - Horímetro: {h_final_gravacao}h, Odômetro: {o_final_gravacao}km]"
+                                
                                 query_update = text("""
                                     UPDATE tarefas 
                                     SET realizado = True, 
+                                        data = :dt_baixa,
                                         descricao = 'OS: ' || :os || '; Prefixo: ' || :pref || '; ' || COALESCE(descricao, '') || '; ' || :relato
                                     WHERE id = :id_banco 
                                     AND empresa_id = :eid
                                 """)
                                 conn.execute(query_update, {
+                                    "dt_baixa": str(data_realizacao_baixa),
                                     "relato": str(relato), "os": str(os_num),
-                                    "pref": str(os_data['prefixo']), "id_banco": int(os_data['id']),
+                                    "pref": pref_veiculo, "id_banco": int(os_data['id']),
                                     "eid": str(emp_id)
                                 })
+                                
                             st.cache_data.clear()
                             st.session_state.os_em_baixa = None
-                            st.success(f"✅ OS {os_num} finalizada com sucesso!")
+                            st.success(f"✅ OS {os_num} finalizada e métricas de controle atualizadas com sucesso!")
                             st.rerun()
 
         else:
@@ -2200,8 +2305,7 @@ else:
             st.stop()
 
         try:
-            query = text("SELECT numero_os, data, prefixo, descricao, realizado FROM tarefas WHERE empresa_id = :eid ORDER BY data DESC")
-            df_agenda = pd.read_sql(query, engine, params={"eid": str(emp_id)})
+            df_agenda = carregar_tarefas_empresa(emp_id)
             if not df_agenda.empty:
                 df_agenda['Nº OS'] = df_agenda['numero_os'].astype(str).replace(['None', 'nan', 'None.0'], '')
                 df_agenda['Nº OS'] = df_agenda['Nº OS'].str.replace('.0', '', regex=False)
@@ -2312,7 +2416,7 @@ else:
         st.divider()
         st.info("✍️ **Logística:** Clique nas colunas de **Início** ou **Fim** para preencher. **PCM:** Clique em **Área** ou **Executor** para definir. O salvamento é automático.")
         
-        df_a = pd.read_sql(text("SELECT * FROM tarefas WHERE empresa_id = :eid ORDER BY data DESC"), engine, params={"eid": str(emp_id)})
+        df_a = carregar_tarefas_empresa(emp_id)
         hoje_input, amanha = datetime.now().date(), datetime.now().date() + timedelta(days=1)
         
         c_per, c_area, c_turno = st.columns([0.4, 0.3, 0.3])
@@ -2396,7 +2500,6 @@ else:
             
         abas_nomes = ["📝 Agendamento Direto", "📚 Gerenciar Planos Master", "⚡ Gerar OS em Lote (Planos)"]
         
-        # Substitui o radio por colunas de botões customizados para sincronia perfeita e visual limpo
         cols_abas = st.columns(3)
         for idx_aba, nome_aba in enumerate(abas_nomes):
             ativo = (st.session_state.sub_aba_idx == idx_aba)
@@ -2464,7 +2567,7 @@ else:
             # --- LISTA GERAL DE SERVIÇOS EXCLUSIVA DA ABA DE AGENDAMENTO DIRETO ---
             st.divider()
             st.subheader("📋 Lista geral de serviços")
-            df_lista = pd.read_sql(text("SELECT * FROM tarefas WHERE empresa_id = :eid ORDER BY data DESC, id DESC"), engine, params={"eid": str(emp_id)})
+            df_lista = carregar_tarefas_empresa(emp_id)
             
             if not df_lista.empty:
                 df_lista['data'] = pd.to_datetime(df_lista['data']).dt.date
@@ -2585,7 +2688,7 @@ else:
             st.subheader("📋 Planos Cadastrados (Clique para Expandir e Gerenciar)")
             
             # --- LISTAGEM COM ACORDEÃO SEGURO ---
-            df_planos_master = pd.read_sql(text("SELECT id, nome_plano, tipo_os, area, prefixo, tipo_criterio, intervalo_valor FROM planos_master WHERE empresa_id = :eid ORDER BY id DESC"), engine, params={"eid": str(emp_id)})
+            df_planos_master = carregar_planos_master_empresa(emp_id)
             
             if not df_planos_master.empty:
                 with st.container(key="container_lista_planos_master"):
@@ -2718,7 +2821,7 @@ else:
             st.markdown("### ⚡ Geração de Ordens de Serviço em Lote via Planos Master")
             st.info("💡 Selecione um plano cadastrado, escolha a data de execução, os horários (opcionais) e os veículos para gerar as OSs.")
 
-            df_planos_lote = pd.read_sql(text("SELECT id, nome_plano, tipo_os, area, prefixo, tipo_criterio, intervalo_valor FROM planos_master WHERE empresa_id = :eid"), engine, params={"eid": str(emp_id)})
+            df_planos_lote = carregar_planos_master_empresa(emp_id)
 
             if not df_planos_lote.empty:
                 mapa_p_lote = {f"{row['nome_plano']} ({row['tipo_os']} - Cada {row['intervalo_valor']} {row['tipo_criterio'].lower()})": row['id'] for _, row in df_planos_lote.iterrows()}
