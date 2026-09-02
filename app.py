@@ -182,24 +182,21 @@ def remover_acentos(texto):
     nfkd = unicodedata.normalize('NFKD', str(texto))
     return "".join([c for c in nfkd if not unicodedata.combining(c)]).lower()
 
-# --- BUSCA DE HISTÓRICO GERAL NA FROTA COM ALTA PRECISÃO ---
+# --- BUSCA DE HISTÓRICO GERAL NA FROTA (ENVIA O CONTEXTO BRUTO PARA A IA DECIDIR) ---
 def buscar_historico_relevante(sintoma, emp_id, prefixo=None):
     engine = get_engine()
     
+    # Busca os registros mais recentes da frota para a IA analisar o contexto completo
     query_geral_frota = text("""
         SELECT data, prefixo, descricao, COALESCE(executor, 'Não informado') as executor, numero_os, realizado 
         FROM tarefas 
         WHERE empresa_id = :eid
-        ORDER BY id DESC
+        ORDER BY id DESC LIMIT 100
     """)
     
     try:
         historico_formatado = []
         vistos = set()
-        
-        sintoma_limpo = remover_acentos(sintoma)
-        # Sem listas fixas em Python: extrai dinamicamente as palavras relevantes do sintoma
-        palavras_chave = [p for p in sintoma_limpo.split() if len(p) > 2]
         
         with engine.connect() as conn:
             resultados = conn.execute(query_geral_frota, {"eid": str(emp_id)}).fetchall()
@@ -212,66 +209,46 @@ def buscar_historico_relevante(sintoma, emp_id, prefixo=None):
                 num_os = f"OS {r[4]}" if r[4] else "Sem Nº"
                 realizado = r[5]
                 
-                desc_norm = remover_acentos(desc)
+                status_os = "Concluída" if realizado else "Pendente"
+                linha = f"[Veículo {pref}] Data: {dt} | {num_os} | Status: {status_os} | Descrição: {desc} | Mecânico: {execut}"
                 
-                # Coincidência dinâmica de termos na descrição
-                match_tecnico = any(kw in desc_norm for kw in palavras_chave)
-                relevante = (prefixo and str(pref).lower() == str(pref).lower()) or match_tecnico
-                
-                if relevante and match_tecnico:
-                    status_os = "Concluída" if realizado else "Pendente / Sem retorno de execução"
-                    linha = f"[Veículo {pref}] Data: {dt} | {num_os} | Status: {status_os} | Descrição/Serviço: {desc} | Mecânico: {execut}"
-                    chave = (dt, pref, desc_norm)
-                    if chave not in vistos:
-                        vistos.add(chave)
-                        historico_formatado.append(linha)
+                if linha not in vistos:
+                    vistos.add(linha)
+                    historico_formatado.append(linha)
 
-        return historico_formatado[:15] if historico_formatado else []
+        return historico_formatado[:30] if historico_formatado else []
     except Exception as e:
         return []
 
-# --- TRIAGEM DO MR. HALLEY COM SEPARAÇÃO RIGOROSA DE FLUXO ---
+# --- TRIAGEM INTELIGENTE DO MR. HALLEY (DECISÃO SEMÂNTICA PURA PELO LLM) ---
 def triagem_mr_halley(sintoma, emp_id, prefixo=None, incluir_saudacao=False):
     try:
         api_key = obter_llm()
         if not api_key:
             return "Erro: Chave da API Groq não configurada."
 
+        # Traz o histórico recente da frota para o modelo avaliar semanticamente
         historicos = buscar_historico_relevante(sintoma, emp_id, prefixo=prefixo)
-        tem_historico = bool(historicos and len(historicos) > 0)
-        
-        historico_formatado = "\n".join(historicos) if tem_historico else "Nenhum registro anterior na frota."
+        historico_formatado = "\n".join(historicos) if historicos else "Nenhum registro no banco."
 
-        if tem_historico:
-            prompt_decisao_e_resposta = f"""
+        # Prompt unificado inteligente: a IA cruza o sentido do sintoma com o histórico de forma autônoma
+        prompt_inteligente = f"""
 Você é o Mr. Halley, assistente técnico de manutenção da plataforma Up 2 Today.
-Veículo: {prefixo if prefixo else "Não informado"}
-Sintoma Relatado: "{sintoma}"
+Veículo em análise: {prefixo if prefixo else "Não informado"}
+Sintoma Relatado pelo Usuário: "{sintoma}"
 
-Histórico Encontrado no Banco de Dados da Frota:
+Histórico de Ordens de Serviço da Frota:
 {historico_formatado}
 
-INSTRUÇÕES OBRIGATÓRIAS:
-1. Analise se o histórico acima trata EXATAMENTE do mesmo problema relatado no sintoma.
-2. SE o histórico for compatível e direto para este problema, baseie sua resposta nele e inicie OBRIGATORIAMENTE com a frase exata: "Baseado no histórico local da frota, recomenda-se"
-3. CASO CONTRÁRIO (se o histórico for genérico ou de outro componente totalmente diferente): Ignore-o e trate como ausência de histórico, utilizando pesquisa externa e iniciando OBRIGATORIAMENTE com: "Não identificamos registros de falhas semelhantes. Mas com base em pesquisas externas, recomenda‑se"
-4. Seja conciso (máximo de 30 palavras).
-"""
-        else:
-            prompt_decisao_e_resposta = f"""
-Você é o Mr. Halley, assistente técnico de manutenção da plataforma Up 2 Today.
-Veículo: {prefixo if prefixo else "Não informado"}
-Sintoma Relatado: "{sintoma}"
-
-Histórico Encontrado: Nenhum registro anterior compatível na frota.
-
-INSTRUÇÕES OBRIGATÓRIAS:
-1. Como NÃO há histórico no banco para este sintoma, utilize pesquisa e conhecimento técnico externo padrão.
-2. Inicie OBRIGATORIAMENTE com a frase exata: "Não identificamos registros de falhas semelhantes. Mas com base em pesquisas externas, recomenda‑se"
-3. Seja conciso (máximo de 30 palavras).
+INSTRUÇÕES DE ANÁLISE E DECISÃO:
+1. Analise criticamente o histórico da frota acima. Existe ALGUM registro anterior cujo problema seja EXATAMENTE o mesmo ou diretamente correlato ao sintoma relatado ("{sintoma}")?
+2. CRITÉRIO DE FONTE (OBRIGATÓRIO):
+   - SE houver um histórico idêntico ou diretamente correspondente no banco: Utilize-o e inicie a resposta exatamente com a frase: "Baseado no histórico local da frota, recomenda-se"
+   - SE NÃO houver nenhum histórico compatível (ou se o histórico disponível for sobre outro componente completamente diferente, como freio/direção para um problema de motor/fumaça): Ignore totalmente o histórico e use seu conhecimento técnico externo, iniciando a resposta exatamente com a frase: "Não identificamos registros de falhas semelhantes. Mas com base em pesquisas externas, recomenda‑se"
+3. Nunca misture as duas fontes. Seja direto e conciso (máximo de 30 palavras).
 """
 
-        resposta = chamar_groq_direto(prompt_decisao_e_resposta, api_key)
+        resposta = chamar_groq_direto(prompt_inteligente, api_key)
         return resposta
         
     except Exception as e:
