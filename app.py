@@ -1935,7 +1935,7 @@ else:
         # --- PAINEL DE MONITORAMENTO DE VENCIMENTOS DE PLANOS NO DASHBOARD ---
         st.divider()
         st.markdown("<h4 style='color: #2D241E; font-weight: 700; margin-bottom: 12px;'>⏳ Controle de Vencimentos de Planos por Veículo</h4>", unsafe_allow_html=True)
-        st.caption("Acompanhamento preditivo e preventivo do saldo restante, exibindo a última leitura geral e os dados da última preventiva realizada. Ordenado por urgência.")
+        st.caption("Acompanhamento preditivo e preventivo do saldo restante, exibindo a próxima meta de preventiva. Ordenado por urgência.")
 
         try:
             df_planos_dash = pd.read_sql(text("SELECT id, nome_plano, tipo_os, area, prefixo, tipo_criterio, intervalo_valor FROM planos_master WHERE empresa_id = :eid"), engine, params={"eid": str(emp_id)})
@@ -1987,7 +1987,7 @@ else:
                                 except Exception:
                                     pass
 
-                            # 3. Determina a "Última Leitura Geral" (maior valor entre medidor e OS, para o cálculo do saldo)
+                            # 3. Determina a "Última Leitura Geral"
                             if crit == "Horímetro":
                                 if med_hor_reg >= os_hor_reg:
                                     ultima_leitura_geral = med_hor_reg
@@ -2006,7 +2006,7 @@ else:
                                 ultima_leitura_geral = 0.0
                                 data_leitura_geral = data_med_reg if data_med_reg != "-" else data_os_reg
 
-                            # 4. Dados específicos da Última Preventiva (vinculada à OS concluída)
+                            # 4. Dados específicos da Última Preventiva
                             if crit == "Horímetro":
                                 ultima_preventiva_val = os_hor_reg
                             elif crit == "Odômetro":
@@ -2014,7 +2014,7 @@ else:
                             else:
                                 ultima_preventiva_val = 0.0
 
-                            # 5. Cálculo correto do saldo restante a partir da última preventiva realizada
+                            # 5. Cálculo correto do saldo restante e da Próxima Preventiva (Meta)
                             atual_val = ultima_leitura_geral
                             if crit in ["Horímetro", "Odômetro"]:
                                 if ultima_preventiva_val > 0 and atual_val >= ultima_preventiva_val:
@@ -2022,12 +2022,17 @@ else:
                                     saldo_restante = intervalo_limite - (rodado_desde_ultima % intervalo_limite)
                                     if saldo_restante <= 0:
                                         saldo_restante = intervalo_limite
+                                    # A próxima meta é a última preventiva somada a quantos blocos de intervalo forem necessários para cobrir o rodado atual
+                                    blocos = int(rodado_desde_ultima // intervalo_limite) + 1
+                                    proxima_preventiva_val = ultima_preventiva_val + (blocos * intervalo_limite)
                                 else:
                                     saldo_restante = intervalo_limite - (atual_val % intervalo_limite)
                                     if saldo_restante == 0:
                                         saldo_restante = intervalo_limite
+                                    proxima_preventiva_val = atual_val + saldo_restante
                             else:
                                 saldo_restante = intervalo_limite
+                                proxima_preventiva_val = 0.0
                             
                             lista_status_frota.append({
                                 "Plano": p['nome_plano'],
@@ -2039,6 +2044,7 @@ else:
                                 "Data Ref.": data_leitura_geral,
                                 "Última Preventiva (Leitura)": f"{ultima_preventiva_val:,.1f}".replace(",", ".") if (crit != "Dias" and ultima_preventiva_val > 0) else "-",
                                 "Data da Preventiva": data_os_reg if ultima_preventiva_val > 0 else "-",
+                                "Próxima Preventiva": f"{proxima_preventiva_val:,.1f} {'km' if crit=='Odômetro' else 'h'}".replace(",", ".") if crit != "Dias" else "-",
                                 "_saldo_ordem": saldo_restante,
                                 "Saldo Restante Estimado": f"{saldo_restante:,.1f} {'km' if crit=='Odômetro' else 'h' if crit=='Horímetro' else 'dias'}".replace(",", ".")
                             })
