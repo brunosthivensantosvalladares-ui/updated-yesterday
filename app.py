@@ -198,9 +198,8 @@ def buscar_historico_relevante(sintoma, emp_id, prefixo=None):
         vistos = set()
         
         sintoma_limpo = remover_acentos(sintoma)
-        # Palavras irrelevantes que não devem isoladamente puxar histórico
-        ignorados = {'de', 'da', 'do', 'em', 'um', 'uma', 'para', 'com', 'o', 'a', 'os', 'as', 'e', 'carro', 'veiculo', 'esta', 'saindo', 'com', 'problema', 'pro'}
-        palavras_chave = [p for p in sintoma_limpo.split() if len(p) > 2 and p not in ignorados]
+        # Sem listas fixas em Python: extrai dinamicamente as palavras relevantes do sintoma
+        palavras_chave = [p for p in sintoma_limpo.split() if len(p) > 2]
         
         with engine.connect() as conn:
             resultados = conn.execute(query_geral_frota, {"eid": str(emp_id)}).fetchall()
@@ -215,9 +214,9 @@ def buscar_historico_relevante(sintoma, emp_id, prefixo=None):
                 
                 desc_norm = remover_acentos(desc)
                 
-                # Exige que pelo menos uma palavra técnica marcante coincida de verdade para evitar falsos positivos
+                # Coincidência dinâmica de termos na descrição
                 match_tecnico = any(kw in desc_norm for kw in palavras_chave)
-                relevante = (prefixo and str(pref).lower() == str(prefixo).lower()) or match_tecnico
+                relevante = (prefixo and str(pref).lower() == str(pref).lower()) or match_tecnico
                 
                 if relevante and match_tecnico:
                     status_os = "Concluída" if realizado else "Pendente / Sem retorno de execução"
@@ -249,13 +248,14 @@ Você é o Mr. Halley, assistente técnico de manutenção da plataforma Up 2 To
 Veículo: {prefixo if prefixo else "Não informado"}
 Sintoma Relatado: "{sintoma}"
 
-Histórico Real Encontrado no Banco de Dados da Frota:
+Histórico Encontrado no Banco de Dados da Frota:
 {historico_formatado}
 
 INSTRUÇÕES OBRIGATÓRIAS:
-1. Como HÁ histórico real acima, baseie sua resposta ESTRITAMENTE nele, sem inventar peças ou procedimentos externos.
-2. Inicie OBRIGATORIAMENTE com a frase exata: "Baseado no histórico local da frota, recomenda-se"
-3. Seja conciso (máximo de 30 palavras).
+1. Analise se o histórico acima trata EXATAMENTE do mesmo problema relatado no sintoma.
+2. SE o histórico for compatível e direto para este problema, baseie sua resposta nele e inicie OBRIGATORIAMENTE com a frase exata: "Baseado no histórico local da frota, recomenda-se"
+3. CASO CONTRÁRIO (se o histórico for genérico ou de outro componente totalmente diferente): Ignore-o e trate como ausência de histórico, utilizando pesquisa externa e iniciando OBRIGATORIAMENTE com: "Não identificamos registros de falhas semelhantes. Mas com base em pesquisas externas, recomenda‑se"
+4. Seja conciso (máximo de 30 palavras).
 """
         else:
             prompt_decisao_e_resposta = f"""
