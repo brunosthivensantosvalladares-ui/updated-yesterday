@@ -490,16 +490,14 @@ def responder_chat_mr_halley(mensagem_usuario, emp_id):
         "\n".join(historicos_banco) if historicos_banco else "Nenhum registro anterior no banco."
     )
 
+    # Manual otimizado e compacto para economizar tokens mantendo a precisão das instruções
     manual_plataforma = """
-FUNCIONALIDADES E PASSO A PASSO DA PLATAFORMA UP 2 TODAY:
-1. Dashboard: Visão geral da operação e métricas principais.
-2. Agenda Principal: Centro operacional para controle de janelas de box e manutenções.
-3. Cadastro Direto: Agendamento direto de preventivas e revisões periódicas pelo gestor.
-4. Chamados Oficina: Espaço do administrador para visualizar, avaliar, aprovar e processar os chamados enviados pela ponta.
-5. OSs Pendentes (Baixa Técnica): Aba onde o gestor clica na linha da OS para preencher a execução e dar a baixa técnica.
-6. OSs Concluídas: Histórico e relatórios exportáveis de serviços finalizados.
-7. Perfil Motorista / Abrir Solicitação: Aba onde o motorista preenche o prefixo e a descrição para **abrir novos chamados** de manutenção de forma remota.
-8. Chat Mr. Halley: Assistente virtual integrado para triagem de falhas, consulta de histórico e abertura conversacional de Ordens de Serviço (OS).
+MAPA RÁPIDO DO UP 2 TODAY:
+1. Abrir Chamados: Aba 'Abrir Solicitação' (Perfil Motorista).
+2. Aprovar Chamados: Aba 'Chamados Oficina' (Gestor).
+3. Baixa de OS: Aba 'OSs Pendentes'.
+4. Agenda: Aba 'Agenda Principal'.
+5. Cadastro de Preventivas: Aba 'Cadastro Direto'.
 """
 
     template_geral = f"""
@@ -513,11 +511,11 @@ Você é o Mr. Halley, assistente técnico de manutenção, telemetria e suporte
 
 Pergunta do Usuário: "{mensagem_usuario}"
 
-DIRETRIZES DE RESPOSTA:
-1. Responda de forma direta, clara e baseada estritamente no manual da plataforma acima.
-2. Se o usuário perguntar onde abrir chamados, explique que os motoristas abrem na aba **Abrir Solicitação** (no perfil de motorista), e o gestor gerencia e aprova esses chamados na aba **Chamados Oficina**.
-3. Se o usuário perguntar sobre baixa de OS, indique a aba **OSs Pendentes**.
-4. Mantenha um tom profissional e técnico (máximo de 4 frases).
+DIRETRIZES DE RESPOSTA (ECONOMIA DE TOKENS):
+1. Seja extremamente direto, objetivo e claro.
+2. Responda em NO MÁXIMO 2 frases curtas, indicando o caminho exato da aba se for dúvida de uso.
+3. Se o usuário perguntar onde abrir chamados, indique a aba 'Abrir Solicitação'. Se for sobre baixa de OS, indique 'OSs Pendentes'.
+4. Mantenha um tom profissional e técnico.
 """
 
     try:
