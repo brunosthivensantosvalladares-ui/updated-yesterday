@@ -1951,7 +1951,7 @@ else:
                         intervalo_limite = float(p['intervalo_valor'])
                         
                         for pref in prefs:
-                            # 1. Tenta buscar a leitura mais próxima na tabela medidores_frota
+                            # 1. Tenta buscar a última leitura avulsa/geral na tabela medidores_frota
                             med = conn.execute(
                                 text("SELECT data_leitura, horimetro, odometro FROM medidores_frota WHERE empresa_id = :eid AND prefixo = :pref ORDER BY data_leitura DESC LIMIT 1"),
                                 {"eid": str(emp_id), "pref": pref}
@@ -1988,16 +1988,35 @@ else:
                                 except Exception:
                                     pass
 
+                            # Se a OS concluída não tiver medidor gravado no texto, busca o medidor mais próximo da data da OS na tabela medidores_frota
+                            if os_recente and data_os_reg != "-":
+                                if (crit == "Horímetro" and os_hor_reg == 0.0) or (crit == "Odômetro" and os_odo_reg == 0.0):
+                                    fallback_os_med = conn.execute(
+                                        text("""
+                                            SELECT horimetro, odometro, ABS(data_leitura - CAST(:dt AS DATE)) as diff_dias
+                                            FROM medidores_frota 
+                                            WHERE empresa_id = :eid AND prefixo = :pref
+                                            ORDER BY diff_dias ASC, data_leitura DESC
+                                            LIMIT 1
+                                        """),
+                                        {"eid": str(emp_id), "pref": pref, "dt": data_os_reg}
+                                    ).fetchone()
+                                    if fallback_os_med:
+                                        if crit == "Horímetro":
+                                            os_hor_reg = float(fallback_os_med[0] or 0.0)
+                                        elif crit == "Odômetro":
+                                            os_odo_reg = float(fallback_os_med[1] or 0.0)
+
                             # Validação de existência de dados para critérios baseados em medidor
                             tem_leitura_sistema = False
-                            if crit == "Horímetro":
+                            if crit == "Dias":
+                                tem_leitura_sistema = True
+                            elif crit == "Horímetro":
                                 if med_hor_reg > 0 or os_hor_reg > 0:
                                     tem_leitura_sistema = True
                             elif crit == "Odômetro":
                                 if med_odo_reg > 0 or os_odo_reg > 0:
                                     tem_leitura_sistema = True
-                            else:
-                                tem_leitura_sistema = True # Para critérios em Dias
 
                             if not tem_leitura_sistema and crit in ["Horímetro", "Odômetro"]:
                                 avisos_pendencia_medidor.add(pref)
@@ -2057,10 +2076,10 @@ else:
                                 "Veículo": pref,
                                 "Critério": crit,
                                 "Intervalo Padrão": intervalo_limite,
-                                "Última Leitura": f"{ultima_leitura_geral:,.1f}".replace(",", ".") if (crit != "Dias" and ultima_leitura_geral > 0) else "⚠️ Sem Leitura",
-                                "Data Ref.": data_leitura_geral if ultima_leitura_geral > 0 else "-",
+                                "Última Leitura": f"{ultima_leitura_geral:,.1f}".replace(",", ".") if (crit != "Dias" and ultima_leitura_geral > 0) else ("-" if crit == "Dias" else "⚠️ Sem Leitura"),
+                                "Data Ref.": data_leitura_geral if (crit == "Dias" or ultima_leitura_geral > 0) else "-",
                                 "Última Preventiva (Leitura)": f"{ultima_preventiva_val:,.1f}".replace(",", ".") if (crit != "Dias" and ultima_preventiva_val > 0) else "-",
-                                "Data da Preventiva": data_os_reg if ultima_preventiva_val > 0 else "-",
+                                "Data da Preventiva": data_os_reg if (crit == "Dias" or ultima_preventiva_val > 0) else "-",
                                 "Próxima Preventiva": f"{proxima_preventiva_val:,.1f} {'km' if crit=='Odômetro' else 'h'}".replace(",", ".") if (crit != "Dias" and proxima_preventiva_val > 0) else "-",
                                 "_saldo_ordem": saldo_restante,
                                 "Saldo Restante Estimado": f"{saldo_restante:,.1f} {'km' if crit=='Odômetro' else 'h' if crit=='Horímetro' else 'dias'}".replace(",", ".") if (crit == "Dias" or tem_leitura_sistema) else "Aguardando Leitura"
