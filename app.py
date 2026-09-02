@@ -177,18 +177,15 @@ def chamar_groq_direto(prompt_texto, api_key):
 import unicodedata
 
 def remover_acentos(texto):
-    """Remove acentos e normaliza o texto para garantir comparações precisas."""
     if not texto:
         return ""
     nfkd = unicodedata.normalize('NFKD', str(texto))
     return "".join([c for c in nfkd if not unicodedata.combining(c)]).lower()
 
-# --- BUSCA DE HISTÓRICO GERAL NA FROTA POR SIMILARIDADE DE SINTOMA ---
+# --- BUSCA DE HISTÓRICO GERAL NA FROTA COM ALTA PRECISÃO ---
 def buscar_historico_relevante(sintoma, emp_id, prefixo=None):
-    """Busca ordens de serviço em toda a frota considerando o sentido e ignorando variações de acentuação."""
     engine = get_engine()
     
-    # Consulta o banco inteiro para garantir cobertura total do histórico
     query_geral_frota = text("""
         SELECT data, prefixo, descricao, COALESCE(executor, 'Não informado') as executor, numero_os, realizado 
         FROM tarefas 
@@ -200,9 +197,10 @@ def buscar_historico_relevante(sintoma, emp_id, prefixo=None):
         historico_formatado = []
         vistos = set()
         
-        # Normaliza o sintoma removendo acentos e filtrando palavras vazias
         sintoma_limpo = remover_acentos(sintoma)
-        palavras_chave = [p for p in sintoma_limpo.split() if p not in ['de', 'da', 'do', 'em', 'um', 'uma', 'para', 'com', 'o', 'a', 'os', 'as']]
+        # Palavras irrelevantes que não devem isoladamente puxar histórico
+        ignorados = {'de', 'da', 'do', 'em', 'um', 'uma', 'para', 'com', 'o', 'a', 'os', 'as', 'e', 'carro', 'veiculo', 'esta', 'saindo', 'com', 'problema', 'pro'}
+        palavras_chave = [p for p in sintoma_limpo.split() if len(p) > 2 and p not in ignorados]
         
         with engine.connect() as conn:
             resultados = conn.execute(query_geral_frota, {"eid": str(emp_id)}).fetchall()
@@ -215,11 +213,13 @@ def buscar_historico_relevante(sintoma, emp_id, prefixo=None):
                 num_os = f"OS {r[4]}" if r[4] else "Sem Nº"
                 realizado = r[5]
                 
-                # Normaliza a descrição do banco para comparar sem conflito de acentos
                 desc_norm = remover_acentos(desc)
-                relevante = (prefixo and str(pref).lower() == str(prefixo).lower()) or any(kw in desc_norm for kw in palavras_chave)
                 
-                if relevante:
+                # Exige que pelo menos uma palavra técnica marcante coincida de verdade para evitar falsos positivos
+                match_tecnico = any(kw in desc_norm for kw in palavras_chave)
+                relevante = (prefixo and str(pref).lower() == str(prefixo).lower()) or match_tecnico
+                
+                if relevante and match_tecnico:
                     status_os = "Concluída" if realizado else "Pendente / Sem retorno de execução"
                     linha = f"[Veículo {pref}] Data: {dt} | {num_os} | Status: {status_os} | Descrição/Serviço: {desc} | Mecânico: {execut}"
                     chave = (dt, pref, desc_norm)
@@ -227,11 +227,11 @@ def buscar_historico_relevante(sintoma, emp_id, prefixo=None):
                         vistos.add(chave)
                         historico_formatado.append(linha)
 
-        return historico_formatado[:20] if historico_formatado else ["Nenhum histórico correlato na frota."]
+        return historico_formatado[:15] if historico_formatado else []
     except Exception as e:
-        return [f"Erro ao buscar histórico: {str(e)}"]
+        return []
 
-# --- TRIAGEM DO MR. HALLEY COM ISOLAMENTO ABSOLUTO DO HISTÓRICO ---
+# --- TRIAGEM DO MR. HALLEY COM SEPARAÇÃO RIGOROSA DE FLUXO ---
 def triagem_mr_halley(sintoma, emp_id, prefixo=None, incluir_saudacao=False):
     try:
         api_key = obter_llm()
@@ -239,25 +239,23 @@ def triagem_mr_halley(sintoma, emp_id, prefixo=None, incluir_saudacao=False):
             return "Erro: Chave da API Groq não configurada."
 
         historicos = buscar_historico_relevante(sintoma, emp_id, prefixo=prefixo)
+        tem_historico = bool(historicos and len(historicos) > 0)
         
-        # Verifica se realmente encontrou histórico real (ignorando a mensagem padrão de vazio)
-        tem_historico_real = historicos and len(historicos) > 0 and "Nenhum histórico" not in historicos[0]
-        historico_formatado = "\n".join(historicos) if tem_historico_real else "Nenhum registro anterior na frota."
+        historico_formatado = "\n".join(historicos) if tem_historico else "Nenhum registro anterior na frota."
 
-        if tem_historico_real:
+        if tem_historico:
             prompt_decisao_e_resposta = f"""
 Você é o Mr. Halley, assistente técnico de manutenção da plataforma Up 2 Today.
 Veículo: {prefixo if prefixo else "Não informado"}
 Sintoma Relatado: "{sintoma}"
 
-Histórico Encontrado no Banco de Dados da Frota:
+Histórico Real Encontrado no Banco de Dados da Frota:
 {historico_formatado}
 
-INSTRUÇÕES DE ANÁLISE E RESPOSTA:
-1. Como HÁ histórico relevante acima, você DEVE utilizá-lo obrigatoriamente.
+INSTRUÇÕES OBRIGATÓRIAS:
+1. Como HÁ histórico real acima, baseie sua resposta ESTRITAMENTE nele, sem inventar peças ou procedimentos externos.
 2. Inicie OBRIGATORIAMENTE com a frase exata: "Baseado no histórico local da frota, recomenda-se"
-3. Descreva a recomendação técnica de forma limpa e direta com base exclusivamente no que foi feito no histórico acima.
-4. Mantenha a resposta concisa (máximo de 30 palavras).
+3. Seja conciso (máximo de 30 palavras).
 """
         else:
             prompt_decisao_e_resposta = f"""
@@ -265,12 +263,12 @@ Você é o Mr. Halley, assistente técnico de manutenção da plataforma Up 2 To
 Veículo: {prefixo if prefixo else "Não informado"}
 Sintoma Relatado: "{sintoma}"
 
-Histórico Disponível: Nenhum registro anterior na frota.
+Histórico Encontrado: Nenhum registro anterior compatível na frota.
 
-INSTRUÇÕES DE ANÁLISE E RESPOSTA:
-1. Como NÃO há histórico compatível, utilize pesquisa/conhecimento técnico externo.
+INSTRUÇÕES OBRIGATÓRIAS:
+1. Como NÃO há histórico no banco para este sintoma, utilize pesquisa e conhecimento técnico externo padrão.
 2. Inicie OBRIGATORIAMENTE com a frase exata: "Não identificamos registros de falhas semelhantes. Mas com base em pesquisas externas, recomenda‑se"
-3. Traga o diagnóstico técnico de forma limpa (máximo de 30 palavras).
+3. Seja conciso (máximo de 30 palavras).
 """
 
         resposta = chamar_groq_direto(prompt_decisao_e_resposta, api_key)
