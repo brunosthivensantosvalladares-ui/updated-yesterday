@@ -239,28 +239,41 @@ def triagem_mr_halley(sintoma, emp_id, prefixo=None, incluir_saudacao=False):
             return "Erro: Chave da API Groq não configurada."
 
         historicos = buscar_historico_relevante(sintoma, emp_id, prefixo=prefixo)
-        historico_formatado = "\n".join(historicos) if historicos else "Nenhum registro anterior na frota."
+        
+        # Verifica se realmente encontrou histórico real (ignorando a mensagem padrão de vazio)
+        tem_historico_real = historicos and len(historicos) > 0 and "Nenhum histórico" not in historicos[0]
+        historico_formatado = "\n".join(historicos) if tem_historico_real else "Nenhum registro anterior na frota."
 
-        prompt_decisao_e_resposta = f"""
+        if tem_historico_real:
+            prompt_decisao_e_resposta = f"""
 Você é o Mr. Halley, assistente técnico de manutenção da plataforma Up 2 Today.
 Veículo: {prefixo if prefixo else "Não informado"}
 Sintoma Relatado: "{sintoma}"
 
-Histórico Disponível no Banco de Dados da Frota:
+Histórico Encontrado no Banco de Dados da Frota:
 {historico_formatado}
 
 INSTRUÇÕES DE ANÁLISE E RESPOSTA:
-1. Avalie se o histórico acima possui um registro com o mesmo sentido ou contexto técnico do sintoma relatado.
-2. SE HOUVER HISTÓRICO COMPATÍVEL:
-   - Inicie OBRIGATORIAMENTE com a frase exata: "Baseado no histórico local da frota, recomenda-se"
-   - É ESTRITAMENTE PROIBIDO usar conhecimentos externos da internet, inventar peças, adicionar cilindros, ajustes ou componentes que não estejam explicitamente escritos no texto do histórico do banco. Siga estritamente o que foi feito ou registrado na OS anterior.
-3. SE NÃO HOUVER HISTÓRICO COMPATÍVEL:
-   - Inicie OBRIGATORIAMENTE com a frase exata: "Não identificamos registros de falhas semelhantes. Mas com base em pesquisas externas, recomenda‑se"
-   - Traga o diagnóstico técnico externo de forma limpa.
+1. Como HÁ histórico relevante acima, você DEVE utilizá-lo obrigatoriamente.
+2. Inicie OBRIGATORIAMENTE com a frase exata: "Baseado no histórico local da frota, recomenda-se"
+3. Descreva a recomendação técnica de forma limpa e direta com base exclusivamente no que foi feito no histórico acima.
 4. Mantenha a resposta concisa (máximo de 30 palavras).
 """
+        else:
+            prompt_decisao_e_resposta = f"""
+Você é o Mr. Halley, assistente técnico de manutenção da plataforma Up 2 Today.
+Veículo: {prefixo if prefixo else "Não informado"}
+Sintoma Relatado: "{sintoma}"
 
-        resposta = chamar_groq_direto(prompt_texto_modelo := prompt_decisao_e_resposta, api_key)
+Histórico Disponível: Nenhum registro anterior na frota.
+
+INSTRUÇÕES DE ANÁLISE E RESPOSTA:
+1. Como NÃO há histórico compatível, utilize pesquisa/conhecimento técnico externo.
+2. Inicie OBRIGATORIAMENTE com a frase exata: "Não identificamos registros de falhas semelhantes. Mas com base em pesquisas externas, recomenda‑se"
+3. Traga o diagnóstico técnico de forma limpa (máximo de 30 palavras).
+"""
+
+        resposta = chamar_groq_direto(prompt_decisao_e_resposta, api_key)
         return resposta
         
     except Exception as e:
