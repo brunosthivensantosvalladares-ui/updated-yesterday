@@ -1950,7 +1950,7 @@ else:
                         intervalo_limite = float(p['intervalo_valor'])
                         
                         for pref in prefs:
-                            # 1. Pega a última leitura oficial cadastrada na tabela medidores_frota para este veículo
+                            # 1. Pega a última leitura geral cadastrada na tabela medidores_frota (para cálculo de saldo atual)
                             med = conn.execute(
                                 text("SELECT data_leitura, horimetro, odometro FROM medidores_frota WHERE empresa_id = :eid AND prefixo = :pref ORDER BY data_leitura DESC LIMIT 1"),
                                 {"eid": str(emp_id), "pref": pref}
@@ -1958,9 +1958,8 @@ else:
                             
                             med_hor_reg = float(med[1] or 0) if med else 0.0
                             med_odo_reg = float(med[2] or 0) if med else 0.0
-                            data_med_reg = str(med[0]) if med and med[0] else "-"
 
-                            # 2. Pega também a última leitura registrada nas OSs concluídas (caso exista no texto da baixa)
+                            # 2. Pega especificamente a última OS concluída vinculada a este plano ou veículo para exibir a "Última Preventiva Realizada"
                             os_recente = conn.execute(
                                 text("""
                                     SELECT data, descricao FROM tarefas 
@@ -1987,36 +1986,26 @@ else:
                                 except Exception:
                                     pass
 
-                            # 3. Compara e define o valor e a data correta conforme o critério (Horímetro, Odômetro ou Dias)
+                            # Valor atual global para cálculo de saldo (maior entre medidor avulso e OS)
                             atual_val = 0.0
-                            data_ref = "-"
-                            
                             if crit == "Horímetro":
-                                if med_hor_reg >= os_hor_reg:
-                                    atual_val = med_hor_reg
-                                    data_ref = data_med_reg
-                                else:
-                                    atual_val = os_hor_reg
-                                    data_ref = data_os_reg
+                                atual_val = max(med_hor_reg, os_hor_reg)
                             elif crit == "Odômetro":
-                                if med_odo_reg >= os_odo_reg:
-                                    atual_val = med_odo_reg
-                                    data_ref = data_med_reg
-                                else:
-                                    atual_val = os_odo_reg
-                                    data_ref = data_os_reg
-                            else:
-                                data_ref = data_os_reg if data_os_reg != "-" else data_med_reg
+                                atual_val = max(med_odo_reg, os_odo_reg)
+                            
+                            # Valor específico da última preventiva/manutenção realizada para a tabela
+                            val_ultima_prev = 0.0
+                            if crit == "Horímetro":
+                                val_ultima_prev = os_hor_reg if os_hor_reg > 0 else med_hor_reg
+                            elif crit == "Odômetro":
+                                val_ultima_prev = os_odo_reg if os_odo_reg > 0 else med_odo_reg
 
-                            # Cálculo do saldo restante para o vencimento
                             if crit in ["Horímetro", "Odômetro"]:
                                 saldo_restante = intervalo_limite - (atual_val % intervalo_limite)
                                 if saldo_restante == 0:
                                     saldo_restante = intervalo_limite
-                                texto_ultima_leitura = f"{atual_val:,.1f} {'km' if crit=='Odômetro' else 'h'}".replace(",", ".")
                             else:
                                 saldo_restante = intervalo_limite
-                                texto_ultima_leitura = "-"
                             
                             lista_status_frota.append({
                                 "Plano": p['nome_plano'],
@@ -2024,8 +2013,8 @@ else:
                                 "Veículo": pref,
                                 "Critério": crit,
                                 "Intervalo Padrão": intervalo_limite,
-                                "Última Leitura": texto_ultima_leitura,
-                                "Data Ref.": data_ref,
+                                "Última Leitura": f"{val_ultima_prev:,.1f}".replace(",", ".") if crit != "Dias" else "-",
+                                "Data da Preventiva": data_os_reg,
                                 "_saldo_ordem": saldo_restante,
                                 "Saldo Restante Estimado": f"{saldo_restante:,.1f} {'km' if crit=='Odômetro' else 'h' if crit=='Horímetro' else 'dias'}".replace(",", ".")
                             })
