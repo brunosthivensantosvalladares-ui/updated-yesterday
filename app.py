@@ -1942,6 +1942,7 @@ else:
 
             if not df_planos_dash.empty:
                 lista_status_frota = []
+                avisos_pendencia_medidor = set()
                 
                 with engine.connect() as conn:
                     for _, p in df_planos_dash.iterrows():
@@ -1950,7 +1951,7 @@ else:
                         intervalo_limite = float(p['intervalo_valor'])
                         
                         for pref in prefs:
-                            # 1. Última leitura avulsa/geral (tabela medidores_frota)
+                            # 1. Tenta buscar a leitura mais próxima na tabela medidores_frota
                             med = conn.execute(
                                 text("SELECT data_leitura, horimetro, odometro FROM medidores_frota WHERE empresa_id = :eid AND prefixo = :pref ORDER BY data_leitura DESC LIMIT 1"),
                                 {"eid": str(emp_id), "pref": pref}
@@ -1987,6 +1988,20 @@ else:
                                 except Exception:
                                     pass
 
+                            # Validação de existência de dados para critérios baseados em medidor
+                            tem_leitura_sistema = False
+                            if crit == "Horímetro":
+                                if med_hor_reg > 0 or os_hor_reg > 0:
+                                    tem_leitura_sistema = True
+                            elif crit == "Odômetro":
+                                if med_odo_reg > 0 or os_odo_reg > 0:
+                                    tem_leitura_sistema = True
+                            else:
+                                tem_leitura_sistema = True # Para critérios em Dias
+
+                            if not tem_leitura_sistema and crit in ["Horímetro", "Odômetro"]:
+                                avisos_pendencia_medidor.add(pref)
+
                             # 3. Determina a "Última Leitura Geral"
                             if crit == "Horímetro":
                                 if med_hor_reg >= os_hor_reg:
@@ -2017,12 +2032,14 @@ else:
                             # 5. Cálculo correto do saldo restante e da Próxima Preventiva (Meta)
                             atual_val = ultima_leitura_geral
                             if crit in ["Horímetro", "Odômetro"]:
-                                if ultima_preventiva_val > 0 and atual_val >= ultima_preventiva_val:
+                                if not tem_leitura_sistema:
+                                    saldo_restante = 0.0
+                                    proxima_preventiva_val = 0.0
+                                elif ultima_preventiva_val > 0 and atual_val >= ultima_preventiva_val:
                                     rodado_desde_ultima = atual_val - ultima_preventiva_val
                                     saldo_restante = intervalo_limite - (rodado_desde_ultima % intervalo_limite)
                                     if saldo_restante <= 0:
                                         saldo_restante = intervalo_limite
-                                    # A próxima meta é a última preventiva somada a quantos blocos de intervalo forem necessários para cobrir o rodado atual
                                     blocos = int(rodado_desde_ultima // intervalo_limite) + 1
                                     proxima_preventiva_val = ultima_preventiva_val + (blocos * intervalo_limite)
                                 else:
@@ -2040,14 +2057,24 @@ else:
                                 "Veículo": pref,
                                 "Critério": crit,
                                 "Intervalo Padrão": intervalo_limite,
-                                "Última Leitura": f"{ultima_leitura_geral:,.1f}".replace(",", ".") if crit != "Dias" else "-",
-                                "Data Ref.": data_leitura_geral,
+                                "Última Leitura": f"{ultima_leitura_geral:,.1f}".replace(",", ".") if (crit != "Dias" and ultima_leitura_geral > 0) else "⚠️ Sem Leitura",
+                                "Data Ref.": data_leitura_geral if ultima_leitura_geral > 0 else "-",
                                 "Última Preventiva (Leitura)": f"{ultima_preventiva_val:,.1f}".replace(",", ".") if (crit != "Dias" and ultima_preventiva_val > 0) else "-",
-                                "Data Últ. Preventiva": data_os_reg if ultima_preventiva_val > 0 else "-",
-                                "Próxima Preventiva": f"{proxima_preventiva_val:,.1f} {'km' if crit=='Odômetro' else 'h'}".replace(",", ".") if crit != "Dias" else "-",
+                                "Data da Preventiva": data_os_reg if ultima_preventiva_val > 0 else "-",
+                                "Próxima Preventiva": f"{proxima_preventiva_val:,.1f} {'km' if crit=='Odômetro' else 'h'}".replace(",", ".") if (crit != "Dias" and proxima_preventiva_val > 0) else "-",
                                 "_saldo_ordem": saldo_restante,
-                                "Saldo Restante Estimado": f"{saldo_restante:,.1f} {'km' if crit=='Odômetro' else 'h' if crit=='Horímetro' else 'dias'}".replace(",", ".")
+                                "Saldo Restante Estimado": f"{saldo_restante:,.1f} {'km' if crit=='Odômetro' else 'h' if crit=='Horímetro' else 'dias'}".replace(",", ".") if (crit == "Dias" or tem_leitura_sistema) else "Aguardando Leitura"
                             })
+
+                # Exibe aviso customizado orientado por diretrizes de telemetria
+                if avisos_pendencia_medidor:
+                    veiculos_str = ", ".join(sorted(avisos_pendencia_medidor))
+                    st.warning(
+                        f"💡 **Orientação de Medidor:** O(s) veículo(s) **{veiculos_str}** não possuem valores de horímetro/odômetro registrados. "
+                        f"Caso não tenha informado os valores durante a baixa da preventiva, certifique-se de que a leitura digitada na aba "
+                        f"**⚡ Alimentar Horímetros/Odômetros** seja o mais próxima possível da data de realização da preventiva. "
+                        f"O sistema utiliza os registros mais próximos como ponto de partida para os cálculos, e a alimentação contínua evita atrasos e distorções no saldo."
+                    )
 
                 df_status_final = pd.DataFrame(lista_status_frota)
                 if not df_status_final.empty:
@@ -2208,7 +2235,7 @@ else:
                             o_final_gravacao = odometro_baixa
                             
                             with engine.begin() as conn:
-                                # Se o usuário não preencheu os medidores na baixa (Prioridade 2), tenta buscar na base com base na data
+                                # Se o usuário não preencheu os medidores na baixa (Prioridade 2), busca na base o mais próximo da data da OS
                                 if h_final_gravacao == 0.0 and o_final_gravacao == 0.0:
                                     med_fallback = conn.execute(
                                         text("""
@@ -2224,20 +2251,6 @@ else:
                                     if med_fallback:
                                         h_final_gravacao = float(med_fallback[0] or 0.0)
                                         o_final_gravacao = float(med_fallback[1] or 0.0)
-
-                                # Salva ou atualiza a leitura oficial do medidor vinculada a esta data de baixa
-                                if h_final_gravacao > 0 or o_final_gravacao > 0:
-                                    conn.execute(
-                                        text("""
-                                            INSERT INTO medidores_frota (empresa_id, prefixo, data_leitura, horimetro, odometro)
-                                            VALUES (:eid, :pref, :dt, :hor, :odo)
-                                        """),
-                                        {
-                                            "eid": str(emp_id), "pref": pref_veiculo, 
-                                            "dt": str(data_realizacao_baixa), 
-                                            "hor": h_final_gravacao, "odo": o_final_gravacao
-                                        }
-                                    )
 
                                 relato = f"Execução: {servico_realizado}{respostas_tecnicas}; Mecânico: {executor}; Horário: {h_ini}-{h_fim} | [Baixa - Horímetro: {h_final_gravacao}h, Odômetro: {o_final_gravacao}km]"
                                 
