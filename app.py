@@ -2014,12 +2014,18 @@ else:
                             else:
                                 ultima_preventiva_val = 0.0
 
-                            # 5. Cálculo do saldo restante baseado na leitura geral mais atualizada
+                            # 5. Cálculo correto do saldo restante a partir da última preventiva realizada
                             atual_val = ultima_leitura_geral
                             if crit in ["Horímetro", "Odômetro"]:
-                                saldo_restante = intervalo_limite - (atual_val % intervalo_limite)
-                                if saldo_restante == 0:
-                                    saldo_restante = intervalo_limite
+                                if ultima_preventiva_val > 0 and atual_val >= ultima_preventiva_val:
+                                    rodado_desde_ultima = atual_val - ultima_preventiva_val
+                                    saldo_restante = intervalo_limite - (rodado_desde_ultima % intervalo_limite)
+                                    if saldo_restante <= 0:
+                                        saldo_restante = intervalo_limite
+                                else:
+                                    saldo_restante = intervalo_limite - (atual_val % intervalo_limite)
+                                    if saldo_restante == 0:
+                                        saldo_restante = intervalo_limite
                             else:
                                 saldo_restante = intervalo_limite
                             
