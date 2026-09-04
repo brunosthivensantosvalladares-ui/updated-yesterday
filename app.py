@@ -2219,28 +2219,119 @@ else:
 
     elif "Abrir Solicitação" in aba_ativa:
         st.subheader("✍️ Nova Solicitação de Manutenção")
-        st.info("💡 **Dica:** Informe o prefixo e detalhe o problema para que a oficina possa se programar.")
+        st.info("💡 **Dica:** O sistema salvará automaticamente sua solicitação caso esteja sem internet.")
         
         emp_id = st.session_state.get("empresa", "U2T_MATRIZ")
-        
-        with st.form("f_ch", clear_on_submit=True):
-            p = st.text_input("Prefixo do Veículo")
-            d = st.text_area("Descrição do Problema")
+        nome_motorista = st.session_state.get("usuario_ativo", "Motorista")
+
+        # Formulário Oculto (A ponte entre o JavaScript e o Python quando há internet)
+        with st.form("form_sync_oculto", clear_on_submit=True):
+            p_sync = st.text_input("p_sync", key="p_sync_input", label_visibility="collapsed")
+            d_sync = st.text_input("d_sync", key="d_sync_input", label_visibility="collapsed")
+            btn_sync = st.form_submit_button("Sync", use_container_width=True)
             
-            if st.form_submit_button("Enviar Solicitação"):
-                if p and d:
-                    nome_motorista = st.session_state.get("usuario_ativo", "Motorista")
+            if btn_sync and p_sync and d_sync:
+                with engine.connect() as conn:
+                    conn.execute(text("""
+                        INSERT INTO chamados (motorista, prefixo, descricao, data_solicitacao, status, empresa_id) 
+                        VALUES (:m, :p, :d, :dt, 'Pendente', :eid)
+                    """), {
+                        "m": nome_motorista, "p": p_sync, "d": d_sync, 
+                        "dt": str(datetime.now().date()), "eid": str(emp_id)
+                    })
+                    conn.commit()
+                st.success("✅ Solicitação enviada com sucesso!")
+
+        # Formulário Híbrido Blindado (Roda no navegador do usuário)
+        st.components.v1.html(f"""
+            <style>
+                body {{ font-family: 'Segoe UI', sans-serif; color: #231F20; background: transparent; padding: 10px; }}
+                label {{ font-size: 14px; font-weight: 600; margin-bottom: 5px; display: block; }}
+                input, textarea {{ width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #C5A059; border-radius: 6px; box-sizing: border-box; background: #FFF; }}
+                button {{ width: 100%; padding: 12px; background: #C5A059; color: #FFF; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; transition: 0.2s; }}
+                button:hover {{ background: #9B783E; }}
+                #msg-feedback {{ margin-top: 10px; padding: 10px; border-radius: 6px; display: none; font-weight: bold; text-align: center; }}
+            </style>
+            
+            <div id="form-container">
+                <label>Prefixo do Veículo</label>
+                <input type="text" id="offline_prefixo" placeholder="Ex: 44001">
+                
+                <label>Descrição do Problema</label>
+                <textarea id="offline_descricao" rows="4" placeholder="Detalhe a falha..."></textarea>
+                
+                <button onclick="enviarSolicitacaoHibrida()">Enviar Solicitação</button>
+                <div id="msg-feedback"></div>
+            </div>
+
+            <script>
+                function enviarSolicitacaoHibrida() {{
+                    const pref = document.getElementById('offline_prefixo').value.trim();
+                    const desc = document.getElementById('offline_descricao').value.trim();
+                    const feedback = document.getElementById('msg-feedback');
                     
-                    with engine.connect() as conn:
-                        conn.execute(text("""
-                            INSERT INTO chamados (motorista, prefixo, descricao, data_solicitacao, status, empresa_id) 
-                            VALUES (:m, :p, :d, :dt, 'Pendente', :eid)
-                        """), {
-                            "m": nome_motorista, "p": p, "d": d, 
-                            "dt": str(datetime.now().date()), "eid": str(emp_id)
-                        })
-                        conn.commit()
-                    st.success("✅ Solicitação enviada com sucesso!")
+                    if(!pref || !desc) {{
+                        feedback.style.display = 'block';
+                        feedback.style.background = '#FFCDD2';
+                        feedback.style.color = '#B71C1C';
+                        feedback.innerText = "⚠️ Preencha o prefixo e a descrição.";
+                        return;
+                    }}
+
+                    if(navigator.onLine) {{
+                        // Com internet: Injeta os dados no formulário oculto do Python e clica no botão invisível
+                        const doc = window.parent.document;
+                        
+                        // Localiza os inputs ocultos gerados pelo Streamlit e dispara eventos de digitação
+                        const inputs = doc.querySelectorAll('div[data-testid="stForm"] input[type="text"]');
+                        if(inputs.length >= 2) {{
+                            let nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+                            
+                            nativeInputValueSetter.call(inputs[0], pref);
+                            inputs[0].dispatchEvent(new Event('input', {{ bubbles: true }}));
+                            
+                            nativeInputValueSetter.call(inputs[1], desc);
+                            inputs[1].dispatchEvent(new Event('input', {{ bubbles: true }}));
+                            
+                            // Clica no botão de sync do Streamlit
+                            const btn = doc.querySelector('div[data-testid="stForm"] button');
+                            if(btn) btn.click();
+                        }}
+                    }} else {{
+                        // Sem internet: Salva no banco de dados local do navegador (IndexedDB)
+                        const request = indexedDB.open("Up2Today_OfflineDB", 1);
+                        request.onsuccess = function(event) {{
+                            const db = event.target.result;
+                            const tx = db.transaction(["fila_offline"], "readwrite");
+                            const store = tx.objectStore("fila_offline");
+                            
+                            store.add({{
+                                tipo: "chamado_motorista",
+                                prefixo: pref,
+                                descricao: desc,
+                                motorista: "{nome_motorista}",
+                                data: new Date().toISOString()
+                            }});
+                            
+                            feedback.style.display = 'block';
+                            feedback.style.background = '#C8E6C9';
+                            feedback.style.color = '#2E7D32';
+                            feedback.innerText = "📶 Salvo Offline! Será enviado quando a internet voltar.";
+                            
+                            document.getElementById('offline_prefixo').value = '';
+                            document.getElementById('offline_descricao').value = '';
+                        }};
+                    }}
+                }}
+            </script>
+        """, height=380)
+
+        # Oculta o formulário Python que serve apenas de ponte
+        st.markdown("""
+            <style>
+                div[data-testid="stForm"]:has(input[aria-label="p_sync"]) { display: none !important; }
+            </style>
+        """, unsafe_allow_html=True)
 
     elif "Status" in aba_ativa:
         st.subheader("📜 Status dos Meus Veículos")
