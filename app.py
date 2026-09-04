@@ -147,15 +147,11 @@ def renderizar_modulo_sincronizacao_offline(emp_id):
                             })
                     conn.commit()
                 st.toast("☁️ Dados offline sincronizados com o servidor!", icon="✅")
+                import time
+                time.sleep(1) # Aguarda 1 segundo para exibir a notificação
+                st.rerun() # Atualiza a tela automaticamente para exibir o dado novo!
             except Exception:
                 pass
-
-    # Oculta o formulário receptor da interface do usuário
-    st.markdown("""
-        <style>
-            div[data-testid="stForm"]:has(input[aria-label="payload_offline"]) { display: none !important; }
-        </style>
-    """, unsafe_allow_html=True)
 
     # 2. Motor JavaScript (Detector de Rede, IndexedDB e Gatilho de Sincronização)
     components.html(f"""
@@ -164,6 +160,13 @@ def renderizar_modulo_sincronizacao_offline(emp_id):
         </div>
         <script>
             const empresaId = "{emp_id}";
+            
+            // Oculta o formulário receptor da interface do usuário com precisão cirúrgica
+            const doc = window.parent.document;
+            const allForms = Array.from(doc.querySelectorAll('div[data-testid="stForm"]'));
+            const syncForm = allForms.find(f => f.textContent.includes('ProcessarSyncOffline'));
+            if (syncForm) syncForm.style.display = 'none';
+
             let db;
             const request = indexedDB.open("Up2Today_OfflineDB", 1);
             
@@ -206,29 +209,25 @@ def renderizar_modulo_sincronizacao_offline(emp_id):
                     req.onsuccess = function() {{
                         const pendentes = req.result;
                         if (pendentes && pendentes.length > 0) {{
-                            // Converte a fila para JSON
                             const payloadStr = JSON.stringify(pendentes);
                             
-                            // Localiza o receptor oculto no Python
-                            const doc = window.parent.document;
-                            const inputOffline = doc.querySelector('div[data-testid="stForm"] input[aria-label="payload_offline"]');
-                            const btnSubmitSync = Array.from(doc.querySelectorAll('div[data-testid="stForm"] button')).find(b => b.innerText.includes("ProcessarSyncOffline"));
+                            if (syncForm) {{
+                                const inputOffline = syncForm.querySelector('input[type="text"]');
+                                const btnSubmitSync = syncForm.querySelector('button');
 
-                            if (inputOffline && btnSubmitSync) {{
-                                // Injeta os dados
-                                let nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
-                                nativeInputValueSetter.call(inputOffline, payloadStr);
-                                inputOffline.dispatchEvent(new Event('input', {{ bubbles: true }}));
-                                
-                                // Dispara o botão para o Python salvar no banco
-                                btnSubmitSync.click();
-                                
-                                // Limpa a fila do navegador
-                                const clearTx = db.transaction(["fila_offline"], "readwrite");
-                                clearTx.objectStore("fila_offline").clear();
-                                
-                                document.getElementById('sync-text').innerText = 'Sincronizado com Sucesso!';
-                                setTimeout(() => {{ document.getElementById('sync-status-box').style.display = 'none'; }}, 4000);
+                                if (inputOffline && btnSubmitSync) {{
+                                    let nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+                                    nativeInputValueSetter.call(inputOffline, payloadStr);
+                                    inputOffline.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                                    
+                                    btnSubmitSync.click();
+                                    
+                                    const clearTx = db.transaction(["fila_offline"], "readwrite");
+                                    clearTx.objectStore("fila_offline").clear();
+                                    
+                                    document.getElementById('sync-text').innerText = 'Sincronizado com Sucesso!';
+                                    setTimeout(() => {{ document.getElementById('sync-status-box').style.display = 'none'; }}, 4000);
+                                }}
                             }}
                         }} else {{
                             setTimeout(() => {{ document.getElementById('sync-status-box').style.display = 'none'; }}, 2000);
@@ -2275,11 +2274,11 @@ else:
         emp_id = st.session_state.get("empresa", "U2T_MATRIZ")
         nome_motorista = st.session_state.get("usuario_ativo", "Motorista")
 
-        # Formulário Oculto (A ponte entre o JavaScript e o Python quando há internet)
-        with st.form("form_sync_oculto", clear_on_submit=True):
-            p_sync = st.text_input("p_sync", key="p_sync_input", label_visibility="collapsed")
-            d_sync = st.text_input("d_sync", key="d_sync_input", label_visibility="collapsed")
-            btn_sync = st.form_submit_button("Sync", use_container_width=True)
+        # Formulário Oculto Exclusivo da Aba (A ponte local)
+        with st.form("form_sync_oculto_aba", clear_on_submit=True):
+            p_sync = st.text_input("p_sync", key="p_sync_aba", label_visibility="collapsed")
+            d_sync = st.text_input("d_sync", key="d_sync_aba", label_visibility="collapsed")
+            btn_sync = st.form_submit_button("SyncSolicitacaoMotorista", use_container_width=True)
             
             if btn_sync and p_sync and d_sync:
                 with engine.connect() as conn:
@@ -2293,10 +2292,10 @@ else:
                     conn.commit()
                 st.success("✅ Solicitação enviada com sucesso!")
 
-        # Formulário Híbrido Blindado (Roda no navegador do usuário)
+        # Formulário Híbrido Blindado
         st.components.v1.html(f"""
             <style>
-                body {{ font-family: 'Segoe UI', sans-serif; color: #231F20; background: transparent; padding: 10px; }}
+                body {{ font-family: 'Segoe UI', sans-serif; color: #231F20; background: transparent; padding: 10px; margin: 0; }}
                 label {{ font-size: 14px; font-weight: 600; margin-bottom: 5px; display: block; }}
                 input, textarea {{ width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #C5A059; border-radius: 6px; box-sizing: border-box; background: #FFF; }}
                 button {{ width: 100%; padding: 12px; background: #C5A059; color: #FFF; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; transition: 0.2s; }}
@@ -2316,6 +2315,12 @@ else:
             </div>
 
             <script>
+                // Ocultar apenas o formulário nativo deste envio
+                const doc = window.parent.document;
+                const allForms = Array.from(doc.querySelectorAll('div[data-testid="stForm"]'));
+                const abaForm = allForms.find(f => f.textContent.includes('SyncSolicitacaoMotorista'));
+                if (abaForm) abaForm.style.display = 'none';
+
                 function enviarSolicitacaoHibrida() {{
                     const pref = document.getElementById('offline_prefixo').value.trim();
                     const desc = document.getElementById('offline_descricao').value.trim();
@@ -2330,26 +2335,31 @@ else:
                     }}
 
                     if(navigator.onLine) {{
-                        // Com internet: Injeta os dados no formulário oculto do Python e clica no botão invisível
-                        const doc = window.parent.document;
-                        
-                        // Localiza os inputs ocultos gerados pelo Streamlit e dispara eventos de digitação
-                        const inputs = doc.querySelectorAll('div[data-testid="stForm"] input[type="text"]');
-                        if(inputs.length >= 2) {{
-                            let nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+                        if (abaForm) {{
+                            const inputs = abaForm.querySelectorAll('input[type="text"]');
+                            const btn = abaForm.querySelector('button');
                             
-                            nativeInputValueSetter.call(inputs[0], pref);
-                            inputs[0].dispatchEvent(new Event('input', {{ bubbles: true }}));
-                            
-                            nativeInputValueSetter.call(inputs[1], desc);
-                            inputs[1].dispatchEvent(new Event('input', {{ bubbles: true }}));
-                            
-                            // Clica no botão de sync do Streamlit
-                            const btn = doc.querySelector('div[data-testid="stForm"] button');
-                            if(btn) btn.click();
+                            if (inputs.length >= 2 && btn) {{
+                                let nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+                                
+                                nativeInputValueSetter.call(inputs[0], pref);
+                                inputs[0].dispatchEvent(new Event('input', {{ bubbles: true }}));
+                                
+                                nativeInputValueSetter.call(inputs[1], desc);
+                                inputs[1].dispatchEvent(new Event('input', {{ bubbles: true }}));
+                                
+                                btn.click();
+                                
+                                feedback.style.display = 'block';
+                                feedback.style.background = '#C8E6C9';
+                                feedback.style.color = '#2E7D32';
+                                feedback.innerText = "Enviando para a oficina...";
+                                
+                                document.getElementById('offline_prefixo').value = '';
+                                document.getElementById('offline_descricao').value = '';
+                            }}
                         }}
                     }} else {{
-                        // Sem internet: Salva no banco de dados local do navegador (IndexedDB)
                         const request = indexedDB.open("Up2Today_OfflineDB", 1);
                         request.onsuccess = function(event) {{
                             const db = event.target.result;
