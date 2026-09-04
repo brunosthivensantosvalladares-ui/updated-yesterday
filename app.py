@@ -119,21 +119,55 @@ def get_engine():
     return create_engine(db_url.replace("postgres://", "postgresql://", 1), pool_pre_ping=True)
 
 def renderizar_modulo_sincronizacao_offline(emp_id):
-    """Injeta o motor de sincronização offline IndexedDB e detector de rede sem custos adicionais."""
+    """Injeta o motor de sincronização offline e o receptor Python para gravar no PostgreSQL."""
+    
+    # 1. Formulário Oculto Receptor (Ponte JS -> Python)
+    with st.form("form_global_sync", clear_on_submit=True):
+        payload_sync = st.text_input("payload_offline", key="payload_offline", label_visibility="collapsed")
+        btn_processar_sync = st.form_submit_button("ProcessarSyncOffline")
+
+        # Quando o JavaScript injetar os dados e clicar aqui, o Python grava no banco
+        if btn_processar_sync and payload_sync:
+            try:
+                import json
+                dados = json.loads(payload_sync)
+                engine = get_engine()
+                with engine.connect() as conn:
+                    for item in dados:
+                        if item.get("tipo") == "chamado_motorista":
+                            conn.execute(text("""
+                                INSERT INTO chamados (motorista, prefixo, descricao, data_solicitacao, status, empresa_id) 
+                                VALUES (:m, :p, :d, :dt, 'Pendente', :eid)
+                            """), {
+                                "m": item.get("motorista", "Desconhecido"),
+                                "p": item.get("prefixo", "S/P"),
+                                "d": item.get("descricao", ""),
+                                "dt": str(datetime.now().date()),
+                                "eid": str(emp_id)
+                            })
+                    conn.commit()
+                st.toast("☁️ Dados offline sincronizados com o servidor!", icon="✅")
+            except Exception:
+                pass
+
+    # Oculta o formulário receptor da interface do usuário
+    st.markdown("""
+        <style>
+            div[data-testid="stForm"]:has(input[aria-label="payload_offline"]) { display: none !important; }
+        </style>
+    """, unsafe_allow_html=True)
+
+    # 2. Motor JavaScript (Detector de Rede, IndexedDB e Gatilho de Sincronização)
     components.html(f"""
         <div id="sync-status-box" style="position: fixed; bottom: 10px; left: 10px; z-index: 999999; font-family: sans-serif; font-size: 11px; background: #3B2E25; color: #fff; padding: 4px 10px; border-radius: 6px; border: 1px solid #C5A059; display: none;">
             📶 <span id="sync-text">Online - Sincronizado</span>
         </div>
         <script>
             const empresaId = "{emp_id}";
-            
-            // Inicializa IndexedDB local para persistência offline
             let db;
             const request = indexedDB.open("Up2Today_OfflineDB", 1);
             
-            request.onerror = function(event) {{
-                console.error("Erro ao abrir banco offline:", event);
-            }};
+            request.onerror = function(event) {{ console.error("Erro banco offline:", event); }};
             
             request.onupgradeneeded = function(event) {{
                 db = event.target.result;
@@ -172,13 +206,30 @@ def renderizar_modulo_sincronizacao_offline(emp_id):
                     req.onsuccess = function() {{
                         const pendentes = req.result;
                         if (pendentes && pendentes.length > 0) {{
-                            // Aqui o motor envia os pacotes pendentes para o backend quando conectado
-                            console.log("Enviando dados offline pendentes...", pendentes);
-                            // Simula limpeza da fila após sucesso de upload
-                            const clearTx = db.transaction(["fila_offline"], "readwrite");
-                            clearTx.objectStore("fila_offline").clear();
-                            document.getElementById('sync-text').innerText = 'Online - Sincronizado com Sucesso!';
-                            setTimeout(() => {{ document.getElementById('sync-status-box').style.display = 'none'; }}, 4000);
+                            // Converte a fila para JSON
+                            const payloadStr = JSON.stringify(pendentes);
+                            
+                            // Localiza o receptor oculto no Python
+                            const doc = window.parent.document;
+                            const inputOffline = doc.querySelector('div[data-testid="stForm"] input[aria-label="payload_offline"]');
+                            const btnSubmitSync = Array.from(doc.querySelectorAll('div[data-testid="stForm"] button')).find(b => b.innerText.includes("ProcessarSyncOffline"));
+
+                            if (inputOffline && btnSubmitSync) {{
+                                // Injeta os dados
+                                let nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+                                nativeInputValueSetter.call(inputOffline, payloadStr);
+                                inputOffline.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                                
+                                // Dispara o botão para o Python salvar no banco
+                                btnSubmitSync.click();
+                                
+                                // Limpa a fila do navegador
+                                const clearTx = db.transaction(["fila_offline"], "readwrite");
+                                clearTx.objectStore("fila_offline").clear();
+                                
+                                document.getElementById('sync-text').innerText = 'Sincronizado com Sucesso!';
+                                setTimeout(() => {{ document.getElementById('sync-status-box').style.display = 'none'; }}, 4000);
+                            }}
                         }} else {{
                             setTimeout(() => {{ document.getElementById('sync-status-box').style.display = 'none'; }}, 2000);
                         }}
