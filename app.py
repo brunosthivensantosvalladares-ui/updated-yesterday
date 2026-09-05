@@ -626,49 +626,49 @@ def gerar_pdf_manual_oficial_pro():
     pdf.set_font("Arial", "B", 16); pdf.set_text_color(27, 34, 76)
     pdf.cell(190, 10, "1. INTRODUCAO E GANHOS ESTRATEGICOS", ln=True)
     pdf.set_font("Arial", "", 11); pdf.set_text_color(0)
-    pdf.multi_cell(190, 7, "O Up 2 Today e uma plataforma de gestao integrada que une a operacao de pista (Motoristas), o planejamento (Logistica) e a execucao (Oficina). O objetivo central e garantir que nenhum veículo fique parado alem do tempo estritamente necessario.\n\nGANHOS PARA A EMPRESA:\n- Reducao de ate 30% no Lead Time de manutencao.\n- Eliminacao total de papeis e planilhas paralelas.\n- Historico digital real por prefixo e placa.\n- Comunicacao instantanea entre motorista e oficina.".encode('latin-1', 'ignore').decode('latin-1'))
+    pdf.multi_cell(190, 7, "O Up 2 Today e uma plataforma de gestao integrada que une a operacao de pista (Motoristas), o planejamento (Logistica) e a execucao (Oficina). O objetivo central e garantir que nenhum veiculo fique parado alem do tempo estritamente necessario.\n\nGANHOS PARA A EMPRESA:\n- Reducao de ate 30% no Lead Time de manutencao.\n- Eliminacao total de papeis e planilhas paralelas.\n- Historico digital real por prefixo e placa.\n- Comunicacao instantanea entre motorista e oficina.")
 
     pdf.add_page()
     pdf.set_font("Arial", "B", 16); pdf.set_text_color(27, 34, 76)
     pdf.cell(190, 10, "2. FLUXO DE TRABALHO (WORKFLOW)", ln=True)
     pdf.set_font("Arial", "", 11)
-    pdf.multi_cell(190, 7, "O ciclo de vida de uma manutencao no Up 2 Today segue tres etapas fundamentais:\n\n1. Solicitacao: O motorista aponta a falha de forma remota via portal.\n2. Aprovacao: O gestor avalia a gravidade, define o executor e a area responsavel.\n3. Execucao: A oficina realiza o servico dentro da janela programada, garantindo a eficiencia.".encode('latin-1', 'ignore').decode('latin-1'))
+    pdf.multi_cell(190, 7, "O ciclo de vida de uma manutencao no Up 2 Today segue tres etapas fundamentais:\n\n1. Solicitacao: O motorista aponta a falha de forma remota via portal.\n2. Aprovacao: O gestor avalia a gravidade, define o executor e a area responsavel.\n3. Execucao: A oficina realiza o servico dentro da janela programada, garantindo a eficiencia.")
 
     pdf.add_page()
     pdf.set_font("Arial", "B", 16); pdf.set_text_color(27, 34, 76)
     pdf.cell(190, 10, "3. OPERACAO DA LOGISTICA (JANELAS)", ln=True)
     pdf.set_font("Arial", "", 11)
-    pdf.multi_cell(190, 7, "A logistica e a peca-chave para o preenchimento da disponibilidade na Agenda Principal.\nOs campos 'Inicio Disp.' e 'Fim Disp.' permitem que a oficina organize o patio, sabendo exatamente quando o veiculo estara livre para o box, evitando ociosidade da equipe.".encode('latin-1', 'ignore').decode('latin-1'))
+    pdf.multi_cell(190, 7, "A logistica e a peca-chave para o preenchimento da disponibilidade na Agenda Principal.\nOs campos 'Inicio Disp.' e 'Fim Disp.' permitem que a oficina organize o patio, sabendo exatamente quando o veiculo estara livre para o box, evitando ociosidade da equipe.")
 
     pdf.add_page()
     pdf.set_font("Arial", "B", 16); pdf.set_text_color(27, 34, 76)
     pdf.cell(190, 10, "4. PERFIS DE ACESSO (ADMIN VS MOTORISTA)", ln=True)
     pdf.set_font("Arial", "", 11)
-    pdf.multi_cell(190, 7, "PERFIL ADMINISTRADOR: Possui visao sistemica. Responsavel por triar chamados, gerenciar a agenda, cadastrar novos usuarios e analisar metricas de performance.\n\nPERFIL MOTORISTA: Interface otimizada para dispositivos moveis. O motorista foca em abrir chamados e acompanhar se o seu veiculo ja foi liberado, sem acesso a dados sensiveis.".encode('latin-1', 'ignore').decode('latin-1'))
+    pdf.multi_cell(190, 7, "PERFIL ADMINISTRADOR: Possui visao sistemica. Responsavel por triar chamados, gerenciar a agenda, cadastrar novos usuarios e analisar metricas de performance.\n\nPERFIL MOTORISTA: Interface otimizada para dispositivos moveis. O motorista foca em abrir chamados e acompanhar se o seu veiculo ja foi liberado, sem acesso a dados sensiveis.")
 
     pdf.add_page()
     pdf.set_font("Arial", "B", 16); pdf.set_text_color(27, 34, 76)
     pdf.cell(190, 10, "5. GUIA: CHAMADOS OFICINA", ln=True)
     pdf.set_font("Arial", "", 11)
-    pdf.multi_cell(190, 7, "1. Analise a descricao tecnica enviada pela ponta.\n2. Preencha o Executor, a Data Programada e a Area de destino.\n3. Marque a caixa 'Aprovar?' e confirme o processamento.\n*Importante: Apos aprovado, o servico e migrado instantaneamente para a Agenda Principal.*".encode('latin-1', 'ignore').decode('latin-1'))
+    pdf.multi_cell(190, 7, "1. Analise a descricao tecnica enviada pela ponta.\n2. Preencha o Executor, a Data Programada e a Area de destino.\n3. Marque a caixa 'Aprovar?' e confirme o processamento.\n*Importante: Apos aprovado, o servico e migrado instantaneamente para a Agenda Principal.*")
 
     pdf.add_page()
     pdf.set_font("Arial", "B", 16); pdf.set_text_color(27, 34, 76)
     pdf.cell(190, 10, "6. GUIA: AGENDA PRINCIPAL", ln=True)
     pdf.set_font("Arial", "", 11)
-    pdf.multi_cell(190, 7, "A Agenda e o centro operacional do dia a dia.\n- Filtros: Navegue por data, turno e area de atuacao.\n- Edicao Dinamica: Altere dados diretamente na grade de visualizacao.\n- Conclusao: O check no campo 'OK' e obrigatorio para encerrar o ciclo e gerar o historico.".encode('latin-1', 'ignore').decode('latin-1'))
+    pdf.multi_cell(190, 7, "A Agenda e o centro operacional do dia a dia.\n- Filtros: Navegue por data, turno e area de atuacao.\n- Edicao Dinamica: Altere dados diretamente na grade de visualizacao.\n- Conclusao: O check no campo 'OK' e obrigatorio para encerrar o ciclo e gerar o historico.")
 
     pdf.add_page()
     pdf.set_font("Arial", "B", 16); pdf.set_text_color(27, 34, 76)
     pdf.cell(190, 10, "7. GUIA: CADASTRO DIRETO", ln=True)
     pdf.set_font("Arial", "", 11)
-    pdf.multi_cell(190, 7, "Utilize esta aba para manutencoes programadas (revisoes e trocas de oleo).\nDiferente dos chamados, o cadastro aqui gera um servico direto na agenda. A lista inferior serve para auditoria e exclusao de registros indevidos.".encode('latin-1', 'ignore').decode('latin-1'))
+    pdf.multi_cell(190, 7, "Utilize esta aba para manutencoes programadas (revisoes e trocas de oleo).\nDiferente dos chamados, o cadastro aqui gera um servico direto na agenda. A lista inferior serve para auditoria e exclusao de registros indevidos.")
 
     pdf.add_page()
     pdf.set_font("Arial", "B", 16); pdf.set_text_color(27, 34, 76)
     pdf.cell(190, 10, "8. ASSISTENTE VIRTUAL E PENDENCIAS", ln=True)
     pdf.set_font("Arial", "", 11)
-    pdf.multi_cell(190, 7, "O Assistente monitora a integridade dos prazos. O alarme visual no topo indica que ha pendencias de datas passadas. O botão 'Resolver' permite ao gestor dar baixa imediata ou reagendar tarefas para o presente com um unico clique.".encode('latin-1', 'ignore').decode('latin-1'))
+    pdf.multi_cell(190, 7, "O Assistente monitora a integridade dos prazos. O alarme visual no topo indica que ha pendencias de datas passadas. O botao 'Resolver' permite ao gestor dar baixa imediata ou reagendar tarefas para o presente com um unico clique.")
 
     return pdf.output(dest='S').encode('latin-1', 'ignore')
 
@@ -2186,7 +2186,7 @@ else:
                         }}
                     }}
                 </script>
-            """, height=370)
+            """, height=440)
 
         # Oculta o formulário Python que serve apenas de ponte
         st.markdown("""
