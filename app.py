@@ -222,9 +222,9 @@ def renderizar_modulo_sincronizacao_offline(emp_id):
                         const pendentes = req.result;
                         if (pendentes && pendentes.length > 0) {{
                             const payloadStr = JSON.stringify(pendentes);
-                            
-                            // Busca os elementos do formulário oculto AGORA para evitar DOM Detachment
                             const doc = window.parent.document;
+                            
+                            // BUSCA ROBUSTA PELO TEXTO DO BOTÃO (Garante que vai achar mesmo oculto)
                             const allForms = Array.from(doc.querySelectorAll('div[data-testid="stForm"]'));
                             const activeSyncForm = allForms.find(f => f.textContent.includes('ProcessarSyncOffline'));
                             
@@ -237,13 +237,14 @@ def renderizar_modulo_sincronizacao_offline(emp_id):
                                     nativeInputValueSetter.call(inputOffline, payloadStr);
                                     inputOffline.dispatchEvent(new Event('input', {{ bubbles: true }}));
                                     
-                                    btnSubmitSync.click();
-                                    
-                                    const clearTx = db.transaction(["fila_offline"], "readwrite");
-                                    clearTx.objectStore("fila_offline").clear();
-                                    
-                                    document.getElementById('sync-text').innerText = 'Sincronizado com Sucesso!';
-                                    setTimeout(() => {{ document.getElementById('sync-status-box').style.display = 'none'; }}, 4000);
+                                    setTimeout(() => {{
+                                        btnSubmitSync.click();
+                                        const clearTx = db.transaction(["fila_offline"], "readwrite");
+                                        clearTx.objectStore("fila_offline").clear();
+                                        
+                                        document.getElementById('sync-text').innerText = 'Sincronizado com Sucesso!';
+                                        setTimeout(() => {{ document.getElementById('sync-status-box').style.display = 'none'; }}, 4000);
+                                    }}, 150);
                                 }}
                             }}
                         }} else {{
@@ -2700,8 +2701,9 @@ else:
                                 }
                             )
                             conn.commit()
-                        st.success("✅ SERVIÇO AGENDADO COM SUCESSO!")
-                        st.info(f"### 📋 ANOTE O Nº DA SUA OS: **{nova_os}**")
+                        
+                        st.session_state.pending_success = f"✅ SERVIÇO AGENDADO! A OS Gerada foi a de Nº {nova_os} (Horímetro ref: {h_prox}h | Odômetro ref: {o_prox}km)"
+                        st.session_state.pending_info = f"### 📋 ANOTE O Nº DA SUA OS: **{nova_os}**"
                         st.cache_data.clear()
                         st.rerun()
                     except Exception as e:
@@ -2713,8 +2715,10 @@ else:
             opcoes_tipo_html = "".join([f'<option value="{tp}">{tp}</option>' for tp in LISTA_TIPOS_OS])
             hoje_str = datetime.now().strftime("%Y-%m-%d")
 
-            # 2. Formulário Híbrido Blindado Harmonizado e Compactado
+            # 2. Formulário Híbrido Blindado Harmonizado
+            # A injeção do time_module.time() força o HTML a recarregar, evitando que a mensagem trave.
             st.components.v1.html(f"""
+                <div style="display:none;">{time_module.time()}</div>
                 <style>
                     body {{ font-family: 'Segoe UI', sans-serif; color: #231F20; background: transparent; padding: 5px; margin: 0; }}
                     label {{ font-size: 13px; font-weight: 600; margin-bottom: 4px; display: block; color: #4A3C31; }}
@@ -2788,15 +2792,14 @@ else:
                                     nativeInputValueSetter.call(inputOffline, JSON.stringify(payload));
                                     inputOffline.dispatchEvent(new Event('input', {{ bubbles: true }}));
                                     
-                                    btnSubmitSync.click();
-                                    
                                     feedback.style.display = 'block';
                                     feedback.style.background = '#C8E6C9';
                                     feedback.style.color = '#2E7D32';
                                     feedback.innerText = "Agendando online...";
                                     
-                                    document.getElementById('off_pref').value = '';
-                                    document.getElementById('off_desc').value = '';
+                                    setTimeout(() => {{
+                                        btnSubmitSync.click();
+                                    }}, 150);
                                 }}
                             }}
                         }} else {{
@@ -2822,8 +2825,8 @@ else:
                         }}
                     }}
                 </script>
-            """, height=340)
-
+            """, height=350)
+            
             # --- LISTA GERAL DE SERVIÇOS EXCLUSIVA DA ABA DE AGENDAMENTO DIRETO ---
             st.divider()
             st.subheader("📋 Lista geral de serviços")
