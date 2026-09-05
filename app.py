@@ -946,6 +946,87 @@ html, body, [data-testid="stAppViewContainer"], .stApp {{
     font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif !important;
 }}
 
+/* =========================================================
+   1. OCULTAÇÃO DEFINITIVA DOS FORMULÁRIOS PONTE
+   ========================================================= */
+div[data-testid="stForm"]:has(input[aria-label="payload_offline"]),
+div[data-testid="stForm"]:has(input[aria-label="payload_cadastro"]),
+div[data-testid="stForm"]:has(input[aria-label="p_sync"]),
+div[data-testid="stForm"]:has(input[aria-label="payload_baixa"]) {{
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+}}
+
+/* =========================================================
+   2. ESTILIZAÇÃO GLOBAL NATIVA STREAMLIT (Campos, Labels e Inputs)
+   ========================================================= */
+.main div[data-testid="stTextInput"] label p,
+.main div[data-testid="stSelectbox"] label p,
+.main div[data-testid="stNumberInput"] label p,
+.main div[data-testid="stDateInput"] label p,
+.main div[data-testid="stTimeInput"] label p,
+.main div[data-testid="stTextArea"] label p,
+.main div[data-testid="stMultiSelect"] label p {{
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    color: #4A3C31 !important;
+    margin-bottom: 2px !important;
+}}
+
+.main div[data-testid="stTextInput"] input,
+.main div[data-testid="stSelectbox"] div[data-baseweb="select"] > div,
+.main div[data-testid="stNumberInput"] input,
+.main div[data-testid="stDateInput"] input,
+.main div[data-testid="stTimeInput"] input,
+.main div[data-testid="stTextArea"] textarea,
+.main div[data-testid="stMultiSelect"] div[data-baseweb="select"] > div {{
+    border: 1px solid #C5A059 !important;
+    border-radius: 6px !important;
+    background-color: #FFFFFF !important;
+    color: #231F20 !important;
+    font-size: 14px !important;
+    padding: 6px 10px !important;
+    min-height: 38px !important;
+    box-shadow: none !important;
+}}
+
+.main div[data-testid="stTextInput"] input:focus,
+.main div[data-testid="stSelectbox"] div[data-baseweb="select"] > div:focus-within,
+.main div[data-testid="stTextArea"] textarea:focus {{
+    border-color: #9B783E !important;
+    box-shadow: 0 0 0 1px #9B783E !important;
+}}
+
+/* Botões Primários Globais Estilo Premium */
+.main button[kind="primary"], .main button[data-testid="stBaseButton-primary"] {{
+    background-color: #C5A059 !important;
+    color: #FFFFFF !important;
+    font-weight: bold !important;
+    border: none !important;
+    border-radius: 6px !important;
+    padding: 8px 16px !important;
+    transition: 0.2s !important;
+    font-size: 14px !important;
+    min-height: 40px !important;
+    height: auto !important;
+}}
+.main button[kind="primary"]:hover, .main button[data-testid="stBaseButton-primary"]:hover {{
+    background-color: #9B783E !important;
+    color: #FFFFFF !important;
+}}
+.main button[kind="primary"] p, .main button[data-testid="stBaseButton-primary"] p {{
+    color: #FFFFFF !important;
+    font-weight: bold !important;
+    font-size: 14px !important;
+}}
+
+/* =========================================================
+   3. CABEÇALHO, TOPO FIXO E SIDEBAR
+   ========================================================= */
 header[data-testid="stHeader"] {{
     background: transparent !important;
     visibility: visible !important;
@@ -1112,22 +1193,12 @@ section[data-testid="stSidebar"] button:not([key^="nav_btn_"]) {{
     justify-content: flex-start !important;
 }}
 
-button, 
-button[kind="primary"], 
-button[kind="secondary"], 
-[data-testid="stBaseButton-primary"], 
-[data-testid="stBaseButton-secondary"] {{
-    background-color: {COR_BRONZE} !important;
-    border: 1.5px solid {COR_OURO} !important;
+button:not(.arrow-btn), 
+button[kind="primary"]:not(.arrow-btn), 
+button[kind="secondary"]:not(.arrow-btn), 
+[data-testid="stBaseButton-primary"]:not(.arrow-btn), 
+[data-testid="stBaseButton-secondary"]:not(.arrow-btn) {{
     border-radius: 6px !important;
-    color: #FFFFFF !important;
-}}
-
-button p, button span, button div,
-[data-testid="stBaseButton-primary"] p, [data-testid="stBaseButton-primary"] span,
-[data-testid="stBaseButton-secondary"] p, [data-testid="stBaseButton-secondary"] span {{
-    color: #FFFFFF !important;
-    -webkit-text-fill-color: #FFFFFF !important;
 }}
 
 div.stHorizontalBlock button[kind="primary"] {{
@@ -2333,16 +2404,17 @@ else:
                     conn.commit()
                 st.success("✅ Solicitação enviada com sucesso!")
 
-        # Formulário Híbrido Blindado Harmonizado
+        # Formulário Híbrido Blindado Harmonizado (Compacto)
         st.components.v1.html(f"""
             <style>
-                body {{ font-family: 'Segoe UI', sans-serif; color: #231F20; background: transparent; padding: 5px; margin: 0; }}
+                body {{ font-family: 'Segoe UI', sans-serif; padding: 5px; margin: 0; color: #231F20; }}
                 label {{ font-size: 13px; font-weight: 600; margin-bottom: 4px; display: block; color: #4A3C31; }}
-                input, select, textarea {{ width: 100%; padding: 8px; margin-bottom: 12px; border: 1px solid #C5A059; border-radius: 6px; box-sizing: border-box; background: #FFF; font-size: 14px; }}
-                button {{ width: auto; min-width: 200px; padding: 12px 24px; background: #C5A059; color: #FFF; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; font-size: 15px; transition: 0.2s; margin-top: 5px; }}
+                input, textarea {{ width: 100%; padding: 6px 10px; margin-bottom: 12px; border: 1px solid #C5A059; border-radius: 6px; box-sizing: border-box; font-size: 14px; background: #FFF; }}
+                input:focus, textarea:focus {{ border-color: #9B783E; outline: none; box-shadow: 0 0 0 1px #9B783E; }}
+                .btn-container {{ text-align: right; margin-top: 5px; }}
+                button {{ padding: 10px 20px; background: #C5A059; color: #FFF; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; transition: 0.2s; width: auto; }}
                 button:hover {{ background: #9B783E; }}
-                #msg-feedback {{ margin-top: 10px; padding: 10px; border-radius: 6px; display: none; font-weight: bold; text-align: center; font-size: 14px; }}
-                .btn-wrapper {{ text-align: right; }}
+                #msg-feedback {{ margin-top: 10px; padding: 10px; border-radius: 6px; display: none; text-align: center; font-size: 14px; font-weight: bold; }}
             </style>
             
             <div id="form-container">
@@ -2352,7 +2424,7 @@ else:
                 <label>Descrição do Problema</label>
                 <textarea id="offline_descricao" rows="4" placeholder="Detalhe a falha..."></textarea>
                 
-                <div class="btn-wrapper">
+                <div class="btn-container">
                     <button onclick="enviarSolicitacaoHibrida()">Enviar Solicitação</button>
                 </div>
                 <div id="msg-feedback"></div>
@@ -2427,7 +2499,7 @@ else:
                     }}
                 }}
             </script>
-        """, height=340)
+        """, height=300)
 
         # Oculta o formulário Python que serve apenas de ponte
         st.markdown("""
@@ -2485,82 +2557,142 @@ else:
                 st.write(f"🚜 **Veículo:** {os_data['prefixo']}")
                 st.write(f"📝 **Serviço Planejado:** {os_data['descricao']}")
                 
-                with st.form("form_baixa_exclusiva"):
-                    servico_realizado = st.text_area("O que foi feito de fato / Observações gerais?")
-                    
-                    st.markdown("---")
-                    st.markdown("#### ⏱️ Dados de Encerramento e Medidores (Para controle de Planos)")
-                    
-                    col_b1, col_b2, col_b3 = st.columns(3)
-                    data_realizacao_baixa = col_b1.date_input("Data de Realização", datetime.now())
-                    horimetro_baixa = col_b2.number_input("Horímetro Atual (Opcional)", min_value=0.0, step=1.0, value=0.0)
-                    odometro_baixa = col_b3.number_input("Odômetro Atual (Opcional)", min_value=0.0, step=1.0, value=0.0)
-                    
-                    # --- CAMPOS DINÂMICOS CONFORME O TIPO DE OS ---
-                    respostas_tecnicas = ""
-                    if tipo_os_atual == "Preditiva":
-                        st.markdown("#### 🔍 Medições Preditivas:")
-                        val_medido = st.number_input("Valor Medido (Ex: Pressão, Temperatura ou Desgaste)", value=0.0)
-                        respostas_tecnicas = f" | [Valor Medido: {val_medido}]"
-                    elif tipo_os_atual == "Checklist":
-                        st.markdown("#### ✔️ Avaliação de Checklist:")
-                        status_check = st.radio("Status do item:", ["Conforme (C)", "Não conforme (NC)"], horizontal=True)
-                        respostas_tecnicas = f" | [Status: {status_check}]"
+                # Formulário Oculto de Ponte (Para comunicação Online)
+                with st.form("form_sync_baixa_oculta", clear_on_submit=True):
+                    payload_baixa = st.text_input("payload_baixa", key="payload_baixa_aba", label_visibility="collapsed")
+                    btn_sync_baixa = st.form_submit_button("SyncBaixaTecnica", use_container_width=True)
 
-                    executor = st.text_input("Mecânico Responsável")
-                    c1, c2 = st.columns(2)
-                    h_ini = c1.text_input("Início", "08:00")
-                    h_fim = c2.text_input("Fim", "10:00")
-
-                    if st.form_submit_button("💾 Finalizar e Salvar Baixa"):
-                        if not servico_realizado:
-                            st.error("A descrição do serviço é obrigatória.")
-                        else:
-                            pref_veiculo = str(os_data['prefixo']).strip()
+                    if btn_sync_baixa and payload_baixa:
+                        import json
+                        try:
+                            p_baixa = json.loads(payload_baixa)
+                            h_b = float(p_baixa.get("horimetro") or 0.0)
+                            o_b = float(p_baixa.get("odometro") or 0.0)
+                            resp_extras = ""
+                            if p_baixa.get("val_medido"): resp_extras += f" | [Valor Medido: {p_baixa.get('val_medido')}]"
+                            if p_baixa.get("status_check"): resp_extras += f" | [Status: {p_baixa.get('status_check')}]"
                             
-                            # PRIORIDADE 1 & 2: Tratamento e Gravação dos Medidores
-                            h_final_gravacao = horimetro_baixa
-                            o_final_gravacao = odometro_baixa
-                            
-                            with engine.begin() as conn:
-                                # Se o usuário não preencheu os medidores na baixa (Prioridade 2), busca na base o mais próximo da data da OS
-                                if h_final_gravacao == 0.0 and o_final_gravacao == 0.0:
-                                    med_fallback = conn.execute(
+                            with engine.connect() as conn:
+                                if h_b == 0.0 and o_b == 0.0:
+                                    m_fall = conn.execute(
                                         text("""
-                                            SELECT horimetro, odometro, ABS(data_leitura - CAST(:dt AS DATE)) as diff_dias
+                                            SELECT horimetro, odometro 
                                             FROM medidores_frota 
-                                            WHERE empresa_id = :eid AND prefixo = :pref
-                                            ORDER BY diff_dias ASC, data_leitura DESC
-                                            LIMIT 1
-                                        """),
-                                        {"eid": str(emp_id), "pref": pref_veiculo, "dt": str(data_realizacao_baixa)}
+                                            WHERE empresa_id = :eid AND prefixo = :p 
+                                            ORDER BY ABS(data_leitura - CAST(:dt AS DATE)) ASC LIMIT 1
+                                        """), 
+                                        {"eid": str(emp_id), "p": p_baixa.get("prefixo"), "dt": p_baixa.get("data_baixa")}
                                     ).fetchone()
+                                    if m_fall: 
+                                        h_b, o_b = float(m_fall[0] or 0), float(m_fall[1] or 0)
                                     
-                                    if med_fallback:
-                                        h_final_gravacao = float(med_fallback[0] or 0.0)
-                                        o_final_gravacao = float(med_fallback[1] or 0.0)
-
-                                relato = f"Execução: {servico_realizado}{respostas_tecnicas}; Mecânico: {executor}; Horário: {h_ini}-{h_fim} | [Baixa - Horímetro: {h_final_gravacao}h, Odômetro: {o_final_gravacao}km]"
+                                relato_final = f"Execução: {p_baixa.get('relato_base')}{resp_extras}; Mecânico: {p_baixa.get('exec_baixa')}; Horário: {p_baixa.get('ini_baixa')}-{p_baixa.get('fim_baixa')} | [Baixa - Horímetro: {h_b}h, Odômetro: {o_b}km]"
                                 
-                                query_update = text("""
+                                conn.execute(text("""
                                     UPDATE tarefas 
                                     SET realizado = True, 
-                                        data = :dt_baixa,
-                                        descricao = 'OS: ' || :os || '; Prefixo: ' || :pref || '; ' || COALESCE(descricao, '') || '; ' || :relato
-                                    WHERE id = :id_banco 
-                                    AND empresa_id = :eid
-                                """)
-                                conn.execute(query_update, {
-                                    "dt_baixa": str(data_realizacao_baixa),
-                                    "relato": str(relato), "os": str(os_num),
-                                    "pref": pref_veiculo, "id_banco": int(os_data['id']),
-                                    "eid": str(emp_id)
-                                })
+                                        data = :dt_baixa, 
+                                        descricao = 'OS: ' || :os || '; Prefixo: ' || :pref || '; ' || COALESCE(descricao, '') || '; ' || :relato 
+                                    WHERE id = :id_banco AND empresa_id = :eid
+                                """), {"dt_baixa": p_baixa.get("data_baixa"), "relato": relato_final, "os": os_num, "pref": p_baixa.get("prefixo"), "id_banco": int(p_baixa.get("id_tarefa")), "eid": str(emp_id)})
+                                conn.commit()
                                 
-                            st.cache_data.clear()
+                            st.session_state.pending_success = f"✅ OS {os_num} finalizada e salva com sucesso!"
                             st.session_state.os_em_baixa = None
-                            st.success(f"✅ OS {os_num} finalizada e métricas de controle atualizadas com sucesso!")
+                            st.cache_data.clear()
                             st.rerun()
+                        except Exception:
+                            pass
+
+                # Criação dos campos extras dinâmicos
+                extra_html = ""
+                if tipo_os_atual == "Preditiva":
+                    extra_html = """<div><label>🔍 Valor Medido</label><input type="number" step="0.1" id="off_val_medido"></div>"""
+                elif tipo_os_atual == "Checklist":
+                    extra_html = """<div><label>✔️ Avaliação de Checklist</label><select id="off_status_check"><option value="Conforme (C)">Conforme (C)</option><option value="Não conforme (NC)">Não conforme (NC)</option></select></div>"""
+
+                hoje_str = datetime.now().strftime("%Y-%m-%d")
+                
+                # Formulário Híbrido Blindado (Offline + Compacto)
+                st.components.v1.html(f"""
+                    <style>
+                        body {{ font-family: 'Segoe UI', sans-serif; color: #231F20; padding: 5px; margin: 0; }}
+                        label {{ font-size: 13px; font-weight: 600; margin-bottom: 4px; display: block; color: #4A3C31; }}
+                        input, select, textarea {{ width: 100%; padding: 6px 10px; margin-bottom: 12px; border: 1px solid #C5A059; border-radius: 6px; box-sizing: border-box; background: #FFF; font-size: 14px; }}
+                        input:focus, select:focus, textarea:focus {{ border-color: #9B783E; outline: none; box-shadow: 0 0 0 1px #9B783E; }}
+                        .grid-3 {{ display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }}
+                        .btn-container {{ text-align: right; margin-top: 5px; }}
+                        button {{ padding: 10px 20px; background: #C5A059; color: #FFF; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; transition: 0.2s; font-size: 14px; width: auto; display: inline-block; }}
+                        button:hover {{ background: #9B783E; }}
+                        #msg-feedback {{ margin-top: 10px; padding: 10px; border-radius: 6px; display: none; text-align: center; font-size: 14px; font-weight: bold; }}
+                    </style>
+                    <div id="form-container">
+                        <div class="grid-3">
+                            <div><label>Data de Realização</label><input type="date" id="off_data_baixa" value="{hoje_str}"></div>
+                            <div><label>Horímetro Atual (Opcional)</label><input type="number" step="1" id="off_hor"></div>
+                            <div><label>Odômetro Atual (Opcional)</label><input type="number" step="1" id="off_odo"></div>
+                        </div>
+                        <div class="grid-3">
+                            <div><label>Mecânico Responsável</label><input type="text" id="off_exec_baixa"></div>
+                            <div><label>Início</label><input type="time" id="off_ini_baixa" value="08:00"></div>
+                            <div><label>Fim</label><input type="time" id="off_fim_baixa" value="10:00"></div>
+                        </div>
+                        {extra_html}
+                        <label>O que foi feito de fato / Observações gerais?</label>
+                        <textarea id="off_relato" rows="3"></textarea>
+                        
+                        <div class="btn-container">
+                            <button onclick="enviarBaixa()">💾 Finalizar Baixa Técnica</button>
+                        </div>
+                        <div id="msg-feedback"></div>
+                    </div>
+                    <script>
+                        function enviarBaixa() {{
+                            const payload = {{
+                                id_tarefa: "{os_data['id']}",
+                                numero_os: "{os_num}",
+                                prefixo: "{os_data['prefixo']}",
+                                data_baixa: document.getElementById('off_data_baixa').value,
+                                horimetro: document.getElementById('off_hor').value,
+                                odometro: document.getElementById('off_odo').value,
+                                exec_baixa: document.getElementById('off_exec_baixa').value.trim(),
+                                ini_baixa: document.getElementById('off_ini_baixa').value,
+                                fim_baixa: document.getElementById('off_fim_baixa').value,
+                                relato_base: document.getElementById('off_relato').value.trim(),
+                                val_medido: document.getElementById('off_val_medido') ? document.getElementById('off_val_medido').value : '',
+                                status_check: document.getElementById('off_status_check') ? document.getElementById('off_status_check').value : ''
+                            }};
+                            
+                            const feedback = document.getElementById('msg-feedback');
+                            if(!payload.relato_base) {{
+                                feedback.style.display = 'block'; feedback.style.background = '#FFCDD2'; feedback.style.color = '#B71C1C'; feedback.innerText = "⚠️ A descrição do serviço é obrigatória."; return;
+                            }}
+
+                            if(navigator.onLine) {{
+                                const doc = window.parent.document;
+                                const allForms = Array.from(doc.querySelectorAll('div[data-testid="stForm"]'));
+                                const abaForm = allForms.find(f => f.textContent.includes('SyncBaixaTecnica'));
+                                
+                                if (abaForm) {{
+                                    const input = abaForm.querySelector('input[type="text"]');
+                                    const btn = abaForm.querySelector('button');
+                                    if (input && btn) {{
+                                        let setVal = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+                                        setVal.call(input, JSON.stringify(payload)); input.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                                        btn.click();
+                                    }}
+                                }}
+                            }} else {{
+                                const req = indexedDB.open("Up2Today_OfflineDB", 1);
+                                req.onsuccess = function(e) {{
+                                    const db = e.target.result;
+                                    db.transaction(["fila_offline"], "readwrite").objectStore("fila_offline").add({{ tipo: "baixa_tecnica", ...payload }});
+                                    feedback.style.display = 'block'; feedback.style.background = '#C8E6C9'; feedback.style.color = '#2E7D32'; feedback.innerText = "📶 Baixa Salva Offline!";
+                                }};
+                            }}
+                        }}
+                    </script>
+                """, height=350)
 
         else:
             st.subheader("⏳ Ordens de Serviço em Aberto")
@@ -2913,14 +3045,16 @@ else:
             # 2. Formulário Híbrido Blindado Harmonizado e Compactado
             st.components.v1.html(f"""
                 <style>
-                    body {{ font-family: 'Segoe UI', sans-serif; color: #231F20; background: transparent; padding: 5px; margin: 0; }}
-                    label {{ font-size: 13px; font-weight: 600; margin-bottom: 4px; display: block; color: #4A3C31; }}
-                    input, select, textarea {{ width: 100%; padding: 8px; margin-bottom: 12px; border: 1px solid #C5A059; border-radius: 6px; box-sizing: border-box; background: #FFF; font-size: 14px; }}
-                    .grid-4 {{ display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; }}
-                    button {{ width: auto; min-width: 200px; padding: 12px 24px; background: #C5A059; color: #FFF; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; font-size: 15px; transition: 0.2s; margin-top: 5px; display: inline-block; }}
-                    button:hover {{ background: #9B783E; }}
-                    #msg-feedback {{ margin-top: 10px; padding: 10px; border-radius: 6px; display: none; font-weight: bold; text-align: center; font-size: 14px; }}
-                    .btn-wrapper {{ text-align: right; }}
+                    body { font-family: 'Segoe UI', sans-serif; color: #231F20; padding: 5px; margin: 0; }
+                    label { font-size: 13px; font-weight: 600; margin-bottom: 4px; display: block; color: #4A3C31; }
+                    input, select, textarea { width: 100%; padding: 6px 10px; margin-bottom: 12px; border: 1px solid #C5A059; border-radius: 6px; box-sizing: border-box; font-size: 14px; background: #FFF; }
+                    input:focus, select:focus, textarea:focus { border-color: #9B783E; outline: none; box-shadow: 0 0 0 1px #9B783E; }
+                    .grid-5 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr; gap: 10px; }
+                    .grid-4 { display: grid; grid-template-columns: 1fr 1fr 2fr; gap: 10px; }
+                    .btn-container { text-align: right; margin-top: 5px; }
+                    button { padding: 10px 20px; background: #C5A059; color: #FFF; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; transition: 0.2s; font-size: 14px; width: auto; }
+                    button:hover { background: #9B783E; }
+                    #msg-feedback { margin-top: 10px; padding: 10px; border-radius: 6px; display: none; text-align: center; font-size: 14px; font-weight: bold; }
                 </style>
                 
                 <div id="form-container">
