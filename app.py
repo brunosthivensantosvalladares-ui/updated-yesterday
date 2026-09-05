@@ -118,15 +118,7 @@ def get_engine():
         st.stop()
     return create_engine(db_url.replace("postgres://", "postgresql://", 1), pool_pre_ping=True)
 
-def renderizar_modulo_sincronizacao_offline(emp_id):
-    """Injeta o motor de sincronização offline e o receptor Python para gravar no PostgreSQL."""
-    
-    # 1. Formulário Oculto Receptor (Ponte JS -> Python)
-    with st.form("form_global_sync", clear_on_submit=True):
-        payload_sync = st.text_input("payload_offline", key="payload_offline", label_visibility="collapsed")
-        btn_processar_sync = st.form_submit_button("ProcessarSyncOffline")
-
-        # Quando o JavaScript injetar os dados e clicar aqui, o Python grava no banco
+# Quando o JavaScript injetar os dados e clicar aqui, o Python grava no banco
         if btn_processar_sync and payload_sync:
             try:
                 import json
@@ -134,7 +126,9 @@ def renderizar_modulo_sincronizacao_offline(emp_id):
                 engine = get_engine()
                 with engine.connect() as conn:
                     for item in dados:
-                        if item.get("tipo") == "chamado_motorista":
+                        tipo = item.get("tipo")
+                        
+                        if tipo == "chamado_motorista":
                             conn.execute(text("""
                                 INSERT INTO chamados (motorista, prefixo, descricao, data_solicitacao, status, empresa_id) 
                                 VALUES (:m, :p, :d, :dt, 'Pendente', :eid)
@@ -145,11 +139,45 @@ def renderizar_modulo_sincronizacao_offline(emp_id):
                                 "dt": str(datetime.now().date()),
                                 "eid": str(emp_id)
                             })
+                            
+                        elif tipo == "agendamento_direto":
+                            pref = item.get("prefixo", "S/P")
+                            dt_exec = item.get("data", str(datetime.now().date()))
+                            
+                            # Busca as medições mais recentes no momento exato em que a internet volta
+                            h_prox, o_prox = obter_medidor_proximo(engine, emp_id, pref, dt_exec)
+                            desc_final = f"{item.get('descricao', '')} | [Leitura Ref (Sync): Horímetro {h_prox}h, Odômetro {o_prox}km]"
+                            nova_os = obter_proxima_os(engine, emp_id)
+                            
+                            conn.execute(text("""
+                                INSERT INTO tarefas (data, executor, prefixo, inicio_disp, fim_disp, descricao, area, tipo_os, turno, origem, empresa_id, numero_os) 
+                                VALUES (:dt, :ex, :pr, :ti, :tf, :ds, :ar, :tp, :tu, 'Direto Offline', :eid, :nos)
+                            """), {
+                                "dt": dt_exec, "ex": item.get("executor", ""), "pr": pref, 
+                                "ti": item.get("inicio", ""), "tf": item.get("fim", ""), 
+                                "ds": desc_final, "ar": item.get("area", "Mecânica"), "tp": item.get("tipo_os", "Corretiva"), 
+                                "tu": item.get("turno", "Não definido"), "eid": str(emp_id), "nos": nova_os
+                            })
+                            
+                        elif tipo == "baixa_tecnica":
+                            conn.execute(text("""
+                                UPDATE tarefas 
+                                SET realizado = True, 
+                                    data = :dt_baixa,
+                                    descricao = 'OS: ' || :os || '; Prefixo: ' || :pref || '; ' || COALESCE(descricao, '') || '; ' || :relato
+                                WHERE id = :id_banco AND empresa_id = :eid
+                            """), {
+                                "dt_baixa": item.get("data_baixa"),
+                                "relato": item.get("relato"), "os": str(item.get("numero_os")),
+                                "pref": item.get("prefixo"), "id_banco": int(item.get("id_tarefa")),
+                                "eid": str(emp_id)
+                            })
+                            
                     conn.commit()
                 st.toast("☁️ Dados offline sincronizados com o servidor!", icon="✅")
                 import time
-                time.sleep(1) # Aguarda 1 segundo para exibir a notificação
-                st.rerun() # Atualiza a tela automaticamente para exibir o dado novo!
+                time.sleep(1.5) 
+                st.rerun() 
             except Exception:
                 pass
 
