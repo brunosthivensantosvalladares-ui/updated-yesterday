@@ -2984,12 +2984,14 @@ else:
                                 }}
                             }}
                         }} else {{
+                            // Salva no cofre IndexedDB
                             const request = indexedDB.open("Up2Today_OfflineDB", 1);
                             request.onsuccess = function(event) {{
                                 const db = event.target.result;
                                 const tx = db.transaction(["fila_offline"], "readwrite");
                                 const store = tx.objectStore("fila_offline");
                                 
+                                // O tipo "agendamento_direto" será reconhecido pela nossa função global
                                 store.add({{
                                     tipo: "agendamento_direto",
                                     ...payload
