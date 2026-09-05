@@ -2072,6 +2072,11 @@ else:
         nome_motorista = st.session_state.get("usuario_ativo", "Motorista")
         hoje_str = datetime.now().strftime("%Y-%m-%d")
 
+        # Exibe o aviso de sucesso armazenado na sessão
+        if st.session_state.get("sucesso_solicitacao"):
+            st.success(st.session_state.sucesso_solicitacao)
+            del st.session_state.sucesso_solicitacao
+
         # Formulário Oculto Exclusivo da Aba (A ponte local)
         with st.form("form_sync_oculto_aba", clear_on_submit=True):
             p_sync = st.text_input("p_sync", key="p_sync_aba", label_visibility="collapsed")
@@ -2088,7 +2093,8 @@ else:
                         "dt": str(datetime.now().date()), "eid": str(emp_id)
                     })
                     conn.commit()
-                st.success("✅ Solicitação enviada com sucesso!")
+                st.session_state.sucesso_solicitacao = "✅ Solicitação enviada com sucesso!"
+                st.rerun()
 
         st.components.v1.html(f"""
             <div style="display:none;">{time_module.time()}</div>
@@ -2134,7 +2140,7 @@ else:
                         const inputDesc = doc.querySelector('input[aria-label="d_sync"]');
                         
                         if (inputPref && inputDesc) {{
-                            const btn = inputPref.closest('div[data-testid="stForm"]').querySelector('button');
+                            const btn = inputPref.closest('div[data-testid="stForm"]')?.querySelector('button');
                             if (btn) {{
                                 let setVal = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
                                 setVal.call(inputPref, pref); 
@@ -2148,7 +2154,7 @@ else:
                                 feedback.style.color = '#2E7D32'; 
                                 feedback.innerText = "Enviando para a oficina...";
                                 
-                                setTimeout(() => {{ btn.click(); }}, 150);
+                                setTimeout(() => {{ btn.click(); }}, 100);
                             }}
                         }}
                     }} else {{
