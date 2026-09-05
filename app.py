@@ -2092,15 +2092,15 @@ else:
         st.components.v1.html(f"""
                 <div style="display:none;">{time_module.time()}</div>
                 <style>
-                    body {{ font-family: 'Segoe UI', sans-serif; color: #231F20; background: transparent; padding: 5px; margin: 0; }}
+                    body {{ font-family: 'Segoe UI', sans-serif; color: #231F20; background: transparent; padding: 5px; margin: 0; overflow: hidden; }}
                     label {{ font-size: 13px; font-weight: 600; margin-bottom: 4px; display: block; color: #4A3C31; }}
                     input, select, textarea {{ width: 100%; padding: 8px; margin-bottom: 10px; border: 1px solid #C5A059; border-radius: 6px; box-sizing: border-box; background: #FFF; font-size: 14px; }}
                     input:focus, select:focus, textarea:focus {{ border-color: #9B783E; outline: none; box-shadow: 0 0 0 1px #9B783E; }}
                     .grid-4 {{ display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; }}
                     button {{ width: auto; min-width: 200px; padding: 12px 24px; background: #C5A059; color: #FFF; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; font-size: 15px; transition: 0.2s; display: inline-block; }}
                     button:hover {{ background: #9B783E; }}
-                    #msg-feedback {{ margin-top: 10px; padding: 12px; border-radius: 6px; display: none; font-weight: bold; text-align: center; font-size: 14px; }}
                     .btn-wrapper {{ text-align: right; margin-top: 5px; }}
+                    #msg-feedback {{ margin-top: 10px; padding: 12px; border-radius: 6px; text-align: center; font-size: 14px; font-weight: bold; background: transparent; color: transparent; border: 1px solid transparent; transition: 0.2s; }}
                 </style>
                 
                 <div id="form-container">
@@ -2124,7 +2124,7 @@ else:
                     <div class="btn-wrapper">
                         <button onclick="enviarCadastroHibrido()">Confirmar Agendamento</button>
                     </div>
-                    <div id="msg-feedback"></div>
+                    <div id="msg-feedback">Aguardando ação...</div>
                 </div>
 
                 <script>
@@ -2149,7 +2149,6 @@ else:
                         const feedback = document.getElementById('msg-feedback');
                         
                         if(!payload.prefixo || !payload.descricao) {{
-                            feedback.style.display = 'block';
                             feedback.style.background = '#FFCDD2';
                             feedback.style.color = '#B71C1C';
                             feedback.innerText = "⚠️ Preencha obrigatoriamente o Prefixo e a Descrição.";
@@ -2166,7 +2165,6 @@ else:
                                     nativeInputValueSetter.call(inputOffline, JSON.stringify([payload]));
                                     inputOffline.dispatchEvent(new Event('input', {{ bubbles: true }}));
                                     
-                                    feedback.style.display = 'block';
                                     feedback.style.background = '#C8E6C9';
                                     feedback.style.color = '#2E7D32';
                                     feedback.innerText = "Agendando online...";
@@ -2182,7 +2180,6 @@ else:
                                 const store = tx.objectStore("fila_offline");
                                 store.add(payload);
                                 
-                                feedback.style.display = 'block';
                                 feedback.style.background = '#C8E6C9';
                                 feedback.style.color = '#2E7D32';
                                 feedback.innerText = "📶 Salvo Offline! A OS será gerada quando a internet voltar.";
@@ -2193,7 +2190,7 @@ else:
                         }}
                     }}
                 </script>
-            """, height=480)
+            """, height=600)
 
         # Oculta o formulário Python que serve apenas de ponte
         st.markdown("""
