@@ -2070,6 +2070,8 @@ else:
         
         emp_id = st.session_state.get("empresa", "U2T_MATRIZ")
         nome_motorista = st.session_state.get("usuario_ativo", "Motorista")
+        
+        hoje_str = datetime.now().strftime("%Y-%m-%d")
 
         # Formulário Oculto Exclusivo da Aba (A ponte local)
         with st.form("form_sync_oculto_aba", clear_on_submit=True):
