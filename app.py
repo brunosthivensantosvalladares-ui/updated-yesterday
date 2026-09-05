@@ -203,13 +203,6 @@ def renderizar_modulo_sincronizacao_offline(emp_id):
         </div>
         <script>
             const empresaId = "{emp_id}";
-            
-            // Oculta o formulário receptor da interface do usuário com precisão cirúrgica
-            const doc = window.parent.document;
-            const allForms = Array.from(doc.querySelectorAll('div[data-testid="stForm"]'));
-            const syncForm = allForms.find(f => f.textContent.includes('ProcessarSyncOffline'));
-            if (syncForm) syncForm.style.display = 'none';
-
             let db;
             const request = indexedDB.open("Up2Today_OfflineDB", 1);
             
@@ -254,9 +247,14 @@ def renderizar_modulo_sincronizacao_offline(emp_id):
                         if (pendentes && pendentes.length > 0) {{
                             const payloadStr = JSON.stringify(pendentes);
                             
-                            if (syncForm) {{
-                                const inputOffline = syncForm.querySelector('input[type="text"]');
-                                const btnSubmitSync = syncForm.querySelector('button');
+                            // Busca os elementos do formulário oculto AGORA para evitar DOM Detachment
+                            const doc = window.parent.document;
+                            const allForms = Array.from(doc.querySelectorAll('div[data-testid="stForm"]'));
+                            const activeSyncForm = allForms.find(f => f.textContent.includes('ProcessarSyncOffline'));
+                            
+                            if (activeSyncForm) {{
+                                const inputOffline = activeSyncForm.querySelector('input[type="text"]');
+                                const btnSubmitSync = activeSyncForm.querySelector('button');
 
                                 if (inputOffline && btnSubmitSync) {{
                                     let nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
@@ -2335,15 +2333,16 @@ else:
                     conn.commit()
                 st.success("✅ Solicitação enviada com sucesso!")
 
-        # Formulário Híbrido Blindado
+        # Formulário Híbrido Blindado Harmonizado
         st.components.v1.html(f"""
             <style>
-                body {{ font-family: 'Segoe UI', sans-serif; color: #231F20; background: transparent; padding: 10px; margin: 0; }}
-                label {{ font-size: 14px; font-weight: 600; margin-bottom: 5px; display: block; }}
-                input, textarea {{ width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #C5A059; border-radius: 6px; box-sizing: border-box; background: #FFF; }}
-                button {{ width: 100%; padding: 12px; background: #C5A059; color: #FFF; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; transition: 0.2s; }}
+                body {{ font-family: 'Segoe UI', sans-serif; color: #231F20; background: transparent; padding: 5px; margin: 0; }}
+                label {{ font-size: 13px; font-weight: 600; margin-bottom: 4px; display: block; color: #4A3C31; }}
+                input, select, textarea {{ width: 100%; padding: 8px; margin-bottom: 12px; border: 1px solid #C5A059; border-radius: 6px; box-sizing: border-box; background: #FFF; font-size: 14px; }}
+                button {{ width: auto; min-width: 200px; padding: 12px 24px; background: #C5A059; color: #FFF; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; font-size: 15px; transition: 0.2s; margin-top: 5px; }}
                 button:hover {{ background: #9B783E; }}
-                #msg-feedback {{ margin-top: 10px; padding: 10px; border-radius: 6px; display: none; font-weight: bold; text-align: center; }}
+                #msg-feedback {{ margin-top: 10px; padding: 10px; border-radius: 6px; display: none; font-weight: bold; text-align: center; font-size: 14px; }}
+                .btn-wrapper {{ text-align: right; }}
             </style>
             
             <div id="form-container">
@@ -2353,18 +2352,18 @@ else:
                 <label>Descrição do Problema</label>
                 <textarea id="offline_descricao" rows="4" placeholder="Detalhe a falha..."></textarea>
                 
-                <button onclick="enviarSolicitacaoHibrida()">Enviar Solicitação</button>
+                <div class="btn-wrapper">
+                    <button onclick="enviarSolicitacaoHibrida()">Enviar Solicitação</button>
+                </div>
                 <div id="msg-feedback"></div>
             </div>
 
             <script>
-                // Ocultar apenas o formulário nativo deste envio
-                const doc = window.parent.document;
-                const allForms = Array.from(doc.querySelectorAll('div[data-testid="stForm"]'));
-                const abaForm = allForms.find(f => f.textContent.includes('SyncSolicitacaoMotorista'));
-                if (abaForm) abaForm.style.display = 'none';
-
                 function enviarSolicitacaoHibrida() {{
+                    const doc = window.parent.document;
+                    const allForms = Array.from(doc.querySelectorAll('div[data-testid="stForm"]'));
+                    const abaForm = allForms.find(f => f.textContent.includes('SyncSolicitacaoMotorista'));
+                    
                     const pref = document.getElementById('offline_prefixo').value.trim();
                     const desc = document.getElementById('offline_descricao').value.trim();
                     const feedback = document.getElementById('msg-feedback');
@@ -2428,7 +2427,7 @@ else:
                     }}
                 }}
             </script>
-        """, height=380)
+        """, height=340)
 
         # Oculta o formulário Python que serve apenas de ponte
         st.markdown("""
@@ -2898,7 +2897,8 @@ else:
                                 }
                             )
                             conn.commit()
-                        st.success(f"✅ SERVIÇO AGENDADO! Nº {nova_os} (Horímetro ref: {h_prox}h | Odômetro ref: {o_prox}km)")
+                        st.success("✅ SERVIÇO AGENDADO COM SUCESSO!")
+                        st.info(f"### 📋 ANOTE O Nº DA SUA OS: **{nova_os}**")
                         st.cache_data.clear()
                         st.rerun()
                     except Exception as e:
@@ -2910,17 +2910,17 @@ else:
             opcoes_tipo_html = "".join([f'<option value="{tp}">{tp}</option>' for tp in LISTA_TIPOS_OS])
             hoje_str = datetime.now().strftime("%Y-%m-%d")
 
-            # 2. Formulário Híbrido Blindado
+            # 2. Formulário Híbrido Blindado Harmonizado e Compactado
             st.components.v1.html(f"""
                 <style>
                     body {{ font-family: 'Segoe UI', sans-serif; color: #231F20; background: transparent; padding: 5px; margin: 0; }}
                     label {{ font-size: 13px; font-weight: 600; margin-bottom: 4px; display: block; color: #4A3C31; }}
                     input, select, textarea {{ width: 100%; padding: 8px; margin-bottom: 12px; border: 1px solid #C5A059; border-radius: 6px; box-sizing: border-box; background: #FFF; font-size: 14px; }}
-                    .grid-2 {{ display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }}
                     .grid-4 {{ display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; }}
-                    button {{ width: 100%; padding: 12px; background: #C5A059; color: #FFF; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; font-size: 15px; transition: 0.2s; margin-top: 5px; }}
+                    button {{ width: auto; min-width: 200px; padding: 12px 24px; background: #C5A059; color: #FFF; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; font-size: 15px; transition: 0.2s; margin-top: 5px; display: inline-block; }}
                     button:hover {{ background: #9B783E; }}
                     #msg-feedback {{ margin-top: 10px; padding: 10px; border-radius: 6px; display: none; font-weight: bold; text-align: center; font-size: 14px; }}
+                    .btn-wrapper {{ text-align: right; }}
                 </style>
                 
                 <div id="form-container">
@@ -2931,30 +2931,28 @@ else:
                         <div><label>Área</label><select id="off_area">{opcoes_area_html}</select></div>
                     </div>
                     
-                    <div class="grid-2">
-                        <div><label>Início (Opcional)</label><input type="time" id="off_ini" value="00:00"></div>
-                        <div><label>Fim (Opcional)</label><input type="time" id="off_fim" value="00:00"></div>
-                    </div>
-                    
                     <label>Descrição</label>
                     <textarea id="off_desc" rows="3" placeholder="Descreva o serviço a ser agendado..."></textarea>
                     
-                    <div class="grid-2">
+                    <div class="grid-4">
+                        <div><label>Início (Opc.)</label><input type="time" id="off_ini" value="00:00"></div>
+                        <div><label>Fim (Opc.)</label><input type="time" id="off_fim" value="00:00"></div>
                         <div><label>Turno</label><select id="off_turno">{opcoes_turno_html}</select></div>
                         <div><label>Tipo de OS</label><select id="off_tipo">{opcoes_tipo_html}</select></div>
                     </div>
                     
-                    <button onclick="enviarCadastroHibrido()">Confirmar Agendamento</button>
+                    <div class="btn-wrapper">
+                        <button onclick="enviarCadastroHibrido()">Confirmar Agendamento</button>
+                    </div>
                     <div id="msg-feedback"></div>
                 </div>
 
                 <script>
-                    const doc = window.parent.document;
-                    const allForms = Array.from(doc.querySelectorAll('div[data-testid="stForm"]'));
-                    const abaForm = allForms.find(f => f.textContent.includes('SyncCadastroDireto'));
-                    if (abaForm) abaForm.style.display = 'none';
-
                     function enviarCadastroHibrido() {{
+                        const doc = window.parent.document;
+                        const allForms = Array.from(doc.querySelectorAll('div[data-testid="stForm"]'));
+                        const abaForm = allForms.find(f => f.textContent.includes('SyncCadastroDireto'));
+                        
                         const payload = {{
                             data: document.getElementById('off_data').value,
                             executor: document.getElementById('off_exec').value.trim(),
@@ -2999,14 +2997,12 @@ else:
                                 }}
                             }}
                         }} else {{
-                            // Salva no cofre IndexedDB
                             const request = indexedDB.open("Up2Today_OfflineDB", 1);
                             request.onsuccess = function(event) {{
                                 const db = event.target.result;
                                 const tx = db.transaction(["fila_offline"], "readwrite");
                                 const store = tx.objectStore("fila_offline");
                                 
-                                // O tipo "agendamento_direto" será reconhecido pela nossa função global
                                 store.add({{
                                     tipo: "agendamento_direto",
                                     ...payload
@@ -3023,7 +3019,7 @@ else:
                         }}
                     }}
                 </script>
-            """, height=440)
+            """, height=340)
 
             # --- LISTA GERAL DE SERVIÇOS EXCLUSIVA DA ABA DE AGENDAMENTO DIRETO ---
             st.divider()
@@ -3327,6 +3323,7 @@ else:
                                 
                                 with engine.connect() as conn:
                                     contador_gerados = 0
+                                    os_geradas = []
                                     for pref in veiculos_selecionados:
                                         nova_os = obter_proxima_os(engine, emp_id)
                                         h_prox, o_prox = obter_medidor_proximo(engine, emp_id, pref, dt_lote)
@@ -3344,10 +3341,11 @@ else:
                                             }
                                         )
                                         contador_gerados += 1
+                                        os_geradas.append(str(nova_os))
                                     conn.commit()
                                 st.cache_data.clear()
-                                st.success(f"✅ {contador_gerados} Ordens de Serviço geradas e enviadas para a Agenda Principal com sucesso!")
-                                st.rerun()
+                                st.success(f"✅ {contador_gerados} Ordens de Serviço geradas com sucesso!")
+                                st.info(f"### 📋 ANOTE OS Nº DAS OS GERADAS: **{', '.join(os_geradas)}**")
                             else:
                                 st.warning("⚠️ Este plano master não possui serviços cadastrados para gerar a OS.")
                         else:
