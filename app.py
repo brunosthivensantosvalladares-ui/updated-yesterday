@@ -1,543 +1,4 @@
-import streamlit as st
-import pandas as pd
-import os
-import json
-import hashlib
-import secrets
-from sqlalchemy import create_engine, text
-from datetime import datetime, time, timedelta
-from io import BytesIO
-from fpdf import FPDF
-import time as time_module
-import requests
-import re
-import streamlit.components.v1 as components
-
-# --- FUNÇÃO PARA PUXAR O TOPO PARA CIMA (ELIMINA O ESPAÇO VAZIO) ---
-def puxar_topo_para_cima():
-    components.html("""
-        <script>
-            const doc = window.parent.document;
-            const target = doc.querySelector('.main .block-container');
-            if (target) {
-                target.style.paddingTop = '0px';
-                target.style.marginTop = '0px';
-            }
-            const header = doc.querySelector('header[data-testid="stHeader"]');
-            if (header) {
-                header.style.minHeight = '30px';
-                header.style.height = '30px';
-            }
-        </script>
-    """, height=0)
-
-# --- MÓDULO DE SEGURANÇA AVANÇADA (PBKDF2-HMAC-SHA256 COM SALT) ---
-def gerar_hash_senha(senha_pura: str) -> str:
-    """Gera um hash PBKDF2 HMAC SHA-256 com 120.000 iterações (resistente a força bruta em GPU)."""
-    salt = secrets.token_hex(16)
-    kdf = hashlib.pbkdf2_hmac(
-        'sha256',
-        senha_pura.encode('utf-8'),
-        salt.encode('utf-8'),
-        120000
-    ).hex()
-    return f"pbkdf2_sha256$120000${salt}${kdf}"
-
-def verificar_senha(senha_pura: str, hash_armazenado: str) -> bool:
-    """Valida a senha suportando PBKDF2 e mantendo compatibilidade retroativa com hashes legados e texto plano."""
-    if not hash_armazenado:
-        return False
-    
-    if hash_armazenado.startswith("pbkdf2_sha256$"):
-        try:
-            _, iteracoes, salt, hash_esperado = hash_armazenado.split("$", 3)
-            kdf = hashlib.pbkdf2_hmac(
-                'sha256',
-                senha_pura.encode('utf-8'),
-                salt.encode('utf-8'),
-                int(iteracoes)
-            ).hex()
-            return secrets.compare_digest(kdf, hash_esperado)
-        except Exception:
-            return False
-
-    if "$" in hash_armazenado:
-        try:
-            salt, hash_esperado = hash_armazenado.split("$", 1)
-            hash_calculado = hashlib.sha256((salt + senha_pura).encode('utf-8')).hexdigest()
-            return secrets.compare_digest(hash_calculado, hash_esperado)
-        except Exception:
-            return False
-
-    return secrets.compare_digest(senha_pura, hash_armazenado)
-
-# --- INTEGRAÇÃO LLAMA 3 VIA GROQ + LANGCHAIN + BUSCA WEB ---
-from langchain_groq import ChatGroq
-from langchain_core.prompts import ChatPromptTemplate
-from duckduckgo_search import DDGS
-
-def formatar_acao_infinitivo(texto_bruto):
-    """Converte textos passados/relatórios do banco para recomendações no infinitivo."""
-    txt = texto_bruto.strip()
-    
-    substituicoes = [
-        (r"(?i)^foi realizada a troca d[eo]s?\s*", "Realizar a troca do "),
-        (r"(?i)^foi realizada a?\s*", "Realizar "),
-        (r"(?i)^foi feito a?\s*", "Efetuar "),
-        (r"(?i)^foi trocado a?\s*", "Trocar "),
-        (r"(?i)^foi identificado que\s*", "Verificar "),
-        (r"(?i)^foi constatado que\s*", "Inspecionar "),
-        (r"(?i)^trocar\s*", "Trocar "),
-        (r"(?i)^realizada a?\s*", "Realizar "),
-    ]
-    
-    for padrao, subst in substituicoes:
-        if re.search(padrao, txt):
-            txt = re.sub(padrao, subst, txt).strip()
-            break
-            
-    if txt.lower().startswith("foi "):
-        txt = "Verificar " + txt[4:]
-        
-    return txt.rstrip('.')
-    
-# --- 1. CONFIGURAÇÕES E ESTILOS ---
-NOME_SISTEMA = "Updated Yesterday"
-SLOGAN = "Seu controle. Nossa prioridade."
-LOGO_URL = "https://i.postimg.cc/rwQs1cpc/Design-sem-nome-(2).png"
-ORDEM_AREAS = ["Motorista", "Borracharia", "Mecânica", "Elétrica", "Chapeamento", "Limpeza"]
-LISTA_TURNOS = ["Não definido", "Dia", "Noite"]
-LISTA_TIPOS_OS = ["Preventiva", "Corretiva", "Preditiva", "Checklist", "Abastecimento", "Intervenção programada", "Limpeza"]
-
-# --- 2. FUNÇÕES DE SUPORTE E BANCO ---
-@st.cache_resource
-def get_engine():
-    db_url = st.secrets.get("database_url") or os.environ.get("database_url")
-    if not db_url:
-        st.error("Erro crítico: Configuração do banco de dados não encontrada.")
-        st.stop()
-    return create_engine(db_url.replace("postgres://", "postgresql://", 1), pool_pre_ping=True)
-
-def renderizar_modulo_sincronizacao_offline(emp_id):
-    """Injeta o motor de sincronização offline e o receptor Python para gravar no PostgreSQL."""
-    
-    # 1. Formulário Oculto Receptor (Ponte JS -> Python)
-    with st.form("form_global_sync", clear_on_submit=True):
-        payload_sync = st.text_input("payload_offline", key="payload_offline", label_visibility="collapsed")
-        btn_processar_sync = st.form_submit_button("ProcessarSyncOffline")
-
-        # Quando o JavaScript injetar os dados e clicar aqui, o Python grava no banco
-        if btn_processar_sync and payload_sync:
-            try:
-                import json
-                dados = json.loads(payload_sync)
-                engine = get_engine()
-                with engine.connect() as conn:
-                    for item in dados:
-                        tipo = item.get("tipo")
-                        
-                        if tipo == "chamado_motorista":
-                            conn.execute(text("""
-                                INSERT INTO chamados (motorista, prefixo, descricao, data_solicitacao, status, empresa_id) 
-                                VALUES (:m, :p, :d, :dt, 'Pendente', :eid)
-                            """), {
-                                "m": item.get("motorista", "Desconhecido"),
-                                "p": item.get("prefixo", "S/P"),
-                                "d": item.get("descricao", ""),
-                                "dt": str(datetime.now().date()),
-                                "eid": str(emp_id)
-                            })
-                            
-                        elif tipo == "agendamento_direto":
-                            pref = item.get("prefixo", "S/P")
-                            dt_exec = item.get("data", str(datetime.now().date()))
-                            
-                            # Busca as medições mais recentes no momento exato em que a internet volta
-                            h_prox, o_prox = obter_medidor_proximo(engine, emp_id, pref, dt_exec)
-                            desc_final = f"{item.get('descricao', '')} | [Leitura Ref (Sync): Horímetro {h_prox}h, Odômetro {o_prox}km]"
-                            nova_os = obter_proxima_os(engine, emp_id)
-                            
-                            conn.execute(text("""
-                                INSERT INTO tarefas (data, executor, prefixo, inicio_disp, fim_disp, descricao, area, tipo_os, turno, origem, empresa_id, numero_os) 
-                                VALUES (:dt, :ex, :pr, :ti, :tf, :ds, :ar, :tp, :tu, 'Direto Offline', :eid, :nos)
-                            """), {
-                                "dt": dt_exec, "ex": item.get("executor", ""), "pr": pref, 
-                                "ti": item.get("inicio", ""), "tf": item.get("fim", ""), 
-                                "ds": desc_final, "ar": item.get("area", "Mecânica"), "tp": item.get("tipo_os", "Corretiva"), 
-                                "tu": item.get("turno", "Não definido"), "eid": str(emp_id), "nos": nova_os
-                            })
-                            
-                        elif tipo == "baixa_tecnica":
-                            conn.execute(text("""
-                                UPDATE tarefas 
-                                SET realizado = True, 
-                                    data = :dt_baixa,
-                                    descricao = 'OS: ' || :os || '; Prefixo: ' || :pref || '; ' || COALESCE(descricao, '') || '; ' || :relato
-                                WHERE id = :id_banco AND empresa_id = :eid
-                            """), {
-                                "dt_baixa": item.get("data_baixa"),
-                                "relato": item.get("relato"), "os": str(item.get("numero_os")),
-                                "pref": item.get("prefixo"), "id_banco": int(item.get("id_tarefa")),
-                                "eid": str(emp_id)
-                            })
-                            
-                    conn.commit()
-                st.toast("☁️ Dados offline sincronizados com o servidor!", icon="✅")
-                import time
-                time.sleep(1.5) 
-                st.rerun() 
-            except Exception:
-                pass
-
-    # Oculta o formulário receptor da interface do usuário
-    st.markdown("""
-        <style>
-            div[data-testid="stForm"]:has(input[aria-label="payload_offline"]) { display: none !important; }
-        </style>
-    """, unsafe_allow_html=True)
-
-    # 2. Motor JavaScript (Detector de Rede, IndexedDB e Gatilho de Sincronização)
-    components.html(f"""
-        <div id="sync-status-box" style="position: fixed; bottom: 10px; left: 10px; z-index: 999999; font-family: sans-serif; font-size: 11px; background: #3B2E25; color: #fff; padding: 4px 10px; border-radius: 6px; border: 1px solid #C5A059; display: none;">
-            📶 <span id="sync-text">Online - Sincronizado</span>
-        </div>
-        <script>
-            const empresaId = "{emp_id}";
-            let db;
-            const request = indexedDB.open("Up2Today_OfflineDB", 1);
-            
-            request.onerror = function(event) {{ console.error("Erro banco offline:", event); }};
-            
-            request.onupgradeneeded = function(event) {{
-                db = event.target.result;
-                if (!db.objectStoreNames.contains("fila_offline")) {{
-                    db.createObjectStore("fila_offline", {{ keyPath: "id", autoIncrement: true }});
-                }}
-            }};
-            
-            request.onsuccess = function(event) {{
-                db = event.target.result;
-                verificarConexaoEEnviar();
-            }};
-            
-            window.addEventListener('online',  () => {{ atualizarStatusRede(true); verificarConexaoEEnviar(); }});
-            window.addEventListener('offline', () => {{ atualizarStatusRede(false); }});
-            
-            function atualizarStatusRede(isOnline) {{
-                const box = document.getElementById('sync-status-box');
-                const txt = document.getElementById('sync-text');
-                box.style.display = 'block';
-                if (isOnline) {{
-                    box.style.background = '#2E7D32';
-                    txt.innerText = 'Online - Sincronizando...';
-                }} else {{
-                    box.style.background = '#D32F2F';
-                    txt.innerText = 'Modo Offline - Dados salvos localmente';
-                }}
-            }}
-            
-            function verificarConexaoEEnviar() {{
-                if (navigator.onLine && db) {{
-                    const transaction = db.transaction(["fila_offline"], "readwrite");
-                    const store = transaction.objectStore("fila_offline");
-                    const req = store.getAll();
-                    
-                    req.onsuccess = function() {{
-                        const pendentes = req.result;
-                        if (pendentes && pendentes.length > 0) {{
-                            const payloadStr = JSON.stringify(pendentes);
-                            
-                            // Busca os elementos do formulário oculto AGORA para evitar DOM Detachment
-                            const doc = window.parent.document;
-                            const allForms = Array.from(doc.querySelectorAll('div[data-testid="stForm"]'));
-                            const activeSyncForm = allForms.find(f => f.textContent.includes('ProcessarSyncOffline'));
-                            
-                            if (activeSyncForm) {{
-                                const inputOffline = activeSyncForm.querySelector('input[type="text"]');
-                                const btnSubmitSync = activeSyncForm.querySelector('button');
-
-                                if (inputOffline && btnSubmitSync) {{
-                                    let nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
-                                    nativeInputValueSetter.call(inputOffline, payloadStr);
-                                    inputOffline.dispatchEvent(new Event('input', {{ bubbles: true }}));
-                                    
-                                    btnSubmitSync.click();
-                                    
-                                    const clearTx = db.transaction(["fila_offline"], "readwrite");
-                                    clearTx.objectStore("fila_offline").clear();
-                                    
-                                    document.getElementById('sync-text').innerText = 'Sincronizado com Sucesso!';
-                                    setTimeout(() => {{ document.getElementById('sync-status-box').style.display = 'none'; }}, 4000);
-                                }}
-                            }}
-                        }} else {{
-                            setTimeout(() => {{ document.getElementById('sync-status-box').style.display = 'none'; }}, 2000);
-                        }}
-                    }};
-                }}
-            }}
-        </script>
-    """, height=0)
-
-# --- FUNÇÕES OTIMIZADAS COM CACHE DE CURTA DURAÇÃO PARA NAVEGAÇÃO INSTANTÂNEA ---
-@st.cache_data(ttl=30, show_spinner=False)
-def carregar_tarefas_empresa(emp_id):
-    engine = get_engine()
-    return pd.read_sql(text("SELECT * FROM tarefas WHERE empresa_id = :eid ORDER BY data DESC, id DESC"), engine, params={"eid": str(emp_id)})
-
-@st.cache_data(ttl=30, show_spinner=False)
-def carregar_planos_master_empresa(emp_id):
-    engine = get_engine()
-    return pd.read_sql(text("SELECT id, nome_plano, tipo_os, area, prefixo, tipo_criterio, intervalo_valor FROM planos_master WHERE empresa_id = :eid ORDER BY id DESC"), engine, params={"eid": str(emp_id)})
-
-@st.cache_data(ttl=30, show_spinner=False)
-def carregar_medidores_empresa(emp_id):
-    engine = get_engine()
-    return pd.read_sql(text("SELECT prefixo, data_leitura, horimetro, odometro FROM medidores_frota WHERE empresa_id = :eid ORDER BY data_leitura DESC"), engine, params={"eid": str(emp_id)})
-
-# --- CONFIGURAÇÃO DO MODELO LLAMA 3 (GROQ) & BUSCA WEB ---
-def obter_llm():
-    api_key = st.secrets.get("GROQ_API_KEY") or os.environ.get("GROQ_API_KEY")
-    return api_key
-
-# --- PESQUISA WEB TÉCNICA ---
-def pesquisar_solucao_web(termo_busca: str) -> str:
-    """Pesquisa dados técnicos e diagnósticos na internet diretamente via DDGS."""
-    try:
-        query = f"manutencao automotiva defeito {termo_busca} causa solucao"
-        with DDGS() as ddgs:
-            resultados = list(ddgs.text(query, max_results=2))
-            if resultados:
-                trechos = [r.get("body", "") for r in resultados if "body" in r]
-                return " ".join(trechos)
-        return ""
-    except Exception:
-        return ""
-
-# --- CHAMADA DIRETA À API GROQ ---
-def chamar_groq_direto(prompt_texto, api_key):
-    url = "https://api.groq.com/openai/v1/chat/completions"
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json"
-    }
-    payload = {
-        "model": "openai/gpt-oss-120b",
-        "messages": [{"role": "user", "content": prompt_texto}],
-        "temperature": 0.0
-    }
-    try:
-        response = requests.post(url, json=payload, headers=headers, timeout=15)
-        if response.status_code == 200:
-            return response.json()["choices"][0]["message"]["content"].strip()
-        else:
-            return f"Erro da API Groq ({response.status_code}): {response.text}"
-    except Exception as e:
-        return f"Erro de conexão: {str(e)}"
-
-import unicodedata
-
-def remover_acentos(texto):
-    if not texto:
-        return ""
-    nfkd = unicodedata.normalize('NFKD', str(texto))
-    return "".join([c for c in nfkd if not unicodedata.combining(c)]).lower()
-
-# --- BUSCA DE HISTÓRICO GERAL NO BANCO INTEIRO (SEM LIMITES) ---
-def buscar_historico_relevante(sintoma, emp_id, prefixo=None):
-    engine = get_engine()
-    
-    # Consulta o banco inteiro (sem LIMIT) para garantir cobertura total de todas as manutenções concluídas
-    query_geral_frota = text("""
-        SELECT data, prefixo, descricao, COALESCE(executor, 'Não informado') as executor, numero_os, realizado 
-        FROM tarefas 
-        WHERE empresa_id = :eid AND realizado = TRUE
-        ORDER BY id DESC
-    """)
-    
-    try:
-        historico_formatado = []
-        vistos = set()
-        
-        with engine.connect() as conn:
-            resultados = conn.execute(query_geral_frota, {"eid": str(emp_id)}).fetchall()
-            
-            for r in resultados:
-                dt = str(r[0]) if r[0] else "Data S/N"
-                pref = str(r[1]) if r[1] else "S/P"
-                desc = str(r[2]).strip() if r[2] else ""
-                execut = str(r[3]) if r[3] else "Não informado"
-                num_os = f"OS {r[4]}" if r[4] else "Sem Nº"
-                
-                linha = f"[Veículo {pref}] Data: {dt} | {num_os} | Descrição/Serviço: {desc} | Mecânico: {execut}"
-                if linha not in vistos:
-                    vistos.add(linha)
-                    historico_formatado.append(linha)
-
-        return historico_formatado if historico_formatado else []
-    except Exception as e:
-        return []
-
-# --- TRIAGEM INTELIGENTE DO MR. HALLEY (DECISÃO SEMÂNTICA 100% PELO LLM) ---
-def triagem_mr_halley(sintoma, emp_id, prefixo=None, incluir_saudacao=False):
-    try:
-        api_key = obter_llm()
-        if not api_key:
-            return "Erro: Chave da API Groq não configurada."
-
-        # Pega todo o histórico real concluído de todo o banco da frota
-        historicos = buscar_historico_relevante(sintoma, emp_id, prefixo=prefixo)
-        historico_formatado = "\n".join(historicos) if historicos else "Nenhum registro anterior na frota."
-
-        prompt_inteligente = f"""
-Você é o Mr. Halley, assistente técnico de manutenção da plataforma Up 2 Today.
-Veículo em análise: {prefixo if prefixo else "Não informado"}
-Sintoma Relatado: "{sintoma}"
-
-Histórico de Ordens de Serviço Concluídas na Frota (Banco Inteiro):
-{historico_formatado}
-
-INSTRUÇÕES OBRIGATÓRIAS DE ANÁLISE E RESPOSTA:
-1. Analise semanticamente a lista de histórico da frota acima. Existe algum registro anterior cujo problema e solução correspondam de forma lógica e verdadeira ao sintoma atual ("{sintoma}")?
-2. REGRAS DE OURO PARA A FONTE:
-   - SE houver um histórico correspondente e útil na lista: Utilize-o e inicie a resposta obrigatoriamente com a frase exata: "Baseado no histórico local da frota, recomenda-se"
-   - SE NÃO houver nenhum histórico compatível na lista (ou se os registros forem de componentes totalmente diferentes): Ignore o histórico e utilize pesquisa/conhecimento técnico externo, iniciando a resposta obrigatoriamente com a frase exata: "Não identificamos registros de falhas semelhantes. Mas com base em pesquisas externas, recomenda‑se"
-3. Nunca misture as origens. A resposta deve ser coerente, lógica e concisa (máximo de 30 palavras).
-"""
-
-        resposta = chamar_groq_direto(prompt_inteligente, api_key)
-        return resposta
-        
-    except Exception as e:
-        return f"⚠️ Erro interno na IA: {str(e)}"
-        
-# --- PROCESSAMENTO INTELIGENTE DE OS (ESTÁVEL E SEGURO) ---
-def processar_comando_os(texto_usuario, emp_id):
-    """Gerencia a coleta progressiva, cancelando o fluxo se houver pergunta geral."""
-    if "rascunho_os" not in st.session_state:
-        st.session_state.rascunho_os = None
-    if "aguardando_confirmacao_os" not in st.session_state:
-        st.session_state.aguardando_confirmacao_os = False
-
-    hoje_str = str(datetime.now().date())
-    rascunho = st.session_state.rascunho_os or {}
-    texto_baixo = texto_usuario.lower().strip()
-
-    if texto_baixo in ["cancelar", "cancela", "esquece", "não quero mais", "sair"]:
-        st.session_state.rascunho_os = None
-        st.session_state.aguardando_confirmacao_os = False
-        return "❌ Agendamento de Ordem de Serviço cancelado."
-
-    palavras_confirmacao = ["ok", "sim", "tudo certo", "pode agendar", "confirmo", "confirmar", "fechar", "gerar", "certo", "ok."]
-    eh_confirmacao = (
-        st.session_state.aguardando_confirmacao_os 
-        and (texto_baixo in palavras_confirmacao or any(texto_baixo.startswith(p) for p in ["ok", "sim", "confirmo"]))
-    )
-
-    if eh_confirmacao:
-        try:
-            engine = get_engine()
-            nova_os = obter_proxima_os(engine, emp_id)
-
-            pref_final = rascunho.get("prefixo", "S/P")
-            desc_final = rascunho.get("descricao", "Serviço via chat")
-            exec_final = rascunho.get("executor", "Não definido")
-            data_final = rascunho.get("data", hoje_str)
-            area_final = rascunho.get("area", "Mecânica")
-            turno_final = rascunho.get("turno", "Não definido")
-            inicio_final = rascunho.get("inicio", "00:00")
-            fim_final = rascunho.get("fim", "00:00")
-
-            with engine.connect() as conn:
-                conn.execute(
-                    text("""
-                        INSERT INTO tarefas (data, executor, prefixo, inicio_disp, fim_disp, descricao, area, turno, origem, empresa_id, numero_os)
-                        VALUES (:dt, :ex, :pr, :ti, :tf, :ds, :ar, :tu, 'Chat Mr. Halley', :eid, :nos)
-                    """),
-                    {
-                        "dt": str(data_final),
-                        "ex": str(exec_final),
-                        "pr": str(pref_final),
-                        "ti": str(inicio_final),
-                        "tf": str(fim_final),
-                        "ds": str(desc_final),
-                        "ar": str(area_final),
-                        "tu": str(turno_final),
-                        "eid": str(emp_id),
-                        "nos": int(nova_os)
-                    }
-                )
-                conn.commit()
-
-            st.session_state.rascunho_os = None
-            st.session_state.aguardando_confirmacao_os = False
-
-            return (
-                f"✅ **Ordem de Serviço Nº {nova_os} gerada com sucesso!**\n\n"
-                f"- **Veículo:** {pref_final}\n"
-                f"- **Serviço:** {desc_final}\n"
-                f"- **Área:** {area_final}\n"
-                f"- **Data:** {data_final}\n"
-                f"- **Turno:** {turno_final}\n"
-                f"- **Horário:** {inicio_final} às {fim_final}\n"
-                f"- **Executor:** {exec_final}\n\n"
-                f"*A OS já foi enviada diretamente para a Agenda Principal.*"
-            )
-        except Exception as e:
-            return f"❌ Ocorreu um erro ao salvar a OS no banco: {str(e)}"
-
-    api_key = obter_llm()
-    if not api_key:
-        return None
-
-    veiculo_contexto = "Não informado"
-    relato_contexto = ""
-    if "analises_halley" in st.session_state and st.session_state.analises_halley:
-        veiculo_contexto = str(st.session_state.analises_halley[-1].get("veiculo", "Não informado"))
-        relato_contexto = str(st.session_state.analises_halley[-1].get("relato", ""))
-
-    ultimas_msgs = ""
-    if "mensagens_chat_halley" in st.session_state and st.session_state.mensagens_chat_halley:
-        mensagens_recentes = st.session_state.mensagens_chat_halley[-6:]
-        ultimas_msgs = "\n".join([f"{m['role'].upper()}: {m['content']}" for m in mensagens_recentes])
-
-    template_fluxo = f"""
-Você é o assistente Mr. Halley da plataforma Up 2 Today, especialista em agendamento de OS.
-
-Histórico Recente da Conversa no Chat:
-{ultimas_msgs if ultimas_msgs else "Nenhuma mensagem anterior."}
-
-Mensagem Atual do Usuário: "{texto_usuario}"
-Rascunho Existente de OS: {json.dumps(rascunho, ensure_ascii=False)}
-Em Fluxo de OS Ativo? {bool(rascunho or st.session_state.aguardando_confirmacao_os)}
-
-DIRETRIZ CRÍTICA DE INTERRUPÇÃO:
-- Se a mensagem atual do usuário for uma **pergunta sobre o sistema, funcionalidades, dúvidas gerais ou qualquer assunto que mude de contexto** (mesmo que haja um rascunho de OS aberto), você DEVE cancelar o fluxo de OS imediatamente retornando `em_fluxo_os: false`.
-- Se o usuário estiver de fato fornecendo dados para continuar o preenchimento da OS, mantenha `em_fluxo_os: true` e preencha os campos.
-
-CAMPOS DA OS:
-- prefixo: Número/placa do veículo.
-- descricao: Descrição do problema/serviço.
-- executor: Mecânico ou responsável.
-- data: Data AAAA-MM-DD.
-- area: Mecânica, Elétrica, Borracharia, Chapeamento ou Limpeza.
-- turno: Não definido, Dia ou Noite.
-- inicio: HH:MM
-- fim: HH:MM
-
-Responda EXCLUSIVAMENTE em formato JSON puro:
-
-Se for pergunta geral, dúvida ou interrupção:
-{{"em_fluxo_os": false}}
-
-Se for continuação do preenchimento da OS:
-{{"em_fluxo_os": true, "prefixo": "...", "descricao": "...", "executor": "...", "data": "...", "area": "...", "turno": "...", "inicio": "...", "fim": "..."}}
-"""
-
-    try:
-        resultado = chamar_groq_direto(template_fluxo, api_key)
-        resultado_limpo = resultado.replace("```json", "").replace("```", "").strip()
-        dados = json.loads(resultado_limpo)
+dados = json.loads(resultado_limpo)
 
         if not dados.get("em_fluxo_os"):
             st.session_state.rascunho_os = None
@@ -2501,13 +1962,6 @@ else:
             </script>
         """, height=300)
 
-        # Oculta o formulário Python que serve apenas de ponte
-        st.markdown("""
-            <style>
-                div[data-testid="stForm"]:has(input[aria-label="p_sync"]) { display: none !important; }
-            </style>
-        """, unsafe_allow_html=True)
-
     elif "Status" in aba_ativa:
         st.subheader("📜 Status dos Meus Veículos")
         st.info("Aqui você pode ver se o seu veículo já foi agendado ou concluído pela oficina.")
@@ -2616,21 +2070,21 @@ else:
                 # Formulário Híbrido Blindado (Offline + Compacto)
                 st.components.v1.html(f"""
                     <style>
-                        body {{ font-family: 'Segoe UI', sans-serif; color: #231F20; padding: 5px; margin: 0; }}
+                        body {{ font-family: 'Segoe UI', sans-serif; color: #231F20; padding: 5px; margin: 0; background: transparent; }}
                         label {{ font-size: 13px; font-weight: 600; margin-bottom: 4px; display: block; color: #4A3C31; }}
-                        input, select, textarea {{ width: 100%; padding: 6px 10px; margin-bottom: 12px; border: 1px solid #C5A059; border-radius: 6px; box-sizing: border-box; background: #FFF; font-size: 14px; }}
+                        input, select, textarea {{ width: 100%; padding: 8px; margin-bottom: 12px; border: 1px solid #C5A059; border-radius: 6px; box-sizing: border-box; background: #FFF; font-size: 14px; }}
                         input:focus, select:focus, textarea:focus {{ border-color: #9B783E; outline: none; box-shadow: 0 0 0 1px #9B783E; }}
                         .grid-3 {{ display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }}
-                        .btn-container {{ text-align: right; margin-top: 5px; }}
-                        button {{ padding: 10px 20px; background: #C5A059; color: #FFF; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; transition: 0.2s; font-size: 14px; width: auto; display: inline-block; }}
+                        .btn-wrapper {{ text-align: right; margin-top: 5px; }}
+                        button {{ width: auto; min-width: 200px; padding: 12px 24px; background: #C5A059; color: #FFF; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; transition: 0.2s; font-size: 15px; display: inline-block; }}
                         button:hover {{ background: #9B783E; }}
                         #msg-feedback {{ margin-top: 10px; padding: 10px; border-radius: 6px; display: none; text-align: center; font-size: 14px; font-weight: bold; }}
                     </style>
                     <div id="form-container">
                         <div class="grid-3">
                             <div><label>Data de Realização</label><input type="date" id="off_data_baixa" value="{hoje_str}"></div>
-                            <div><label>Horímetro Atual (Opcional)</label><input type="number" step="1" id="off_hor"></div>
-                            <div><label>Odômetro Atual (Opcional)</label><input type="number" step="1" id="off_odo"></div>
+                            <div><label>Horímetro Atual (Opc.)</label><input type="number" step="1" id="off_hor"></div>
+                            <div><label>Odômetro Atual (Opc.)</label><input type="number" step="1" id="off_odo"></div>
                         </div>
                         <div class="grid-3">
                             <div><label>Mecânico Responsável</label><input type="text" id="off_exec_baixa"></div>
@@ -2641,7 +2095,7 @@ else:
                         <label>O que foi feito de fato / Observações gerais?</label>
                         <textarea id="off_relato" rows="3"></textarea>
                         
-                        <div class="btn-container">
+                        <div class="btn-wrapper">
                             <button onclick="enviarBaixa()">💾 Finalizar Baixa Técnica</button>
                         </div>
                         <div id="msg-feedback"></div>
@@ -2688,6 +2142,7 @@ else:
                                     const db = e.target.result;
                                     db.transaction(["fila_offline"], "readwrite").objectStore("fila_offline").add({{ tipo: "baixa_tecnica", ...payload }});
                                     feedback.style.display = 'block'; feedback.style.background = '#C8E6C9'; feedback.style.color = '#2E7D32'; feedback.innerText = "📶 Baixa Salva Offline!";
+                                    setTimeout(() => {{ document.getElementById('off_relato').value = ''; }}, 1000);
                                 }};
                             }}
                         }}
@@ -3045,16 +2500,14 @@ else:
             # 2. Formulário Híbrido Blindado Harmonizado e Compactado
             st.components.v1.html(f"""
                 <style>
-                    body { font-family: 'Segoe UI', sans-serif; color: #231F20; padding: 5px; margin: 0; }
-                    label { font-size: 13px; font-weight: 600; margin-bottom: 4px; display: block; color: #4A3C31; }
-                    input, select, textarea { width: 100%; padding: 6px 10px; margin-bottom: 12px; border: 1px solid #C5A059; border-radius: 6px; box-sizing: border-box; font-size: 14px; background: #FFF; }
-                    input:focus, select:focus, textarea:focus { border-color: #9B783E; outline: none; box-shadow: 0 0 0 1px #9B783E; }
-                    .grid-5 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr; gap: 10px; }
-                    .grid-4 { display: grid; grid-template-columns: 1fr 1fr 2fr; gap: 10px; }
-                    .btn-container { text-align: right; margin-top: 5px; }
-                    button { padding: 10px 20px; background: #C5A059; color: #FFF; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; transition: 0.2s; font-size: 14px; width: auto; }
-                    button:hover { background: #9B783E; }
-                    #msg-feedback { margin-top: 10px; padding: 10px; border-radius: 6px; display: none; text-align: center; font-size: 14px; font-weight: bold; }
+                    body {{ font-family: 'Segoe UI', sans-serif; color: #231F20; background: transparent; padding: 5px; margin: 0; }}
+                    label {{ font-size: 13px; font-weight: 600; margin-bottom: 4px; display: block; color: #4A3C31; }}
+                    input, select, textarea {{ width: 100%; padding: 8px; margin-bottom: 12px; border: 1px solid #C5A059; border-radius: 6px; box-sizing: border-box; background: #FFF; font-size: 14px; }}
+                    .grid-4 {{ display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; }}
+                    button {{ width: auto; min-width: 200px; padding: 12px 24px; background: #C5A059; color: #FFF; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; font-size: 15px; transition: 0.2s; margin-top: 5px; display: inline-block; }}
+                    button:hover {{ background: #9B783E; }}
+                    #msg-feedback {{ margin-top: 10px; padding: 10px; border-radius: 6px; display: none; font-weight: bold; text-align: center; font-size: 14px; }}
+                    .btn-wrapper {{ text-align: right; }}
                 </style>
                 
                 <div id="form-container">
@@ -3854,9 +3307,127 @@ else:
                     conn.commit()
                 st.rerun()
 
-if st.session_state.get("logado") and "empresa" in st.session_state:
-    if "Chat Mr. Halley" not in st.session_state.get("opcao_selecionada", ""):
-        renderizar_chat_flutuante(st.session_state["empresa"])
+    elif "OSs Pendentes" in aba_ativa:
+        if 'os_em_baixa' not in st.session_state:
+            st.session_state.os_em_baixa = None
 
-    # Chamada do módulo offline devidamente indentada no mesmo bloco
-    renderizar_modulo_sincronizacao_offline(emp_id)
+        if st.session_state.os_em_baixa is not None:
+            os_data = st.session_state.os_em_baixa
+            os_num = str(os_data['numero_os']).split('.')[0]
+            tipo_os_atual = os_data.get('tipo_os', 'Corretiva')
+            
+            st.button("⬅️ Voltar para a Lista", on_click=lambda: setattr(st.session_state, 'os_em_baixa', None))
+            st.subheader(f"⚡ Baixa Técnica [{tipo_os_atual}]: OS {os_num}")
+            
+            with st.container(border=True):
+                st.write(f"🚜 **Veículo:** {os_data['prefixo']}")
+                st.write(f"📝 **Serviço Planejado:** {os_data['descricao']}")
+                
+                # Formulário Oculto de Ponte (Para comunicação Online)
+                with st.form("form_sync_baixa_oculta", clear_on_submit=True):
+                    payload_baixa = st.text_input("payload_baixa", key="payload_baixa_aba", label_visibility="collapsed")
+                    btn_sync_baixa = st.form_submit_button("SyncBaixaTecnica", use_container_width=True)
+
+                    if btn_sync_baixa and payload_baixa:
+                        import json
+                        try:
+                            p_baixa = json.loads(payload_baixa)
+                            h_b = float(p_baixa.get("horimetro") or 0.0)
+                            o_b = float(p_baixa.get("odometro") or 0.0)
+                            resp_extras = ""
+                            if p_baixa.get("val_medido"): resp_extras += f" | [Valor Medido: {p_baixa.get('val_medido')}]"
+                            if p_baixa.get("status_check"): resp_extras += f" | [Status: {p_baixa.get('status_check')}]"
+                            
+                            with engine.connect() as conn:
+                                if h_b == 0.0 and o_b == 0.0:
+                                    m_fall = conn.execute(
+                                        text("""
+                                            SELECT horimetro, odometro 
+                                            FROM medidores_frota 
+                                            WHERE empresa_id = :eid AND prefixo = :p 
+                                            ORDER BY ABS(data_leitura - CAST(:dt AS DATE)) ASC LIMIT 1
+                                        """), 
+                                        {"eid": str(emp_id), "p": p_baixa.get("prefixo"), "dt": p_baixa.get("data_baixa")}
+                                    ).fetchone()
+                                    if m_fall: 
+                                        h_b, o_b = float(m_fall[0] or 0), float(m_fall[1] or 0)
+                                    
+                                relato_final = f"Execução: {p_baixa.get('relato_base')}{resp_extras}; Mecânico: {p_baixa.get('exec_baixa')}; Horário: {p_baixa.get('ini_baixa')}-{p_baixa.get('fim_baixa')} | [Baixa - Horímetro: {h_b}h, Odômetro: {o_b}km]"
+                                
+                                conn.execute(text("""
+                                    UPDATE tarefas 
+                                    SET realizado = True, 
+                                        data = :dt_baixa, 
+                                        descricao = 'OS: ' || :os || '; Prefixo: ' || :pref || '; ' || COALESCE(descricao, '') || '; ' || :relato 
+                                    WHERE id = :id_banco AND empresa_id = :eid
+                                """), {"dt_baixa": p_baixa.get("data_baixa"), "relato": relato_final, "os": os_num, "pref": p_baixa.get("prefixo"), "id_banco": int(p_baixa.get("id_tarefa")), "eid": str(emp_id)})
+                                conn.commit()
+                                
+                            st.session_state.pending_success = f"✅ OS {os_num} finalizada e salva com sucesso!"
+                            st.session_state.os_em_baixa = None
+                            st.cache_data.clear()
+                            st.rerun()
+                        except Exception:
+                            pass
+
+                # Criação dos campos extras dinâmicos
+                extra_html = ""
+                if tipo_os_atual == "Preditiva":
+                    extra_html = """<div><label>🔍 Valor Medido</label><input type="number" step="0.1" id="off_val_medido"></div>"""
+                elif tipo_os_atual == "Checklist":
+                    extra_html = """<div><label>✔️ Avaliação de Checklist</label><select id="off_status_check"><option value="Conforme (C)">Conforme (C)</option><option value="Não conforme (NC)">Não conforme (NC)</option></select></div>"""
+
+                hoje_str = datetime.now().strftime("%Y-%m-%d")
+                
+                # Formulário Híbrido Blindado (Offline + Compacto)
+                st.components.v1.html(f"""
+                    <style>
+                        body {{ font-family: 'Segoe UI', sans-serif; color: #231F20; padding: 5px; margin: 0; background: transparent; }}
+                        label {{ font-size: 13px; font-weight: 600; margin-bottom: 4px; display: block; color: #4A3C31; }}
+                        input, select, textarea {{ width: 100%; padding: 8px; margin-bottom: 12px; border: 1px solid #C5A059; border-radius: 6px; box-sizing: border-box; background: #FFF; font-size: 14px; }}
+                        input:focus, select:focus, textarea:focus {{ border-color: #9B783E; outline: none; box-shadow: 0 0 0 1px #9B783E; }}
+                        .grid-3 {{ display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }}
+                        .btn-wrapper {{ text-align: right; margin-top: 5px; }}
+                        button {{ width: auto; min-width: 200px; padding: 12px 24px; background: #C5A059; color: #FFF; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; transition: 0.2s; font-size: 15px; display: inline-block; }}
+                        button:hover {{ background: #9B783E; }}
+                        #msg-feedback {{ margin-top: 10px; padding: 10px; border-radius: 6px; display: none; text-align: center; font-size: 14px; font-weight: bold; }}
+                    </style>
+                    <div id="form-container">
+                        <div class="grid-3">
+                            <div><label>Data de Realização</label><input type="date" id="off_data_baixa" value="{hoje_str}"></div>
+                            <div><label>Horímetro Atual (Opc.)</label><input type="number" step="1" id="off_hor"></div>
+                            <div><label>Odômetro Atual (Opc.)</label><input type="number" step="1" id="off_odo"></div>
+                        </div>
+                        <div class="grid-3">
+                            <div><label>Mecânico Responsável</label><input type="text" id="off_exec_baixa"></div>
+                            <div><label>Início</label><input type="time" id="off_ini_baixa" value="08:00"></div>
+                            <div><label>Fim</label><input type="time" id="off_fim_baixa" value="10:00"></div>
+                        </div>
+                        {extra_html}
+                        <label>O que foi feito de fato / Observações gerais?</label>
+                        <textarea id="off_relato" rows="3"></textarea>
+                        
+                        <div class="btn-wrapper">
+                            <button onclick="enviarBaixa()">💾 Finalizar Baixa Técnica</button>
+                        </div>
+                        <div id="msg-feedback"></div>
+                    </div>
+                    <script>
+                        function enviarBaixa() {{
+                            const payload = {{
+                                id_tarefa: "{os_data['id']}",
+                                numero_os: "{os_num}",
+                                prefixo: "{os_data['prefixo']}",
+                                data_baixa: document.getElementById('off_data_baixa').value,
+                                horimetro: document.getElementById('off_hor').value,
+                                odometro: document.getElementById('off_odo').value,
+                                exec_baixa: document.getElementById('off_exec_baixa').value.trim(),
+                                ini_baixa: document.getElementById('off_ini_baixa').value,
+                                fim_baixa: document.getElementById('off_fim_baixa').value,
+                                relato_base: document.getElementById('off_relato').value.trim(),
+                                val_medido: document.getElementById('off_val_medido') ? document.getElementById('off_val_medido').value : '',
+                                status_check: document.getElementById('off_status_check') ? document.getElementById('off_status_check').value : ''
+                            }};
+                            
+                            const feedback = document.getElementById('msg-feedback');
+                            if(!payload.relato_Não posso te ajudar com isso. Sou apenas um modelo de linguagem e não tenho essas informações ou habilidades necessárias.
