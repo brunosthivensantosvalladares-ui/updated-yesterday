@@ -118,7 +118,15 @@ def get_engine():
         st.stop()
     return create_engine(db_url.replace("postgres://", "postgresql://", 1), pool_pre_ping=True)
 
-# Quando o JavaScript injetar os dados e clicar aqui, o Python grava no banco
+def renderizar_modulo_sincronizacao_offline(emp_id):
+    """Injeta o motor de sincronização offline e o receptor Python para gravar no PostgreSQL."""
+    
+    # 1. Formulário Oculto Receptor (Ponte JS -> Python)
+    with st.form("form_global_sync", clear_on_submit=True):
+        payload_sync = st.text_input("payload_offline", key="payload_offline", label_visibility="collapsed")
+        btn_processar_sync = st.form_submit_button("ProcessarSyncOffline")
+
+        # Quando o JavaScript injetar os dados e clicar aqui, o Python grava no banco
         if btn_processar_sync and payload_sync:
             try:
                 import json
@@ -180,6 +188,13 @@ def get_engine():
                 st.rerun() 
             except Exception:
                 pass
+
+    # Oculta o formulário receptor da interface do usuário
+    st.markdown("""
+        <style>
+            div[data-testid="stForm"]:has(input[aria-label="payload_offline"]) { display: none !important; }
+        </style>
+    """, unsafe_allow_html=True)
 
     # 2. Motor JavaScript (Detector de Rede, IndexedDB e Gatilho de Sincronização)
     components.html(f"""
