@@ -172,7 +172,7 @@ def renderizar_modulo_sincronizacao_offline(emp_id):
             except Exception as e:
                 print(f"Erro Sync Offline: {e}")
 
-    # 2. Motor JavaScript (Detector de Rede, IndexedDB e Gatilho de Sincronização)
+    # Motor JavaScript Atualizado (Acha o botão de forma invisível)
     components.html(f"""
         <div id="sync-status-box" style="position: fixed; bottom: 10px; left: 10px; z-index: 999999; font-family: sans-serif; font-size: 11px; background: #3B2E25; color: #fff; padding: 4px 10px; border-radius: 6px; border: 1px solid #C5A059; display: none;">
             📶 <span id="sync-text">Online - Sincronizado</span>
@@ -224,15 +224,13 @@ def renderizar_modulo_sincronizacao_offline(emp_id):
                             const payloadStr = JSON.stringify(pendentes);
                             const doc = window.parent.document;
                             
-                            // BUSCA ROBUSTA PELO TEXTO DO BOTÃO (Garante que vai achar mesmo oculto)
-                            const allForms = Array.from(doc.querySelectorAll('div[data-testid="stForm"]'));
-                            const activeSyncForm = allForms.find(f => f.textContent.includes('ProcessarSyncOffline'));
+                            // Busca robusta e imune ao CSS display: none
+                            const inputOffline = doc.querySelector('input[aria-label="payload_offline"]');
                             
-                            if (activeSyncForm) {{
-                                const inputOffline = activeSyncForm.querySelector('input[type="text"]');
-                                const btnSubmitSync = activeSyncForm.querySelector('button');
+                            if (inputOffline) {{
+                                const btnSubmitSync = inputOffline.closest('div[data-testid="stForm"]').querySelector('button');
 
-                                if (inputOffline && btnSubmitSync) {{
+                                if (btnSubmitSync) {{
                                     let nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
                                     nativeInputValueSetter.call(inputOffline, payloadStr);
                                     inputOffline.dispatchEvent(new Event('input', {{ bubbles: true }}));
@@ -2670,14 +2668,14 @@ else:
         st.divider()
 
         if sub_aba_escolhida == 0:
-            with st.popover("💡 Como usar o Cadastro Direto?"):
-                st.markdown("""
-                    ### 📝 Guia Rápido - Cadastro
-                    1. **Uso:** Utilize para preventivas avulsas ou serviços diretos.
-                    2. **Formulário:** Preencha os campos e confirme. Se a internet cair, será salvo offline!
-                """)
             
-            # 1. Formulário Oculto Exclusivo (A ponte local para envios Online)
+            # --- 1. NOTIFICAÇÃO DE SUCESSO E NÚMERO DA OS ---
+            if "os_gerada_agora" in st.session_state:
+                os_info = st.session_state.os_gerada_agora
+                st.success(f"✅ SERVIÇO AGENDADO! A OS Gerada foi a de Nº {os_info}")
+                st.info(f"### 📋 ANOTE O Nº DA SUA OS: **{os_info}**")
+                del st.session_state.os_gerada_agora
+
             with st.form("form_sync_oculto_cadastro", clear_on_submit=True):
                 payload_cadastro = st.text_input("payload_cadastro", key="payload_cadastro_aba", label_visibility="collapsed")
                 btn_sync_cad = st.form_submit_button("SyncCadastroDireto", use_container_width=True)
@@ -2702,64 +2700,53 @@ else:
                             )
                             conn.commit()
                         
-                        st.session_state.pending_success = f"✅ SERVIÇO AGENDADO! A OS Gerada foi a de Nº {nova_os} (Horímetro ref: {h_prox}h | Odômetro ref: {o_prox}km)"
-                        st.session_state.pending_info = f"### 📋 ANOTE O Nº DA SUA OS: **{nova_os}**"
+                        st.session_state.os_gerada_agora = nova_os
                         st.cache_data.clear()
                         st.rerun()
                     except Exception as e:
-                        pass
+                        st.error(f"Erro ao salvar: {e}")
 
-            # Prepara as listas dinâmicas para o HTML
             opcoes_area_html = "".join([f'<option value="{a}">{a}</option>' for a in ORDEM_AREAS])
             opcoes_turno_html = "".join([f'<option value="{t}">{t}</option>' for t in LISTA_TURNOS])
             opcoes_tipo_html = "".join([f'<option value="{tp}">{tp}</option>' for tp in LISTA_TIPOS_OS])
             hoje_str = datetime.now().strftime("%Y-%m-%d")
 
-            # 2. Formulário Híbrido Blindado Harmonizado
-            # A injeção do time_module.time() força o HTML a recarregar, evitando que a mensagem trave.
             st.components.v1.html(f"""
                 <div style="display:none;">{time_module.time()}</div>
                 <style>
-                    body {{ font-family: 'Segoe UI', sans-serif; color: #231F20; background: transparent; padding: 5px; margin: 0; }}
+                    body {{ font-family: 'Segoe UI', sans-serif; color: #231F20; padding: 5px; margin: 0; }}
                     label {{ font-size: 13px; font-weight: 600; margin-bottom: 4px; display: block; color: #4A3C31; }}
-                    input, select, textarea {{ width: 100%; padding: 8px; margin-bottom: 12px; border: 1px solid #C5A059; border-radius: 6px; box-sizing: border-box; background: #FFF; font-size: 14px; }}
-                    .grid-4 {{ display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; }}
-                    button {{ width: auto; min-width: 200px; padding: 12px 24px; background: #C5A059; color: #FFF; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; font-size: 15px; transition: 0.2s; margin-top: 5px; display: inline-block; }}
+                    input, select, textarea {{ width: 100%; padding: 6px 10px; margin-bottom: 12px; border: 1px solid #C5A059; border-radius: 6px; box-sizing: border-box; font-size: 14px; background: #FFF; }}
+                    input:focus, select:focus, textarea:focus {{ border-color: #9B783E; outline: none; box-shadow: 0 0 0 1px #9B783E; }}
+                    .grid-5 {{ display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr; gap: 10px; }}
+                    .grid-4 {{ display: grid; grid-template-columns: 1fr 1fr 2fr; gap: 10px; }}
+                    .btn-container {{ text-align: right; margin-top: 5px; }}
+                    button {{ padding: 8px 16px; background: #C5A059; color: #FFF; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; transition: 0.2s; font-size: 14px; width: auto; display: inline-block; }}
                     button:hover {{ background: #9B783E; }}
-                    #msg-feedback {{ margin-top: 10px; padding: 10px; border-radius: 6px; display: none; font-weight: bold; text-align: center; font-size: 14px; }}
-                    .btn-wrapper {{ text-align: right; }}
+                    #msg-feedback {{ margin-top: 10px; padding: 10px; border-radius: 6px; display: none; text-align: center; font-size: 14px; font-weight: bold; }}
                 </style>
-                
                 <div id="form-container">
-                    <div class="grid-4">
+                    <div class="grid-5">
                         <div><label>Data</label><input type="date" id="off_data" value="{hoje_str}"></div>
-                        <div><label>Executor</label><input type="text" id="off_exec" placeholder="Opcional"></div>
                         <div><label>Prefixo</label><input type="text" id="off_pref" placeholder="Ex: 1025"></div>
                         <div><label>Área</label><select id="off_area">{opcoes_area_html}</select></div>
-                    </div>
-                    
-                    <label>Descrição</label>
-                    <textarea id="off_desc" rows="3" placeholder="Descreva o serviço a ser agendado..."></textarea>
-                    
-                    <div class="grid-4">
-                        <div><label>Início (Opc.)</label><input type="time" id="off_ini" value="00:00"></div>
-                        <div><label>Fim (Opc.)</label><input type="time" id="off_fim" value="00:00"></div>
                         <div><label>Turno</label><select id="off_turno">{opcoes_turno_html}</select></div>
-                        <div><label>Tipo de OS</label><select id="off_tipo">{opcoes_tipo_html}</select></div>
+                        <div><label>Tipo</label><select id="off_tipo">{opcoes_tipo_html}</select></div>
                     </div>
+                    <div class="grid-4">
+                        <div><label>Início (Opcional)</label><input type="time" id="off_ini" value="00:00"></div>
+                        <div><label>Fim (Opcional)</label><input type="time" id="off_fim" value="00:00"></div>
+                        <div><label>Executor (Opcional)</label><input type="text" id="off_exec" placeholder="Nome"></div>
+                    </div>
+                    <label>Descrição</label><textarea id="off_desc" rows="3" placeholder="Descreva o serviço a ser agendado..."></textarea>
                     
-                    <div class="btn-wrapper">
-                        <button onclick="enviarCadastroHibrido()">Confirmar Agendamento</button>
+                    <div class="btn-container">
+                        <button onclick="enviar()">Confirmar Agendamento</button>
                     </div>
                     <div id="msg-feedback"></div>
                 </div>
-
                 <script>
-                    function enviarCadastroHibrido() {{
-                        const doc = window.parent.document;
-                        const allForms = Array.from(doc.querySelectorAll('div[data-testid="stForm"]'));
-                        const abaForm = allForms.find(f => f.textContent.includes('SyncCadastroDireto'));
-                        
+                    function enviar() {{
                         const payload = {{
                             data: document.getElementById('off_data').value,
                             executor: document.getElementById('off_exec').value.trim(),
@@ -2773,70 +2760,59 @@ else:
                         }};
                         
                         const feedback = document.getElementById('msg-feedback');
-                        
                         if(!payload.prefixo || !payload.descricao) {{
-                            feedback.style.display = 'block';
-                            feedback.style.background = '#FFCDD2';
-                            feedback.style.color = '#B71C1C';
-                            feedback.innerText = "⚠️ Preencha obrigatoriamente o Prefixo e a Descrição.";
-                            return;
+                            feedback.style.display = 'block'; feedback.style.background = '#FFCDD2'; feedback.style.color = '#B71C1C'; feedback.innerText = "⚠️ Preencha obrigatoriamente o Prefixo e a Descrição."; return;
                         }}
 
                         if(navigator.onLine) {{
-                            if (abaForm) {{
-                                const inputOffline = abaForm.querySelector('input[type="text"]');
-                                const btnSubmitSync = abaForm.querySelector('button');
-                                
-                                if (inputOffline && btnSubmitSync) {{
-                                    let nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
-                                    nativeInputValueSetter.call(inputOffline, JSON.stringify(payload));
+                            const doc = window.parent.document;
+                            const inputOffline = doc.querySelector('input[aria-label="payload_cadastro"]');
+                            
+                            if (inputOffline) {{
+                                const btn = inputOffline.closest('div[data-testid="stForm"]').querySelector('button');
+                                if (btn) {{
+                                    let setVal = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+                                    setVal.call(inputOffline, JSON.stringify(payload)); 
                                     inputOffline.dispatchEvent(new Event('input', {{ bubbles: true }}));
                                     
-                                    feedback.style.display = 'block';
-                                    feedback.style.background = '#C8E6C9';
-                                    feedback.style.color = '#2E7D32';
-                                    feedback.innerText = "Agendando online...";
-                                    
-                                    setTimeout(() => {{
-                                        btnSubmitSync.click();
-                                    }}, 150);
+                                    feedback.style.display = 'block'; feedback.style.background = '#C8E6C9'; feedback.style.color = '#2E7D32'; feedback.innerText = "Agendando online...";
+                                    setTimeout(() => {{ btn.click(); }}, 150);
                                 }}
                             }}
                         }} else {{
-                            const request = indexedDB.open("Up2Today_OfflineDB", 1);
-                            request.onsuccess = function(event) {{
-                                const db = event.target.result;
-                                const tx = db.transaction(["fila_offline"], "readwrite");
-                                const store = tx.objectStore("fila_offline");
-                                
-                                store.add({{
-                                    tipo: "agendamento_direto",
-                                    ...payload
-                                }});
-                                
-                                feedback.style.display = 'block';
-                                feedback.style.background = '#C8E6C9';
-                                feedback.style.color = '#2E7D32';
-                                feedback.innerText = "📶 Salvo Offline! A OS será gerada quando a internet voltar.";
-                                
-                                document.getElementById('off_pref').value = '';
-                                document.getElementById('off_desc').value = '';
+                            const req = indexedDB.open("Up2Today_OfflineDB", 1);
+                            req.onsuccess = function(e) {{
+                                const db = e.target.result;
+                                db.transaction(["fila_offline"], "readwrite").objectStore("fila_offline").add({{ tipo: "agendamento_direto", ...payload }});
+                                feedback.style.display = 'block'; feedback.style.background = '#C8E6C9'; feedback.style.color = '#2E7D32'; feedback.innerText = "📶 Salvo Offline! A OS será gerada quando a internet voltar.";
+                                document.getElementById('off_pref').value = ''; document.getElementById('off_desc').value = '';
                             }};
                         }}
                     }}
                 </script>
-            """, height=350)
+            """, height=310)
             
-            # --- LISTA GERAL DE SERVIÇOS EXCLUSIVA DA ABA DE AGENDAMENTO DIRETO ---
+            # --- LISTA GERAL COM A COLUNA Nº OS READICIONADA ---
             st.divider()
             st.subheader("📋 Lista geral de serviços")
             df_lista = carregar_tarefas_empresa(emp_id)
             
             if not df_lista.empty:
                 df_lista['data'] = pd.to_datetime(df_lista['data']).dt.date
+                df_lista['Nº OS'] = df_lista['numero_os'].astype(str).replace(['None', 'nan', 'None.0'], 'S/N').str.replace('.0', '', regex=False)
                 df_lista['Exc'] = False
                 
-                ed_l = st.data_editor(df_lista[['Exc', 'data', 'turno', 'executor', 'prefixo', 'inicio_disp', 'fim_disp', 'descricao', 'area', 'id']], hide_index=True, use_container_width=True, key="ed_lista_servicos_direto")
+                cols_ed = ['Exc', 'Nº OS', 'data', 'turno', 'executor', 'prefixo', 'inicio_disp', 'fim_disp', 'descricao', 'area', 'id']
+                
+                ed_l = st.data_editor(
+                    df_lista[cols_ed], 
+                    hide_index=True, 
+                    use_container_width=True, 
+                    key="ed_lista_servicos_direto",
+                    column_config={
+                        "Nº OS": st.column_config.TextColumn("Nº OS", disabled=True)
+                    }
+                )
                 
                 if st.button("🗑️ Excluir Selecionados", key="btn_excluir_servicos_direto"):
                     with engine.connect() as conn:
