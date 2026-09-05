@@ -582,7 +582,7 @@ def gerar_pdf_manual_oficial_pro():
             self.set_y(-15)
             self.set_font("Arial", "I", 8)
             self.set_text_color(128, 128, 128)
-            self.cell(0, 10, f"Página {self.page_no()}", 0, 0, 'C')
+            self.cell(0, 10, f"Pagina {self.page_no()}", 0, 0, 'C')
 
     pdf = PDF()
     pdf.set_auto_page_break(auto=True, margin=15)
@@ -600,9 +600,18 @@ def gerar_pdf_manual_oficial_pro():
     pdf.cell(190, 10, "Seu Controle. Nossa Prioridade.", ln=True, align='C')
     pdf.add_page()
     pdf.set_font("Arial", "B", 18); pdf.set_text_color(27, 34, 76)
-    pdf.cell(190, 15, "SUMÁRIO", ln=True); pdf.ln(10)
+    pdf.cell(190, 15, "SUMARIO", ln=True); pdf.ln(10)
     
-    itens_sumario = [("1. Introdução e Ganhos Estratégicos", "3"), ("2. Fluxo de Trabalho (Workflow)", "4"), ("3. Operação da Logística (Janelas)", "5"), ("4. Perfis de Acesso (Admin vs Motorista)", "6"), ("5. Guia: Chamados Oficina", "7"), ("6. Guia: Agenda Principal", "8"), ("7. Guia: Cadastro Direto", "9"), ("8. Assistente Virtual e Pendências", "10")]
+    itens_sumario = [
+        ("1. Introducao e Ganhos Estrategicos", "3"),
+        ("2. Fluxo de Trabalho (Workflow)", "4"),
+        ("3. Operacao da Logistica (Janelas)", "5"),
+        ("4. Perfis de Acesso (Admin vs Motorista)", "6"),
+        ("5. Guia: Chamados Oficina", "7"),
+        ("6. Guia: Agenda Principal", "8"),
+        ("7. Guia: Cadastro Direto", "9"),
+        ("8. Assistente Virtual e Pendencias", "10")
+    ]
     for titulo, pagina in itens_sumario:
         pdf.set_font("Arial", "B", 12); pdf.set_text_color(0)
         largura_titulo = pdf.get_string_width(titulo)
@@ -615,53 +624,53 @@ def gerar_pdf_manual_oficial_pro():
 
     pdf.add_page()
     pdf.set_font("Arial", "B", 16); pdf.set_text_color(27, 34, 76)
-    pdf.cell(190, 10, "1. INTRODUÇÃO E GANHOS ESTRATÉGICOS", ln=True)
+    pdf.cell(190, 10, "1. INTRODUCAO E GANHOS ESTRATEGICOS", ln=True)
     pdf.set_font("Arial", "", 11); pdf.set_text_color(0)
-    pdf.multi_cell(190, 7, "O Up 2 Today é uma plataforma de gestão integrada que une a operação de pista (Motoristas), o planejamento (Logística) e a execução (Oficina). O objetivo central é garantir que nenhum veículo fique parado além do tempo estritamente necessário.\n\nGANHOS PARA A EMPRESA:\n- Redução de até 30% no Lead Time de manutenção.\n- Eliminação total de papéis e planilhas paralelas.\n- Histórico digital real por prefixo e placa.\n- Comunicação instantânea entre motorista e oficina.")
+    pdf.multi_cell(190, 7, "O Up 2 Today e uma plataforma de gestao integrada que une a operacao de pista (Motoristas), o planejamento (Logistica) e a execucao (Oficina). O objetivo central e garantir que nenhum veículo fique parado alem do tempo estritamente necessario.\n\nGANHOS PARA A EMPRESA:\n- Reducao de ate 30% no Lead Time de manutencao.\n- Eliminacao total de papeis e planilhas paralelas.\n- Historico digital real por prefixo e placa.\n- Comunicacao instantanea entre motorista e oficina.".encode('latin-1', 'ignore').decode('latin-1'))
 
     pdf.add_page()
     pdf.set_font("Arial", "B", 16); pdf.set_text_color(27, 34, 76)
     pdf.cell(190, 10, "2. FLUXO DE TRABALHO (WORKFLOW)", ln=True)
     pdf.set_font("Arial", "", 11)
-    pdf.multi_cell(190, 7, "O ciclo de vida de uma manutenção no Up 2 Today segue três etapas fundamentais:\n\n1. Solicitação: O motorista aponta a falha de forma remota via portal.\n2. Aprovação: O gestor avalia a gravidade, define o executor e a área responsável.\n3. Execução: A oficina realiza o serviço dentro da janela programada, garantindo a eficiência.")
+    pdf.multi_cell(190, 7, "O ciclo de vida de uma manutencao no Up 2 Today segue tres etapas fundamentais:\n\n1. Solicitacao: O motorista aponta a falha de forma remota via portal.\n2. Aprovacao: O gestor avalia a gravidade, define o executor e a area responsavel.\n3. Execucao: A oficina realiza o servico dentro da janela programada, garantindo a eficiencia.".encode('latin-1', 'ignore').decode('latin-1'))
 
     pdf.add_page()
     pdf.set_font("Arial", "B", 16); pdf.set_text_color(27, 34, 76)
-    pdf.cell(190, 10, "3. OPERAÇÃO DA LOGÍSTICA (JANELAS)", ln=True)
+    pdf.cell(190, 10, "3. OPERACAO DA LOGISTICA (JANELAS)", ln=True)
     pdf.set_font("Arial", "", 11)
-    pdf.multi_cell(190, 7, "A logística é a peça-chave para o preenchimento da disponibilidade na Agenda Principal.\nOs campos 'Início Disp.' e 'Fim Disp.' permitem que a oficina organize o pátio, sabendo exatamente quando o veículo estará livre para o box, evitando ociosidade da equipe.")
+    pdf.multi_cell(190, 7, "A logistica e a peca-chave para o preenchimento da disponibilidade na Agenda Principal.\nOs campos 'Inicio Disp.' e 'Fim Disp.' permitem que a oficina organize o patio, sabendo exatamente quando o veiculo estara livre para o box, evitando ociosidade da equipe.".encode('latin-1', 'ignore').decode('latin-1'))
 
     pdf.add_page()
     pdf.set_font("Arial", "B", 16); pdf.set_text_color(27, 34, 76)
     pdf.cell(190, 10, "4. PERFIS DE ACESSO (ADMIN VS MOTORISTA)", ln=True)
     pdf.set_font("Arial", "", 11)
-    pdf.multi_cell(190, 7, "PERFIL ADMINISTRADOR: Possui visão sistêmica. Responsável por triar chamados, gerenciar a agenda, cadastrar novos usuários e analisar métricas de performance.\n\nPERFIL MOTORISTA: Interface otimizada para dispositivos móveis. O motorista foca em abrir chamados e acompanhar se o seu veículo já foi liberado, sem acesso a dados sensíveis.")
+    pdf.multi_cell(190, 7, "PERFIL ADMINISTRADOR: Possui visao sistemica. Responsavel por triar chamados, gerenciar a agenda, cadastrar novos usuarios e analisar metricas de performance.\n\nPERFIL MOTORISTA: Interface otimizada para dispositivos moveis. O motorista foca em abrir chamados e acompanhar se o seu veiculo ja foi liberado, sem acesso a dados sensiveis.".encode('latin-1', 'ignore').decode('latin-1'))
 
     pdf.add_page()
     pdf.set_font("Arial", "B", 16); pdf.set_text_color(27, 34, 76)
     pdf.cell(190, 10, "5. GUIA: CHAMADOS OFICINA", ln=True)
     pdf.set_font("Arial", "", 11)
-    pdf.multi_cell(190, 7, "1. Analise a descrição técnica enviada pela ponta.\n2. Preencha o Executor, a Data Programada e a Área de destino.\n3. Marque a caixa 'Aprovar?' e confirme o processamento.\n*Importante: Após aprovado, o serviço é migrado instantaneamente para a Agenda Principal.*")
+    pdf.multi_cell(190, 7, "1. Analise a descricao tecnica enviada pela ponta.\n2. Preencha o Executor, a Data Programada e a Area de destino.\n3. Marque a caixa 'Aprovar?' e confirme o processamento.\n*Importante: Apos aprovado, o servico e migrado instantaneamente para a Agenda Principal.*".encode('latin-1', 'ignore').decode('latin-1'))
 
     pdf.add_page()
     pdf.set_font("Arial", "B", 16); pdf.set_text_color(27, 34, 76)
     pdf.cell(190, 10, "6. GUIA: AGENDA PRINCIPAL", ln=True)
     pdf.set_font("Arial", "", 11)
-    pdf.multi_cell(190, 7, "A Agenda é o centro operacional do dia a dia.\n- Filtros: Navegue por data, turno e área de atuação.\n- Edição Dinâmica: Altere dados diretamente na grade de visualização.\n- Conclusão: O check no campo 'OK' é obrigatório para encerrar o ciclo e gerar o histórico.")
+    pdf.multi_cell(190, 7, "A Agenda e o centro operacional do dia a dia.\n- Filtros: Navegue por data, turno e area de atuacao.\n- Edicao Dinamica: Altere dados diretamente na grade de visualizacao.\n- Conclusao: O check no campo 'OK' e obrigatorio para encerrar o ciclo e gerar o historico.".encode('latin-1', 'ignore').decode('latin-1'))
 
     pdf.add_page()
     pdf.set_font("Arial", "B", 16); pdf.set_text_color(27, 34, 76)
     pdf.cell(190, 10, "7. GUIA: CADASTRO DIRETO", ln=True)
     pdf.set_font("Arial", "", 11)
-    pdf.multi_cell(190, 7, "Utilize esta aba para manutenções programadas (revisões e trocas de óleo).\nDiferente dos chamados, o cadastro aqui gera um serviço direto na agenda. A lista inferior serve para auditoria e exclusão de registros indevidos.")
+    pdf.multi_cell(190, 7, "Utilize esta aba para manutencoes programadas (revisoes e trocas de oleo).\nDiferente dos chamados, o cadastro aqui gera um servico direto na agenda. A lista inferior serve para auditoria e exclusao de registros indevidos.".encode('latin-1', 'ignore').decode('latin-1'))
 
     pdf.add_page()
     pdf.set_font("Arial", "B", 16); pdf.set_text_color(27, 34, 76)
-    pdf.cell(190, 10, "8. ASSISTENTE VIRTUAL E PENDÊNCIAS", ln=True)
+    pdf.cell(190, 10, "8. ASSISTENTE VIRTUAL E PENDENCIAS", ln=True)
     pdf.set_font("Arial", "", 11)
-    pdf.multi_cell(190, 7, "O Assistente monitora a integridade dos prazos. O alarme visual no topo indica que há pendências de datas passadas. O botão 'Resolver' permite ao gestor dar baixa imediata ou reagendar tarefas para o presente com um único clique.")
+    pdf.multi_cell(190, 7, "O Assistente monitora a integridade dos prazos. O alarme visual no topo indica que ha pendencias de datas passadas. O botão 'Resolver' permite ao gestor dar baixa imediata ou reagendar tarefas para o presente com um unico clique.".encode('latin-1', 'ignore').decode('latin-1'))
 
-    return pdf.output(dest='S').encode('latin-1', 'replace')
+    return pdf.output(dest='S').encode('latin-1', 'ignore')
 
 def obter_proxima_os(engine, emp_id):
     try:
@@ -2074,101 +2083,110 @@ else:
                     conn.commit()
                 st.success("✅ Solicitação enviada com sucesso!")
 
-        # Formulário Híbrido Blindado Harmonizado
         st.components.v1.html(f"""
-            <style>
-                body {{ font-family: 'Segoe UI', sans-serif; color: #231F20; background: transparent; padding: 5px; margin: 0; }}
-                label {{ font-size: 13px; font-weight: 600; margin-bottom: 4px; display: block; color: #4A3C31; }}
-                input, select, textarea {{ width: 100%; padding: 8px; margin-bottom: 12px; border: 1px solid #C5A059; border-radius: 6px; box-sizing: border-box; background: #FFF; font-size: 14px; }}
-                button {{ width: auto; min-width: 200px; padding: 12px 24px; background: #C5A059; color: #FFF; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; font-size: 15px; transition: 0.2s; margin-top: 5px; display: inline-block; }}
-                button:hover {{ background: #9B783E; }}
-                #msg-feedback {{ margin-top: 10px; padding: 10px; border-radius: 6px; display: none; font-weight: bold; text-align: center; font-size: 14px; }}
-                .btn-wrapper {{ text-align: right; }}
-            </style>
-            
-            <div id="form-container">
-                <label>Prefixo do Veículo</label>
-                <input type="text" id="offline_prefixo" placeholder="Ex: 44001">
+                <div style="display:none;">{time_module.time()}</div>
+                <style>
+                    body {{ font-family: 'Segoe UI', sans-serif; color: #231F20; background: transparent; padding: 5px; margin: 0; }}
+                    label {{ font-size: 13px; font-weight: 600; margin-bottom: 4px; display: block; color: #4A3C31; }}
+                    input, select, textarea {{ width: 100%; padding: 8px; margin-bottom: 12px; border: 1px solid #C5A059; border-radius: 6px; box-sizing: border-box; background: #FFF; font-size: 14px; }}
+                    .grid-4 {{ display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; }}
+                    button {{ width: auto; min-width: 200px; padding: 12px 24px; background: #C5A059; color: #FFF; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; font-size: 15px; transition: 0.2s; margin-top: 5px; display: inline-block; }}
+                    button:hover {{ background: #9B783E; }}
+                    #msg-feedback {{ margin-top: 10px; padding: 10px; border-radius: 6px; display: none; font-weight: bold; text-align: center; font-size: 14px; }}
+                    .btn-wrapper {{ text-align: right; }}
+                </style>
                 
-                <label>Descrição do Problema</label>
-                <textarea id="offline_descricao" rows="4" placeholder="Detalhe a falha..."></textarea>
-                
-                <div class="btn-wrapper">
-                    <button onclick="enviarSolicitacaoHibrida()">Enviar Solicitação</button>
+                <div id="form-container">
+                    <div class="grid-4">
+                        <div><label>Data</label><input type="date" id="off_data" value="{hoje_str}"></div>
+                        <div><label>Executor</label><input type="text" id="off_exec" placeholder="Opcional"></div>
+                        <div><label>Prefixo</label><input type="text" id="off_pref" placeholder="Ex: 1025"></div>
+                        <div><label>Área</label><select id="off_area">{opcoes_area_html}</select></div>
+                    </div>
+                    
+                    <label>Descrição</label>
+                    <textarea id="off_desc" rows="3" placeholder="Descreva o serviço a ser agendado..."></textarea>
+                    
+                    <div class="grid-4">
+                        <div><label>Início (Opc.)</label><input type="time" id="off_ini" value="00:00"></div>
+                        <div><label>Fim (Opc.)</label><input type="time" id="off_fim" value="00:00"></div>
+                        <div><label>Turno</label><select id="off_turno">{opcoes_turno_html}</select></div>
+                        <div><label>Tipo de OS</label><select id="off_tipo">{opcoes_tipo_html}</select></div>
+                    </div>
+                    
+                    <div class="btn-wrapper">
+                        <button onclick="enviarCadastroHibrido()">Confirmar Agendamento</button>
+                    </div>
+                    <div id="msg-feedback"></div>
                 </div>
-                <div id="msg-feedback"></div>
-            </div>
 
-            <script>
-                function enviarSolicitacaoHibrida() {{
-                    const doc = window.parent.document;
-                    const allForms = Array.from(doc.querySelectorAll('div[data-testid="stForm"]'));
-                    const abaForm = allForms.find(f => f.textContent.includes('SyncSolicitacaoMotorista'));
-                    
-                    const pref = document.getElementById('offline_prefixo').value.trim();
-                    const desc = document.getElementById('offline_descricao').value.trim();
-                    const feedback = document.getElementById('msg-feedback');
-                    
-                    if(!pref || !desc) {{
-                        feedback.style.display = 'block';
-                        feedback.style.background = '#FFCDD2';
-                        feedback.style.color = '#B71C1C';
-                        feedback.innerText = "⚠️ Preencha o prefixo e a descrição.";
-                        return;
-                    }}
+                <script>
+                    function enviarCadastroHibrido() {{
+                        const doc = window.parent.document;
+                        const allForms = Array.from(doc.querySelectorAll('div[data-testid="stForm"]'));
+                        const abaForm = allForms.find(f => f.textContent.includes('SyncCadastroDireto'));
+                        
+                        const payload = {{
+                            tipo: "agendamento_direto",
+                            data: document.getElementById('off_data').value,
+                            executor: document.getElementById('off_exec').value.trim(),
+                            prefixo: document.getElementById('off_pref').value.trim(),
+                            area: document.getElementById('off_area').value,
+                            inicio: document.getElementById('off_ini').value,
+                            fim: document.getElementById('off_fim').value,
+                            descricao: document.getElementById('off_desc').value.trim(),
+                            turno: document.getElementById('off_turno').value,
+                            tipo_os: document.getElementById('off_tipo').value
+                        }};
+                        
+                        const feedback = document.getElementById('msg-feedback');
+                        
+                        if(!payload.prefixo || !payload.descricao) {{
+                            feedback.style.display = 'block';
+                            feedback.style.background = '#FFCDD2';
+                            feedback.style.color = '#B71C1C';
+                            feedback.innerText = "⚠️ Preencha obrigatoriamente o Prefixo e a Descrição.";
+                            return;
+                        }}
 
-                    if(navigator.onLine) {{
-                        if (abaForm) {{
-                            const inputs = abaForm.querySelectorAll('input[type="text"]');
-                            const btn = abaForm.querySelector('button');
-                            
-                            if (inputs.length >= 2 && btn) {{
-                                let nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+                        if(navigator.onLine) {{
+                            if (abaForm) {{
+                                const inputOffline = abaForm.querySelector('input[type="text"]');
+                                const btnSubmitSync = abaForm.querySelector('button');
                                 
-                                nativeInputValueSetter.call(inputs[0], pref);
-                                inputs[0].dispatchEvent(new Event('input', {{ bubbles: true }}));
-                                
-                                nativeInputValueSetter.call(inputs[1], desc);
-                                inputs[1].dispatchEvent(new Event('input', {{ bubbles: true }}));
-                                
-                                btn.click();
+                                if (inputOffline && btnSubmitSync) {{
+                                    let nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+                                    nativeInputValueSetter.call(inputOffline, JSON.stringify([payload]));
+                                    inputOffline.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                                    
+                                    feedback.style.display = 'block';
+                                    feedback.style.background = '#C8E6C9';
+                                    feedback.style.color = '#2E7D32';
+                                    feedback.innerText = "Agendando online...";
+                                    
+                                    setTimeout(() => {{ btnSubmitSync.click(); }}, 150);
+                                }}
+                            }}
+                        }} else {{
+                            const request = indexedDB.open("Up2Today_OfflineDB", 1);
+                            request.onsuccess = function(event) {{
+                                const db = event.target.result;
+                                const tx = db.transaction(["fila_offline"], "readwrite");
+                                const store = tx.objectStore("fila_offline");
+                                store.add(payload);
                                 
                                 feedback.style.display = 'block';
                                 feedback.style.background = '#C8E6C9';
                                 feedback.style.color = '#2E7D32';
-                                feedback.innerText = "Enviando para a oficina...";
+                                feedback.innerText = "📶 Salvo Offline! A OS será gerada quando a internet voltar.";
                                 
-                                document.getElementById('offline_prefixo').value = '';
-                                document.getElementById('offline_descricao').value = '';
-                            }}
+                                document.getElementById('off_pref').value = '';
+                                document.getElementById('off_desc').value = '';
+                            }};
                         }}
-                    }} else {{
-                        const request = indexedDB.open("Up2Today_OfflineDB", 1);
-                        request.onsuccess = function(event) {{
-                            const db = event.target.result;
-                            const tx = db.transaction(["fila_offline"], "readwrite");
-                            const store = tx.objectStore("fila_offline");
-                            
-                            store.add({{
-                                tipo: "chamado_motorista",
-                                prefixo: pref,
-                                descricao: desc,
-                                motorista: "{nome_motorista}",
-                                data: new Date().toISOString()
-                            }});
-                            
-                            feedback.style.display = 'block';
-                            feedback.style.background = '#C8E6C9';
-                            feedback.style.color = '#2E7D32';
-                            feedback.innerText = "📶 Salvo Offline! Será enviado quando a internet voltar.";
-                            
-                            document.getElementById('offline_prefixo').value = '';
-                            document.getElementById('offline_descricao').value = '';
-                        }};
                     }}
-                }}
-            </script>
-        """, height=340)
+                </script>
+            """, height=370)
 
         # Oculta o formulário Python que serve apenas de ponte
         st.markdown("""
