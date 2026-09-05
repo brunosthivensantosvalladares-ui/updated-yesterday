@@ -2070,7 +2070,6 @@ else:
         
         emp_id = st.session_state.get("empresa", "U2T_MATRIZ")
         nome_motorista = st.session_state.get("usuario_ativo", "Motorista")
-        
         hoje_str = datetime.now().strftime("%Y-%m-%d")
 
         # Formulário Oculto Exclusivo da Aba (A ponte local)
@@ -2092,107 +2091,90 @@ else:
                 st.success("✅ Solicitação enviada com sucesso!")
 
         st.components.v1.html(f"""
-                <div style="display:none;">{time_module.time()}</div>
-                <style>
-                    body {{ font-family: 'Segoe UI', sans-serif; color: #231F20; background: transparent; padding: 5px; margin: 0; overflow: hidden; }}
-                    label {{ font-size: 13px; font-weight: 600; margin-bottom: 4px; display: block; color: #4A3C31; }}
-                    input, select, textarea {{ width: 100%; padding: 8px; margin-bottom: 10px; border: 1px solid #C5A059; border-radius: 6px; box-sizing: border-box; background: #FFF; font-size: 14px; }}
-                    input:focus, select:focus, textarea:focus {{ border-color: #9B783E; outline: none; box-shadow: 0 0 0 1px #9B783E; }}
-                    .grid-4 {{ display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; }}
-                    button {{ width: auto; min-width: 200px; padding: 12px 24px; background: #C5A059; color: #FFF; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; font-size: 15px; transition: 0.2s; display: inline-block; }}
-                    button:hover {{ background: #9B783E; }}
-                    .btn-wrapper {{ text-align: right; margin-top: 5px; }}
-                    #msg-feedback {{ margin-top: 10px; padding: 12px; border-radius: 6px; text-align: center; font-size: 14px; font-weight: bold; background: transparent; color: transparent; border: 1px solid transparent; transition: 0.2s; }}
-                </style>
+            <div style="display:none;">{time_module.time()}</div>
+            <style>
+                body {{ font-family: 'Segoe UI', sans-serif; padding: 5px; margin: 0; color: #231F20; }}
+                label {{ font-size: 13px; font-weight: 600; margin-bottom: 4px; display: block; color: #4A3C31; }}
+                input, textarea {{ width: 100%; padding: 6px 10px; margin-bottom: 12px; border: 1px solid #C5A059; border-radius: 6px; box-sizing: border-box; font-size: 14px; background: #FFF; }}
+                input:focus, textarea:focus {{ border-color: #9B783E; outline: none; box-shadow: 0 0 0 1px #9B783E; }}
+                .btn-container {{ text-align: right; margin-top: 5px; }}
+                button {{ padding: 8px 16px; background: #C5A059; color: #FFF; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; transition: 0.2s; width: auto; min-width: 180px; display: inline-block; }}
+                button:hover {{ background: #9B783E; }}
+                #msg-feedback {{ margin-top: 10px; padding: 10px; border-radius: 6px; display: none; text-align: center; font-size: 14px; font-weight: bold; }}
+            </style>
+            <div id="form-container">
+                <label>Prefixo do Veículo</label>
+                <input type="text" id="offline_prefixo" placeholder="Ex: 44001" aria-label="p_sync">
                 
-                <div id="form-container">
-                    <div class="grid-4">
-                        <div><label>Data</label><input type="date" id="off_data" value="{hoje_str}"></div>
-                        <div><label>Executor</label><input type="text" id="off_exec" placeholder="Opcional"></div>
-                        <div><label>Prefixo</label><input type="text" id="off_pref" placeholder="Ex: 1025"></div>
-                        <div><label>Área</label><select id="off_area">{opcoes_area_html}</select></div>
-                    </div>
-                    
-                    <label>Descrição</label>
-                    <textarea id="off_desc" rows="3" placeholder="Descreva o serviço a ser agendado..."></textarea>
-                    
-                    <div class="grid-4">
-                        <div><label>Início (Opc.)</label><input type="time" id="off_ini" value="00:00"></div>
-                        <div><label>Fim (Opc.)</label><input type="time" id="off_fim" value="00:00"></div>
-                        <div><label>Turno</label><select id="off_turno">{opcoes_turno_html}</select></div>
-                        <div><label>Tipo de OS</label><select id="off_tipo">{opcoes_tipo_html}</select></div>
-                    </div>
-                    
-                    <div class="btn-wrapper">
-                        <button onclick="enviarCadastroHibrido()">Confirmar Agendamento</button>
-                    </div>
-                    <div id="msg-feedback">Aguardando ação...</div>
+                <label>Descrição do Problema</label>
+                <textarea id="offline_descricao" rows="4" aria-label="d_sync" placeholder="Descreva o problema..."></textarea>
+                
+                <div class="btn-container">
+                    <button onclick="enviar()">Enviar Solicitação</button>
                 </div>
-
-                <script>
-                    function enviarCadastroHibrido() {{
-                        const doc = window.parent.document;
-                        const allForms = Array.from(doc.querySelectorAll('div[data-testid="stForm"]'));
-                        const abaForm = allForms.find(f => f.textContent.includes('SyncCadastroDireto'));
-                        
-                        const payload = {{
-                            tipo: "agendamento_direto",
-                            data: document.getElementById('off_data').value,
-                            executor: document.getElementById('off_exec').value.trim(),
-                            prefixo: document.getElementById('off_pref').value.trim(),
-                            area: document.getElementById('off_area').value,
-                            inicio: document.getElementById('off_ini').value,
-                            fim: document.getElementById('off_fim').value,
-                            descricao: document.getElementById('off_desc').value.trim(),
-                            turno: document.getElementById('off_turno').value,
-                            tipo_os: document.getElementById('off_tipo').value
-                        }};
-                        
-                        const feedback = document.getElementById('msg-feedback');
-                        
-                        if(!payload.prefixo || !payload.descricao) {{
-                            feedback.style.background = '#FFCDD2';
-                            feedback.style.color = '#B71C1C';
-                            feedback.innerText = "⚠️ Preencha obrigatoriamente o Prefixo e a Descrição.";
-                            return;
-                        }}
-
-                        if(navigator.onLine) {{
-                            if (abaForm) {{
-                                const inputOffline = abaForm.querySelector('input[type="text"]');
-                                const btnSubmitSync = abaForm.querySelector('button');
-                                
-                                if (inputOffline && btnSubmitSync) {{
-                                    let nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
-                                    nativeInputValueSetter.call(inputOffline, JSON.stringify([payload]));
-                                    inputOffline.dispatchEvent(new Event('input', {{ bubbles: true }}));
-                                    
-                                    feedback.style.background = '#C8E6C9';
-                                    feedback.style.color = '#2E7D32';
-                                    feedback.innerText = "Agendando online...";
-                                    
-                                    setTimeout(() => {{ btnSubmitSync.click(); }}, 150);
-                                }}
-                            }}
-                        }} else {{
-                            const request = indexedDB.open("Up2Today_OfflineDB", 1);
-                            request.onsuccess = function(event) {{
-                                const db = event.target.result;
-                                const tx = db.transaction(["fila_offline"], "readwrite");
-                                const store = tx.objectStore("fila_offline");
-                                store.add(payload);
-                                
-                                feedback.style.background = '#C8E6C9';
-                                feedback.style.color = '#2E7D32';
-                                feedback.innerText = "📶 Salvo Offline! A OS será gerada quando a internet voltar.";
-                                
-                                document.getElementById('off_pref').value = '';
-                                document.getElementById('off_desc').value = '';
-                            }};
-                        }}
+                <div id="msg-feedback"></div>
+            </div>
+            <script>
+                function enviar() {{
+                    const pref = document.getElementById('offline_prefixo').value.trim();
+                    const desc = document.getElementById('offline_descricao').value.trim();
+                    const feedback = document.getElementById('msg-feedback');
+                    
+                    if(!pref || !desc) {{
+                        feedback.style.display = 'block'; 
+                        feedback.style.background = '#FFCDD2'; 
+                        feedback.style.color = '#B71C1C'; 
+                        feedback.innerText = "⚠️ Preencha os campos obrigatórios."; 
+                        return;
                     }}
-                </script>
-            """, height=600)
+
+                    if(navigator.onLine) {{
+                        const doc = window.parent.document;
+                        const inputPref = doc.querySelector('input[aria-label="p_sync"]');
+                        const inputDesc = doc.querySelector('input[aria-label="d_sync"]');
+                        
+                        if (inputPref && inputDesc) {{
+                            const btn = inputPref.closest('div[data-testid="stForm"]').querySelector('button');
+                            if (btn) {{
+                                let setVal = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+                                setVal.call(inputPref, pref); 
+                                inputPref.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                                
+                                setVal.call(inputDesc, desc); 
+                                inputDesc.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                                
+                                feedback.style.display = 'block'; 
+                                feedback.style.background = '#C8E6C9'; 
+                                feedback.style.color = '#2E7D32'; 
+                                feedback.innerText = "Enviando para a oficina...";
+                                
+                                setTimeout(() => {{ btn.click(); }}, 150);
+                            }}
+                        }}
+                    }} else {{
+                        const req = indexedDB.open("Up2Today_OfflineDB", 1);
+                        req.onsuccess = function(e) {{
+                            const db = e.target.result;
+                            const tx = db.transaction(["fila_offline"], "readwrite");
+                            tx.objectStore("fila_offline").add({{ 
+                                tipo: "chamado_motorista", 
+                                prefixo: pref, 
+                                descricao: desc, 
+                                motorista: "{nome_motorista}", 
+                                data: "{hoje_str}" 
+                            }});
+                            feedback.style.display = 'block'; 
+                            feedback.style.background = '#C8E6C9'; 
+                            feedback.style.color = '#2E7D32'; 
+                            feedback.innerText = "📶 Salvo Offline! O chamado será enviado quando a internet voltar.";
+                            
+                            document.getElementById('offline_prefixo').value = ''; 
+                            document.getElementById('offline_descricao').value = '';
+                        }};
+                    }}
+                }}
+            </script>
+        """, height=280)
 
         # Oculta o formulário Python que serve apenas de ponte
         st.markdown("""
