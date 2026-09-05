@@ -670,7 +670,13 @@ def gerar_pdf_manual_oficial_pro():
     pdf.set_font("Arial", "", 11)
     pdf.multi_cell(190, 7, "O Assistente monitora a integridade dos prazos. O alarme visual no topo indica que ha pendencias de datas passadas. O botao 'Resolver' permite ao gestor dar baixa imediata ou reagendar tarefas para o presente com um unico clique.")
 
-    return pdf.output(dest='S').encode('latin-1', 'ignore')
+    # Tratamento seguro de bytes compatível com qualquer versão do FPDF
+    res = pdf.output(dest='S')
+    if isinstance(res, str):
+        return res.encode('latin-1', 'replace')
+    elif isinstance(res, bytearray):
+        return bytes(res)
+    return res
 
 def obter_proxima_os(engine, emp_id):
     try:
@@ -2088,12 +2094,13 @@ else:
                 <style>
                     body {{ font-family: 'Segoe UI', sans-serif; color: #231F20; background: transparent; padding: 5px; margin: 0; }}
                     label {{ font-size: 13px; font-weight: 600; margin-bottom: 4px; display: block; color: #4A3C31; }}
-                    input, select, textarea {{ width: 100%; padding: 8px; margin-bottom: 12px; border: 1px solid #C5A059; border-radius: 6px; box-sizing: border-box; background: #FFF; font-size: 14px; }}
+                    input, select, textarea {{ width: 100%; padding: 8px; margin-bottom: 10px; border: 1px solid #C5A059; border-radius: 6px; box-sizing: border-box; background: #FFF; font-size: 14px; }}
+                    input:focus, select:focus, textarea:focus {{ border-color: #9B783E; outline: none; box-shadow: 0 0 0 1px #9B783E; }}
                     .grid-4 {{ display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; }}
-                    button {{ width: auto; min-width: 200px; padding: 12px 24px; background: #C5A059; color: #FFF; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; font-size: 15px; transition: 0.2s; margin-top: 5px; display: inline-block; }}
+                    button {{ width: auto; min-width: 200px; padding: 12px 24px; background: #C5A059; color: #FFF; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; font-size: 15px; transition: 0.2s; display: inline-block; }}
                     button:hover {{ background: #9B783E; }}
-                    #msg-feedback {{ margin-top: 10px; padding: 10px; border-radius: 6px; display: none; font-weight: bold; text-align: center; font-size: 14px; }}
-                    .btn-wrapper {{ text-align: right; }}
+                    #msg-feedback {{ margin-top: 10px; padding: 12px; border-radius: 6px; display: none; font-weight: bold; text-align: center; font-size: 14px; }}
+                    .btn-wrapper {{ text-align: right; margin-top: 5px; }}
                 </style>
                 
                 <div id="form-container">
@@ -2186,7 +2193,7 @@ else:
                         }}
                     }}
                 </script>
-            """, height=440)
+            """, height=480)
 
         # Oculta o formulário Python que serve apenas de ponte
         st.markdown("""
