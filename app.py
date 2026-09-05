@@ -2705,7 +2705,10 @@ else:
                 if btn_sync_cad and payload_cadastro:
                     import json
                     try:
-                        dados_cad = json.loads(payload_cadastro)
+                        dados_brutos = json.loads(payload_cadastro)
+                        # Garante compatibilidade caso venha em lista ou dicionário único
+                        dados_cad = dados_brutos[0] if isinstance(dados_brutos, list) else dados_brutos
+                        
                         nova_os = obter_proxima_os(engine, emp_id)
                         h_prox, o_prox = obter_medidor_proximo(engine, emp_id, dados_cad['prefixo'], dados_cad['data'])
                         desc_com_medidor = f"{dados_cad['descricao']} | [Leitura Ref: Horímetro {h_prox}h, Odômetro {o_prox}km]"
@@ -2770,6 +2773,7 @@ else:
                 <script>
                     function enviar() {{
                         const payload = {{
+                            tipo: "agendamento_direto",
                             data: document.getElementById('off_data').value,
                             executor: document.getElementById('off_exec').value.trim(),
                             prefixo: document.getElementById('off_pref').value.trim(),
@@ -2794,7 +2798,7 @@ else:
                                 const btn = inputOffline.closest('div[data-testid="stForm"]').querySelector('button');
                                 if (btn) {{
                                     let setVal = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
-                                    setVal.call(inputOffline, JSON.stringify(payload)); 
+                                    setVal.call(inputOffline, JSON.stringify([payload])); 
                                     inputOffline.dispatchEvent(new Event('input', {{ bubbles: true }}));
                                     
                                     feedback.style.display = 'block'; feedback.style.background = '#C8E6C9'; feedback.style.color = '#2E7D32'; feedback.innerText = "Agendando online...";
@@ -2805,14 +2809,14 @@ else:
                             const req = indexedDB.open("Up2Today_OfflineDB", 1);
                             req.onsuccess = function(e) {{
                                 const db = e.target.result;
-                                db.transaction(["fila_offline"], "readwrite").objectStore("fila_offline").add({{ tipo: "agendamento_direto", ...payload }});
+                                db.transaction(["fila_offline"], "readwrite").objectStore("fila_offline").add(payload);
                                 feedback.style.display = 'block'; feedback.style.background = '#C8E6C9'; feedback.style.color = '#2E7D32'; feedback.innerText = "📶 Salvo Offline! A OS será gerada quando a internet voltar.";
                                 document.getElementById('off_pref').value = ''; document.getElementById('off_desc').value = '';
                             }};
                         }}
                     }}
                 </script>
-            """, height=310)
+            """, height=410)
             
             # --- LISTA GERAL COM A COLUNA Nº OS READICIONADA ---
             st.divider()
