@@ -2856,54 +2856,157 @@ else:
                 st.markdown("""
                     ### 📝 Guia Rápido - Cadastro
                     1. **Uso:** Utilize para preventivas avulsas ou serviços diretos.
-                    2. **Formulário:** Preencha os campos e confirme.
+                    2. **Formulário:** Preencha os campos e confirme. Se a internet cair, será salvo offline!
                 """)
             
-            with st.form("f_d", clear_on_submit=True):
-                c1, c2, c3, c4 = st.columns(4)
-                with c1: d_i = st.date_input("Data", datetime.now())
-                with c2: e_i = st.text_input("Executor")
-                with c3: p_i = st.text_input("Prefixo")
-                with c4: a_i = st.selectbox("Área", ORDEM_AREAS)
-                
-                c5, c6 = st.columns(2)
-                with c5: t_ini = st.text_input("Início (Ex: 08:00)", "00:00")
-                with c6: t_fim = st.text_input("Fim (Ex: 10:00)", "00:00")
-                
-                ds_i = st.text_area("Descrição")
-                
-                cc1, cc2 = st.columns(2)
-                with cc1: t_i = st.selectbox("Turno", LISTA_TURNOS)
-                with cc2: tipo_os_i = st.selectbox("Tipo de OS", LISTA_TIPOS_OS)
-                
-                df_planos_box = pd.read_sql(text("SELECT id, nome_plano FROM planos_master WHERE empresa_id = :eid"), engine, params={"eid": str(emp_id)})
-                lista_nomes_planos = ["Nenhum (Avulso)"] + (df_planos_box['nome_plano'].tolist() if not df_planos_box.empty else [])
-                plano_escolhido = st.selectbox("Vincular a um Plano Master (Opcional)", lista_nomes_planos)
-                
-                if st.form_submit_button("Confirmar Agendamento"):
-                    nova_os = obter_proxima_os(engine, emp_id)
-                    h_prox, o_prox = obter_medidor_proximo(engine, emp_id, p_i, d_i)
-                    desc_com_medidor = f"{ds_i} | [Leitura Ref: Horímetro {h_prox}h, Odômetro {o_prox}km]"
-                    
-                    plano_id_val = None
-                    if plano_escolhido != "Nenhum (Avulso)":
-                        row_plano = df_planos_box[df_planos_box['nome_plano'] == plano_escolhido]
-                        if not row_plano.empty:
-                            plano_id_val = int(row_plano.iloc[0]['id'])
+            # 1. Formulário Oculto Exclusivo (A ponte local para envios Online)
+            with st.form("form_sync_oculto_cadastro", clear_on_submit=True):
+                payload_cadastro = st.text_input("payload_cadastro", key="payload_cadastro_aba", label_visibility="collapsed")
+                btn_sync_cad = st.form_submit_button("SyncCadastroDireto", use_container_width=True)
 
-                    with engine.connect() as conn:
-                        conn.execute(
-                            text("INSERT INTO tarefas (data, executor, prefixo, inicio_disp, fim_disp, descricao, area, tipo_os, turno, plano_id, origem, empresa_id, numero_os) VALUES (:dt, :ex, :pr, :ti, :tf, :ds, :ar, :tp, :tu, :pid, 'Direto', :eid, :nos)"), 
-                            {
-                                "dt": str(d_i), "ex": e_i, "pr": p_i, "ti": t_ini, "tf": t_fim, 
-                                "ds": desc_com_medidor, "ar": a_i, "tp": tipo_os_i, "tu": t_i, 
-                                "pid": plano_id_val, "eid": str(emp_id), "nos": nova_os
-                            }
-                        )
-                        conn.commit()
-                    st.success(f"✅ SERVIÇO AGENDADO! Nº {nova_os} (Horímetro ref: {h_prox}h | Odômetro ref: {o_prox}km)")
-                    st.cache_data.clear()
-                    st.rerun()
+                if btn_sync_cad and payload_cadastro:
+                    import json
+                    try:
+                        dados_cad = json.loads(payload_cadastro)
+                        nova_os = obter_proxima_os(engine, emp_id)
+                        h_prox, o_prox = obter_medidor_proximo(engine, emp_id, dados_cad['prefixo'], dados_cad['data'])
+                        desc_com_medidor = f"{dados_cad['descricao']} | [Leitura Ref: Horímetro {h_prox}h, Odômetro {o_prox}km]"
+
+                        with engine.connect() as conn:
+                            conn.execute(
+                                text("INSERT INTO tarefas (data, executor, prefixo, inicio_disp, fim_disp, descricao, area, tipo_os, turno, plano_id, origem, empresa_id, numero_os) VALUES (:dt, :ex, :pr, :ti, :tf, :ds, :ar, :tp, :tu, NULL, 'Direto', :eid, :nos)"),
+                                {
+                                    "dt": dados_cad['data'], "ex": dados_cad['executor'], "pr": dados_cad['prefixo'],
+                                    "ti": dados_cad['inicio'], "tf": dados_cad['fim'],
+                                    "ds": desc_com_medidor, "ar": dados_cad['area'], "tp": dados_cad['tipo_os'],
+                                    "tu": dados_cad['turno'], "eid": str(emp_id), "nos": nova_os
+                                }
+                            )
+                            conn.commit()
+                        st.success(f"✅ SERVIÇO AGENDADO! Nº {nova_os} (Horímetro ref: {h_prox}h | Odômetro ref: {o_prox}km)")
+                        st.cache_data.clear()
+                        st.rerun()
+                    except Exception as e:
+                        pass
+
+            # Prepara as listas dinâmicas para o HTML
+            opcoes_area_html = "".join([f'<option value="{a}">{a}</option>' for a in ORDEM_AREAS])
+            opcoes_turno_html = "".join([f'<option value="{t}">{t}</option>' for t in LISTA_TURNOS])
+            opcoes_tipo_html = "".join([f'<option value="{tp}">{tp}</option>' for tp in LISTA_TIPOS_OS])
+            hoje_str = datetime.now().strftime("%Y-%m-%d")
+
+            # 2. Formulário Híbrido Blindado
+            st.components.v1.html(f"""
+                <style>
+                    body {{ font-family: 'Segoe UI', sans-serif; color: #231F20; background: transparent; padding: 5px; margin: 0; }}
+                    label {{ font-size: 13px; font-weight: 600; margin-bottom: 4px; display: block; color: #4A3C31; }}
+                    input, select, textarea {{ width: 100%; padding: 8px; margin-bottom: 12px; border: 1px solid #C5A059; border-radius: 6px; box-sizing: border-box; background: #FFF; font-size: 14px; }}
+                    .grid-2 {{ display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }}
+                    .grid-4 {{ display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; }}
+                    button {{ width: 100%; padding: 12px; background: #C5A059; color: #FFF; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; font-size: 15px; transition: 0.2s; margin-top: 5px; }}
+                    button:hover {{ background: #9B783E; }}
+                    #msg-feedback {{ margin-top: 10px; padding: 10px; border-radius: 6px; display: none; font-weight: bold; text-align: center; font-size: 14px; }}
+                </style>
+                
+                <div id="form-container">
+                    <div class="grid-4">
+                        <div><label>Data</label><input type="date" id="off_data" value="{hoje_str}"></div>
+                        <div><label>Executor</label><input type="text" id="off_exec" placeholder="Opcional"></div>
+                        <div><label>Prefixo</label><input type="text" id="off_pref" placeholder="Ex: 1025"></div>
+                        <div><label>Área</label><select id="off_area">{opcoes_area_html}</select></div>
+                    </div>
+                    
+                    <div class="grid-2">
+                        <div><label>Início (Opcional)</label><input type="time" id="off_ini" value="00:00"></div>
+                        <div><label>Fim (Opcional)</label><input type="time" id="off_fim" value="00:00"></div>
+                    </div>
+                    
+                    <label>Descrição</label>
+                    <textarea id="off_desc" rows="3" placeholder="Descreva o serviço a ser agendado..."></textarea>
+                    
+                    <div class="grid-2">
+                        <div><label>Turno</label><select id="off_turno">{opcoes_turno_html}</select></div>
+                        <div><label>Tipo de OS</label><select id="off_tipo">{opcoes_tipo_html}</select></div>
+                    </div>
+                    
+                    <button onclick="enviarCadastroHibrido()">Confirmar Agendamento</button>
+                    <div id="msg-feedback"></div>
+                </div>
+
+                <script>
+                    const doc = window.parent.document;
+                    const allForms = Array.from(doc.querySelectorAll('div[data-testid="stForm"]'));
+                    const abaForm = allForms.find(f => f.textContent.includes('SyncCadastroDireto'));
+                    if (abaForm) abaForm.style.display = 'none';
+
+                    function enviarCadastroHibrido() {{
+                        const payload = {{
+                            data: document.getElementById('off_data').value,
+                            executor: document.getElementById('off_exec').value.trim(),
+                            prefixo: document.getElementById('off_pref').value.trim(),
+                            area: document.getElementById('off_area').value,
+                            inicio: document.getElementById('off_ini').value,
+                            fim: document.getElementById('off_fim').value,
+                            descricao: document.getElementById('off_desc').value.trim(),
+                            turno: document.getElementById('off_turno').value,
+                            tipo_os: document.getElementById('off_tipo').value
+                        }};
+                        
+                        const feedback = document.getElementById('msg-feedback');
+                        
+                        if(!payload.prefixo || !payload.descricao) {{
+                            feedback.style.display = 'block';
+                            feedback.style.background = '#FFCDD2';
+                            feedback.style.color = '#B71C1C';
+                            feedback.innerText = "⚠️ Preencha obrigatoriamente o Prefixo e a Descrição.";
+                            return;
+                        }}
+
+                        if(navigator.onLine) {{
+                            if (abaForm) {{
+                                const inputOffline = abaForm.querySelector('input[type="text"]');
+                                const btnSubmitSync = abaForm.querySelector('button');
+                                
+                                if (inputOffline && btnSubmitSync) {{
+                                    let nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+                                    nativeInputValueSetter.call(inputOffline, JSON.stringify(payload));
+                                    inputOffline.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                                    
+                                    btnSubmitSync.click();
+                                    
+                                    feedback.style.display = 'block';
+                                    feedback.style.background = '#C8E6C9';
+                                    feedback.style.color = '#2E7D32';
+                                    feedback.innerText = "Agendando online...";
+                                    
+                                    document.getElementById('off_pref').value = '';
+                                    document.getElementById('off_desc').value = '';
+                                }}
+                            }}
+                        }} else {{
+                            const request = indexedDB.open("Up2Today_OfflineDB", 1);
+                            request.onsuccess = function(event) {{
+                                const db = event.target.result;
+                                const tx = db.transaction(["fila_offline"], "readwrite");
+                                const store = tx.objectStore("fila_offline");
+                                
+                                store.add({{
+                                    tipo: "agendamento_direto",
+                                    ...payload
+                                }});
+                                
+                                feedback.style.display = 'block';
+                                feedback.style.background = '#C8E6C9';
+                                feedback.style.color = '#2E7D32';
+                                feedback.innerText = "📶 Salvo Offline! A OS será gerada quando a internet voltar.";
+                                
+                                document.getElementById('off_pref').value = '';
+                                document.getElementById('off_desc').value = '';
+                            }};
+                        }}
+                    }}
+                </script>
+            """, height=440)
 
             # --- LISTA GERAL DE SERVIÇOS EXCLUSIVA DA ABA DE AGENDAMENTO DIRETO ---
             st.divider()
@@ -2936,7 +3039,7 @@ else:
                         conn.commit()
                     st.cache_data.clear()
                     st.rerun()
-
+                    
         elif sub_aba_escolhida == 1:
             st.markdown("### 📚 Gestão de Planos Master e Serviços")
             st.info("💡 Cadastre o plano, defina a periodicidade, a área e adicione os serviços.")
