@@ -99,7 +99,7 @@ def formatar_acao_infinitivo(texto_bruto):
 NOME_SISTEMA = "Updated Yesterday"
 SLOGAN = "Nós não dependemos de sorte.<br>Planejamento é o que nos move."
 # Nova URL da imagem de fundo atualizada
-BG_LOGIN_URL = "https://i.postimg.cc/qR3mKVVy/Emblema-de-Bronze-com-Monograma-Central.png"
+BG_LOGIN_URL = "https://i.postimg.cc/KcJN3Z4M/Na-Updated-Yesterday-nao-dependemos-da-sorte-O-planejamento-e-que-nos-move-(6).jpg"
 
 # Estilização Global Dinâmica (Verifica se está logado para aplicar o fundo da tela de login ou o tema padrão)
 estilo_fundo_login = ""
