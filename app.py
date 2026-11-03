@@ -130,7 +130,7 @@ if not st.session_state.get("logado", False):
     
     /* Força o tamanho do título em qualquer tag interna */
 .login-brand-title, .login-brand-title * {{
-    font-size: 38px !important;
+    font-size: 65px !important;
     font-weight: 800 !important;
     color: #FFFFFF !important;
     text-transform: uppercase !important;
@@ -141,7 +141,7 @@ if not st.session_state.get("logado", False):
 
 /* Força o tamanho do slogan */
 .login-brand-subtitle, .login-brand-subtitle * {{
-    font-size: 18px !important;
+    font-size: 35px !important;
     color: #FFFFFF !important;
     font-weight: 500 !important;
     text-shadow: 0 1px 4px rgba(0,0,0,0.7) !important;
