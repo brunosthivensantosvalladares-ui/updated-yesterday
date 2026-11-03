@@ -85,7 +85,7 @@ NOME_SISTEMA = "Updated Yesterday"
 SLOGAN = "Nós não dependemos de sorte.<br>Planejamento é o que nos move."
 LOGO_URL = "https://i.postimg.cc/rwQs1cpc/Design-sem-nome-(2).png"
 # Nova URL da imagem de fundo atualizada
-BG_LOGIN_URL = "https://i.postimg.cc/RhyzZ0Xr/Na-Updated-Yesterday-nao-dependemos-da-sorte-O-planejamento-e-que-nos-move-(1).jpg"
+BG_LOGIN_URL = "https://i.postimg.cc/KvTncH8W/Na-Updated-Yesterday-nao-dependemos-da-sorte-O-planejamento-e-que-nos-move-(2).jpg"
 
 # Estilização Global Dinâmica (Verifica se está logado para aplicar o fundo da tela de login ou o tema padrão)
 estilo_fundo_login = ""
