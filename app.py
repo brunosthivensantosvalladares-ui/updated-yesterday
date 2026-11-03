@@ -84,12 +84,47 @@ def formatar_acao_infinitivo(texto_bruto):
 NOME_SISTEMA = "Updated Yesterday"
 SLOGAN = "Nós não dependemos de sorte.<br>Planejamento é o que nos move."
 LOGO_URL = "https://i.postimg.cc/rwQs1cpc/Design-sem-nome-(2).png"
-# imagem de fundo da tela de login
 BG_LOGIN_URL = "https://i.postimg.cc/tJnNfXg3/3.jpg"
+
+COR_BRONZE = "#4A3C31"  
+COR_OURO = "#C5A059"    
+COR_CHAPA = "#F7F5F0"   
+COR_TEXTO = "#231F20"   
 
 ORDEM_AREAS = ["Motorista", "Borracharia", "Mecânica", "Elétrica", "Chapeamento", "Limpeza"]
 LISTA_TURNOS = ["Não definido", "Dia", "Noite"]
 LISTA_TIPOS_OS = ["Preventiva", "Corretiva", "Preditiva", "Checklist", "Abastecimento", "Intervenção programada", "Limpeza"]
+
+# Estilização Global Dinâmica (Verifica se está logado para aplicar o fundo da tela de login ou o tema padrão)
+estilo_fundo_login = ""
+if not st.session_state.get("logado", False):
+    estilo_fundo_login = f"""
+    /* Força o fundo da imagem em toda a janela do Streamlit */
+    html, body, [data-testid="stAppViewContainer"], .stApp, header[data-testid="stHeader"] {{ 
+        background: url('{BG_LOGIN_URL}') no-repeat center center fixed !important;
+        background-size: cover !important;
+    }}
+    /* Remove qualquer cor de fundo padrão que possa estar a tapar a imagem */
+    .main, [data-testid="stMainBlockContainer"], [data-testid="stAppViewBlockContainer"] {{
+        background: transparent !important;
+    }}
+    /* Caixa de login translúcida e elegante destacando sobre a imagem */
+    div[data-testid="stVerticalBlock"] > div:has(div.login-brand-title) {{
+        background: rgba(20, 16, 13, 0.82) !important;
+        padding: 35px !important;
+        border-radius: 16px !important;
+        border: 1px solid rgba(197, 160, 89, 0.5) !important;
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6) !important;
+        backdrop-filter: blur(8px) !important;
+    }}
+    """
+else:
+    estilo_fundo_login = f"""
+    html, body, [data-testid="stAppViewContainer"], .stApp {{ 
+        background-color: {COR_CHAPA} !important; 
+        font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif !important;
+    }}
+    """
 
 # --- 2. FUNÇÕES DE SUPORTE E BANCO ---
 @st.cache_resource
@@ -174,37 +209,6 @@ def renderizar_modulo_sincronizacao_offline(emp_id):
                 st.rerun() 
             except Exception as e:
                 print(f"Erro Sync Offline: {e}")
-
-# Estilização Global Dinâmica (Verifica se está logado para aplicar o fundo da tela de login ou o tema padrão)
-estilo_fundo_login = ""
-if not st.session_state.get("logado", False):
-    estilo_fundo_login = f"""
-    /* Força o fundo da imagem em toda a janela do Streamlit */
-    html, body, [data-testid="stAppViewContainer"], .stApp, header[data-testid="stHeader"] {{ 
-        background: url('{BG_LOGIN_URL}') no-repeat center center fixed !important;
-        background-size: cover !important;
-    }}
-    /* Remove qualquer cor de fundo padrão que possa estar a tapar a imagem */
-    .main, [data-testid="stMainBlockContainer"], [data-testid="stAppViewBlockContainer"] {{
-        background: transparent !important;
-    }}
-    /* Caixa de login translúcida e elegante destacando sobre a imagem */
-    div[data-testid="stVerticalBlock"] > div:has(div.login-brand-title) {{
-        background: rgba(20, 16, 13, 0.82) !important;
-        padding: 35px !important;
-        border-radius: 16px !important;
-        border: 1px solid rgba(197, 160, 89, 0.5) !important;
-        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6) !important;
-        backdrop-filter: blur(8px) !important;
-    }}
-    """
-else:
-    estilo_fundo_login = f"""
-    html, body, [data-testid="stAppViewContainer"], .stApp {{ 
-        background-color: {COR_CHAPA} !important; 
-        font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif !important;
-    }}
-    """
 
     # Motor JavaScript Atualizado (Acha o botão de forma invisível)
     components.html(f"""
