@@ -100,9 +100,9 @@ estilo_fundo_login = ""
 if not st.session_state.get("logado", False):
     estilo_fundo_login = f"""
     <style>
-    /* Fundo com película pastel mais suave (0.45) para destacar mais a imagem */
+    /* Película em tom pastel amarelado mais transparente (0.30) para destacar a imagem */
     root, html, body, [data-testid="stAppViewContainer"], .stApp {{
-        background: linear-gradient(rgba(247, 245, 240, 0.45), rgba(247, 245, 240, 0.45)), url('{BG_LOGIN_URL}') !important;
+        background: linear-gradient(rgba(248, 243, 225, 0.30), rgba(248, 243, 225, 0.30)), url('{BG_LOGIN_URL}') !important;
         background-size: cover !important;
         background-position: center center !important;
         background-repeat: no-repeat !important;
@@ -112,9 +112,9 @@ if not st.session_state.get("logado", False):
     .main, [data-testid="stMainBlockContainer"], [data-testid="stAppViewBlockContainer"], header[data-testid="stHeader"] {{
         background: transparent !important;
     }}
-    /* Cartão do formulário de login mais translúcido para o fundo aparecer levemente atrás */
+    /* Cartão do formulário de login com leve transparência para mesclar com o fundo */
     div[data-testid="stVerticalBlock"] > div:has(div.login-brand-title) {{
-        background: rgba(255, 255, 255, 0.70) !important;
+        background: rgba(255, 255, 255, 0.62) !important;
         padding: 40px !important;
         border-radius: 16px !important;
         border: 1.5px solid rgba(197, 160, 89, 0.5) !important;
