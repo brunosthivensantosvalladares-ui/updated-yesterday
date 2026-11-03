@@ -261,7 +261,7 @@ def renderizar_modulo_sincronizacao_offline(emp_id):
 
     # Motor JavaScript Atualizado (Acha o botão de forma invisível)
     components.html(f"""
-        <div id="sync-status-box" style="position: fixed; bottom: 10px; left: 10px; z-index: 999999; font-family: sans-serif; font-size: 11px; background: #3B2E25; color: #fff; padding: 4px 10px; border-radius: 6px; border: 1px solid #C5A059; display: none;">
+        <div id="sync-status-box" style="position: fixed; bottom: 10px; left: 10px; z-index: 999999; font-family: sans-serif;  11px; background: #3B2E25; color: #fff; padding: 4px 10px; border-radius: 6px; border: 1px solid #C5A059; display: none;">
             📶 <span id="sync-text">Online - Sincronizado</span>
         </div>
         <script>
@@ -1255,7 +1255,7 @@ if not st.session_state["logado"]:
     _, col_login, _ = st.columns([1.2, 1, 1.2])
     with col_login:
         st.markdown(f"""
-            <div style='text-align: center; margin-bottom: 25px;'>
+            <div style='text-align: center; margin-bottom: 17px;'>
                 <div class='logo-container-circular' style='width: 90px; height: 90px;'>
                 </div>
                 <h1 class='login-brand-title' style='
