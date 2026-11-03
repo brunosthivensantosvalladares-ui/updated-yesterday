@@ -100,11 +100,11 @@ estilo_fundo_login = ""
 if not st.session_state.get("logado", False):
     estilo_fundo_login = f"""
     <style>
-    /* Aplica a imagem com um filtro em tom pastel claro (#F7F5F0) translúcido por cima */
+    /* Exibe a imagem de fundo com uma película suave para destacar os elementos */
     root, html, body, [data-testid="stAppViewContainer"], .stApp {{
-        background: linear-gradient(rgba(247, 245, 240, 0.88), rgba(247, 245, 240, 0.88)), url('{BG_LOGIN_URL}') !important;
-        background-size: cover !important;
-        background-position: center center !important;
+        background: linear-gradient(rgba(247, 245, 240, 0.75), rgba(247, 245, 240, 0.75)), url('{BG_LOGIN_URL}') !important;
+        background-size: 750px auto !important;
+        background-position: center 45% !important;
         background-repeat: no-repeat !important;
         background-attachment: fixed !important;
     }}
@@ -112,13 +112,13 @@ if not st.session_state.get("logado", False):
     .main, [data-testid="stMainBlockContainer"], [data-testid="stAppViewBlockContainer"], header[data-testid="stHeader"] {{
         background: transparent !important;
     }}
-    /* Cartão de login ajustado para combinar com o tom claro */
+    /* Cartão de login com fundo translúcido para mesclar com o fundo */
     div[data-testid="stVerticalBlock"] > div:has(div.login-brand-title) {{
-        background: rgba(255, 255, 255, 0.90) !important;
+        background: rgba(255, 255, 255, 0.88) !important;
         padding: 40px !important;
         border-radius: 16px !important;
         border: 1.5px solid rgba(197, 160, 89, 0.5) !important;
-        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15) !important;
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12) !important;
         backdrop-filter: blur(8px) !important;
     }}
     </style>
