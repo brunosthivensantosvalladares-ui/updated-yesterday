@@ -1266,7 +1266,7 @@ if not st.session_state["logado"]:
                     letter-spacing: 2px !important; 
                     margin: 0 !important; 
                     text-transform: uppercase !important;
-                    text-shadow: 0 2px 8px rgba(0,0,0,0.8) !important;
+                    text-shadow: 0 2px 8px rgba(0,0,0,0.9) !important;
                     font-family: "Cinzel", serif !important;
                 '>
                     {NOME_SISTEMA}
@@ -1276,9 +1276,9 @@ if not st.session_state["logado"]:
                     -webkit-text-fill-color: #FFFFFF !important;
                     font-size: 18px !important; 
                     font-style: italic !important; 
-                    font-weight: 500 !important;
+                    font-weight: 600 !important;
                     margin-top: 10px !important; 
-                    text-shadow: 0 1px 5px rgba(0,0,0,0.8) !important;
+                    text-shadow: 0 1px 5px rgba(0,0,0,0.9) !important;
                 '>
                     {SLOGAN}
                 </p>
