@@ -130,7 +130,7 @@ if not st.session_state.get("logado", False):
     
     /* Força o tamanho do título em qualquer tag interna */
 .login-brand-title, .login-brand-title * {{
-    font-size: 45px !important;
+    font-size: 65px !important;
     font-weight: 1100 !important;
     color: #FFFFFF !important;
     text-transform: uppercase !important;
@@ -141,7 +141,7 @@ if not st.session_state.get("logado", False):
 
 /* Força o tamanho do slogan */
 .login-brand-subtitle, .login-brand-subtitle * {{
-    font-size: 25px !important;
+    font-size: 35px !important;
     color: #FFFFFF !important;
     font-weight: 800 !important;
     text-shadow: 0 1px 4px rgba(0,0,0,0.7) !important;
@@ -261,7 +261,7 @@ def renderizar_modulo_sincronizacao_offline(emp_id):
 
     # Motor JavaScript Atualizado (Acha o botão de forma invisível)
     components.html(f"""
-        <div id="sync-status-box" style="position: fixed; bottom: 10px; left: 10px; z-index: 999999; font-family: sans-serif;  11px; background: #3B2E25; color: #fff; padding: 4px 10px; border-radius: 6px; border: 1px solid #C5A059; display: none;">
+        <div id="sync-status-box" style="position: fixed; bottom: 10px; left: 10px; z-index: 999999; font-family: sans-serif; font-size: 11px; background: #3B2E25; color: #fff; padding: 4px 10px; border-radius: 6px; border: 1px solid #C5A059; display: none;">
             📶 <span id="sync-text">Online - Sincronizado</span>
         </div>
         <script>
@@ -1255,28 +1255,11 @@ if not st.session_state["logado"]:
     _, col_login, _ = st.columns([1.2, 1, 1.2])
     with col_login:
         st.markdown(f"""
-            <div style='text-align: center; margin-bottom: 17px;'>
+            <div style='text-align: center; margin-bottom: 5px;'>
                 <div class='logo-container-circular' style='width: 90px; height: 90px;'>
                 </div>
-                <h1 class='login-brand-title' style='
-                    font-size: 25px !important; 
-                    font-weight: 800 !important; 
-                    letter-spacing: 2px !important; 
-                    margin: 0 !important; 
-                    text-transform: uppercase !important;
-                    font-family: "Cinzel", serif !important;
-                '>
-                    {NOME_SISTEMA}
-                </h1>
-                <p style='
-                    text-align: center; 
-                    font-style: italic; 
-                    color: #8F847B; 
-                    margin: 4px 0 30px 0; 
-                    font-size: 7px !important;
-                '>
-                    {SLOGAN}
-                </p>
+                <p class='login-brand-title'>UPDATED YESTERDAY</p>
+                <p style='text-align: center; font-style: italic; color: #8F847B; margin: 4px 0 30px 0; font-size: 0.78rem;'>{SLOGAN}</p>
             </div>
         """, unsafe_allow_html=True)
         
