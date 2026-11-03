@@ -1259,7 +1259,7 @@ if not st.session_state["logado"]:
                 <div class='logo-container-circular' style='width: 90px; height: 90px;'>
                 </div>
                 <h1 class='login-brand-title' style='
-                    font-size: 40px !important; 
+                    font-size: 25px !important; 
                     font-weight: 800 !important; 
                     letter-spacing: 2px !important; 
                     margin: 0 !important; 
@@ -1273,7 +1273,7 @@ if not st.session_state["logado"]:
                     font-style: italic; 
                     color: #8F847B; 
                     margin: 4px 0 30px 0; 
-                    font-size: 12px !important;
+                    font-size: 7px !important;
                 '>
                     {SLOGAN}
                 </p>
