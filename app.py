@@ -133,7 +133,7 @@ if not st.session_state.get("logado", False):
     /* Aumenta o tamanho e deixa o nome da plataforma em destaque (branco) */
     .login-brand-title, div[data-testid="stVerticalBlock"] h1, div[data-testid="stVerticalBlock"] h2, div[data-testid="stVerticalBlock"] h3 {{
         color: #FFFFFF !important;
-        font-size: 28px !important;
+        font-size: 40px !important;
         font-weight: 700 !important;
         text-shadow: 0 2px 4px rgba(0,0,0,0.4) !important;
     }}
@@ -1269,7 +1269,7 @@ if not st.session_state["logado"]:
                 user_input = st.text_input("E-mail ou Usuário", key="u_log").lower().strip()
                 pw_input = st.text_input("Senha", type="password", key="p_log").strip()
                 
-                if st.button(f"Acessar Painel {NOME_SISTEMA}", use_container_width=True, type="primary"):
+                if st.button(f"Acessar {NOME_SISTEMA}", use_container_width=True, type="primary"):
                     if user_input and pw_input:
                         engine = get_engine()
                         inicializar_banco()
