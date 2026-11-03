@@ -106,7 +106,7 @@ estilo_fundo_login = ""
 if not st.session_state.get("logado", False):
     estilo_fundo_login = f"""
     <style>
-    /* Tom pastel amarelado bem suave (opacidade 0.08) para iluminar e deixar a imagem bem clara */
+    /* Fundo com a imagem e película suave */
     root, html, body, [data-testid="stAppViewContainer"], .stApp {{
         background: linear-gradient(rgba(254, 252, 245, 0.08), rgba(254, 252, 245, 0.08)), url('{BG_LOGIN_URL}') !important;
         background-size: cover !important;
@@ -118,7 +118,7 @@ if not st.session_state.get("logado", False):
     .main, [data-testid="stMainBlockContainer"], [data-testid="stAppViewBlockContainer"], header[data-testid="stHeader"] {{
         background: transparent !important;
     }}
-    /* Cartão do formulário de login bem leve e translúcido */
+    /* Cartão do formulário de login translúcido */
     div[data-testid="stVerticalBlock"] > div:has(div.login-brand-title) {{
         background: rgba(255, 255, 255, 0.50) !important;
         padding: 40px !important;
@@ -126,6 +126,38 @@ if not st.session_state.get("logado", False):
         border: 1.5px solid rgba(197, 160, 89, 0.4) !important;
         box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08) !important;
         backdrop-filter: blur(6px) !important;
+    }}
+    
+    /* --- AJUSTES DE TEXTO E CORES SOLICITADOS --- */
+    
+    /* Aumenta o tamanho e deixa o nome da plataforma em destaque (branco) */
+    .login-brand-title, div[data-testid="stVerticalBlock"] h1, div[data-testid="stVerticalBlock"] h2, div[data-testid="stVerticalBlock"] h3 {{
+        color: #FFFFFF !important;
+        font-size: 28px !important;
+        font-weight: 700 !important;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.4) !important;
+    }}
+    
+    /* Aumenta o slogan, deixa em branco e com boa legibilidade */
+    .login-brand-subtitle, div[data-testid="stVerticalBlock"] p {{
+        color: #FFFFFF !important;
+        font-size: 15px !important;
+        font-weight: 500 !important;
+        text-shadow: 0 1px 3px rgba(0,0,0,0.4) !important;
+    }}
+    
+    /* Deixa os rótulos (E-mail ou Usuário, Senha) na cor branca */
+    .stTextInput label, [data-testid="stWidgetLabel"] p, label {{
+        color: #FFFFFF !important;
+        font-weight: 600 !important;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.4) !important;
+    }}
+    
+    /* Deixa os textos do botão de rádio (Acessar / Criar Conta) na cor branca */
+    .stRadio label span {{
+        color: #FFFFFF !important;
+        font-weight: 600 !important;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.4) !important;
     }}
     </style>
     """
