@@ -1209,7 +1209,6 @@ if not st.session_state["logado"]:
         st.markdown(f"""
             <div style='text-align: center; margin-bottom: 5px;'>
                 <div class='logo-container-circular' style='width: 90px; height: 90px;'>
-                    <img src='{LOGO_URL}' class='logo-img-crop'>
                 </div>
                 <p class='login-brand-title'>UPDATED YESTERDAY</p>
                 <p style='text-align: center; font-style: italic; color: #8F847B; margin: 4px 0 30px 0; font-size: 0.78rem;'>{SLOGAN}</p>
