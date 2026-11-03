@@ -12,7 +12,7 @@ import time as time_module
 import requests
 import re
 import streamlit.components.v1 as components
-
+LOGO_URL = "https://i.postimg.cc/rwQs1cpc/Design-sem-nome-(2).png"
 # --- FUNÇÃO PARA PUXAR O TOPO PARA CIMA (ELIMINA O ESPAÇO VAZIO) ---
 def puxar_topo_para_cima():
     components.html("""
@@ -83,7 +83,6 @@ def formatar_acao_infinitivo(texto_bruto):
 # --- 1. CONFIGURAÇÕES E ESTILOS ---
 NOME_SISTEMA = "Updated Yesterday"
 SLOGAN = "Nós não dependemos de sorte.<br>Planejamento é o que nos move."
-LOGO_URL = "https://i.postimg.cc/rwQs1cpc/Design-sem-nome-(2).png"
 # Nova URL da imagem de fundo atualizada
 BG_LOGIN_URL = "https://i.postimg.cc/KvTncH8W/Na-Updated-Yesterday-nao-dependemos-da-sorte-O-planejamento-e-que-nos-move-(2).jpg"
 
