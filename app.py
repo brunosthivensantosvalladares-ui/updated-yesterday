@@ -12,7 +12,22 @@ import time as time_module
 import requests
 import re
 import streamlit.components.v1 as components
+
+# --- CONFIGURAÇÕES GLOBAIS E CORES ---
+NOME_SISTEMA = "Updated Yesterday"
+SLOGAN = "Nós não dependemos de sorte.<br>Planejamento é o que nos move."
 LOGO_URL = "https://i.postimg.cc/rwQs1cpc/Design-sem-nome-(2).png"
+BG_LOGIN_URL = "https://i.postimg.cc/RhyzZ0Xr/Na-Updated-Yesterday-nao-dependemos-da-sorte-O-planejamento-e-que-nos-move-(1).jpg"
+
+COR_BRONZE = "#4A3C31"  
+COR_OURO = "#C5A059"    
+COR_CHAPA = "#F7F5F0"   
+COR_TEXTO = "#231F20"   
+
+ORDEM_AREAS = ["Motorista", "Borracharia", "Mecânica", "Elétrica", "Chapeamento", "Limpeza"]
+LISTA_TURNOS = ["Não definido", "Dia", "Noite"]
+LISTA_TIPOS_OS = ["Preventiva", "Corretiva", "Preditiva", "Checklist", "Abastecimento", "Intervenção programada", "Limpeza"]
+
 # --- FUNÇÃO PARA PUXAR O TOPO PARA CIMA (ELIMINA O ESPAÇO VAZIO) ---
 def puxar_topo_para_cima():
     components.html("""
