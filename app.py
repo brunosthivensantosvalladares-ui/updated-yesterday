@@ -128,23 +128,24 @@ if not st.session_state.get("logado", False):
         backdrop-filter: blur(6px) !important;
     }}
     
-    /* --- AJUSTES DE TEXTO E CORES SOLICITADOS --- */
-    
-    /* Aumenta o tamanho e deixa o nome da plataforma em destaque (branco) */
-    .login-brand-title, div[data-testid="stVerticalBlock"] h1, div[data-testid="stVerticalBlock"] h2, div[data-testid="stVerticalBlock"] h3 {{
-        color: #FFFFFF !important;
-        font-size: 65px !important;
-        font-weight: 700 !important;
-        text-shadow: 0 2px 4px rgba(0,0,0,0.4) !important;
-    }}
-    
-    /* Aumenta o slogan, deixa em branco e com boa legibilidade */
-    .login-brand-subtitle, div[data-testid="stVerticalBlock"] p {{
-        color: #FFFFFF !important;
-        font-size: 15px !important;
-        font-weight: 500 !important;
-        text-shadow: 0 1px 3px rgba(0,0,0,0.4) !important;
-    }}
+    /* Força o tamanho do título em qualquer tag interna */
+.login-brand-title, .login-brand-title * {{
+    font-size: 38px !important;
+    font-weight: 800 !important;
+    color: #FFFFFF !important;
+    text-transform: uppercase !important;
+    letter-spacing: 2px !important;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.7) !important;
+    line-height: 1.2 !important;
+}}
+
+/* Força o tamanho do slogan */
+.login-brand-subtitle, .login-brand-subtitle * {{
+    font-size: 18px !important;
+    color: #FFFFFF !important;
+    font-weight: 500 !important;
+    text-shadow: 0 1px 4px rgba(0,0,0,0.7) !important;
+}}
     
     /* Deixa os rótulos (E-mail ou Usuário, Senha) na cor branca */
     .stTextInput label, [data-testid="stWidgetLabel"] p, label {{
