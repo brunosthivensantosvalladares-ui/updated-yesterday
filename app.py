@@ -1255,11 +1255,31 @@ if not st.session_state["logado"]:
     _, col_login, _ = st.columns([1.2, 1, 1.2])
     with col_login:
         st.markdown(f"""
-            <div style='text-align: center; margin-bottom: 5px;'>
+            <div style='text-align: center; margin-bottom: 25px;'>
                 <div class='logo-container-circular' style='width: 90px; height: 90px;'>
                 </div>
-                <p class='login-brand-title'>UPDATED YESTERDAY</p>
-                <p style='text-align: center; font-style: italic; color: #8F847B; margin: 4px 0 30px 0; font-size: 0.78rem;'>{SLOGAN}</p>
+                <h1 style='
+                    color: #FFFFFF !important; 
+                    font-size: 55px !important; 
+                    font-weight: 800 !important; 
+                    letter-spacing: 2px !important; 
+                    margin: 0 !important; 
+                    text-transform: uppercase !important;
+                    text-shadow: 0 2px 8px rgba(0,0,0,0.8) !important;
+                    font-family: "Cinzel", serif !important;
+                '>
+                    {NOME_SISTEMA}
+                </h1>
+                <p style='
+                    color: #FFFFFF !important; 
+                    font-size: 18px !important; 
+                    font-style: italic !important; 
+                    font-weight: 500 !important;
+                    margin-top: 10px !important; 
+                    text-shadow: 0 1px 5px rgba(0,0,0,0.8) !important;
+                '>
+                    {SLOGAN}
+                </p>
             </div>
         """, unsafe_allow_html=True)
         
