@@ -85,7 +85,7 @@ NOME_SISTEMA = "Updated Yesterday"
 SLOGAN = "Nós não dependemos de sorte.<br>Planejamento é o que nos move."
 LOGO_URL = "https://i.postimg.cc/rwQs1cpc/Design-sem-nome-(2).png"
 #imagem de fundo da tela de login
-BG_LOGIN_URL = "https://i.postimg.cc/tJnNfXg3/3.jpg"
+BG_LOGIN_URL = "https://i.postimg.cc/wjqmQb0p/3.jpg"
 
 ORDEM_AREAS = ["Motorista", "Borracharia", "Mecânica", "Elétrica", "Chapeamento", "Limpeza"]
 LISTA_TURNOS = ["Não definido", "Dia", "Noite"]
