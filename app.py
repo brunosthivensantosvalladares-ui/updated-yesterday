@@ -100,26 +100,26 @@ estilo_fundo_login = ""
 if not st.session_state.get("logado", False):
     estilo_fundo_login = f"""
     <style>
-    /* Força o background em todos os níveis do HTML e do Streamlit */
+    /* Aplica a imagem com uma camada escura suave por cima para destacar o logo */
     root, html, body, [data-testid="stAppViewContainer"], .stApp {{
-        background-image: url('{BG_LOGIN_URL}') !important;
+        background: linear-gradient(rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0.45)), url('{BG_LOGIN_URL}') !important;
         background-size: cover !important;
         background-position: center center !important;
         background-repeat: no-repeat !important;
         background-attachment: fixed !important;
     }}
-    /* Torna os containers internos transparentes para exibir a imagem de fundo */
+    /* Torna os containers internos transparentes */
     .main, [data-testid="stMainBlockContainer"], [data-testid="stAppViewBlockContainer"], header[data-testid="stHeader"] {{
         background: transparent !important;
     }}
-    /* Caixa de login translúcida e elegante destacando sobre a imagem */
+    /* Cartão de login com fundo escuro elegante e equilibrado para destacar as caixas */
     div[data-testid="stVerticalBlock"] > div:has(div.login-brand-title) {{
-        background: rgba(20, 16, 13, 0.82) !important;
-        padding: 35px !important;
+        background: rgba(18, 14, 11, 0.90) !important;
+        padding: 40px !important;
         border-radius: 16px !important;
-        border: 1px solid rgba(197, 160, 89, 0.5) !important;
-        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6) !important;
-        backdrop-filter: blur(8px) !important;
+        border: 1.5px solid rgba(197, 160, 89, 0.6) !important;
+        box-shadow: 0 16px 48px rgba(0, 0, 0, 0.7) !important;
+        backdrop-filter: blur(10px) !important;
     }}
     </style>
     """
