@@ -84,7 +84,7 @@ def formatar_acao_infinitivo(texto_bruto):
 NOME_SISTEMA = "Updated Yesterday"
 SLOGAN = "Nós não dependemos de sorte.<br>Planejamento é o que nos move."
 LOGO_URL = "https://i.postimg.cc/rwQs1cpc/Design-sem-nome-(2).png"
-BG_LOGIN_URL = "https://i.postimg.cc/KYPTxSq8/Na-Updated-Yesterday-nao-dependemos-da-sorte-O-planejamento-e-que-nos-move.jpg"
+BG_LOGIN_URL = "https://i.postimg.cc/RhyzZ0Xr/Na-Updated-Yesterday-nao-dependemos-da-sorte-O-planejamento-e-que-nos-move-(1).jpg"
 
 COR_BRONZE = "#4A3C31"  
 COR_OURO = "#C5A059"    
