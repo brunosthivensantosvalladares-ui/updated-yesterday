@@ -99,13 +99,17 @@ LISTA_TIPOS_OS = ["Preventiva", "Corretiva", "Preditiva", "Checklist", "Abasteci
 estilo_fundo_login = ""
 if not st.session_state.get("logado", False):
     estilo_fundo_login = f"""
-    /* Força o fundo da imagem em toda a janela do Streamlit */
-    html, body, [data-testid="stAppViewContainer"], .stApp, header[data-testid="stHeader"] {{ 
-        background: url('{BG_LOGIN_URL}') no-repeat center center fixed !important;
+    <style>
+    /* Força o background em todos os níveis do HTML e do Streamlit */
+    root, html, body, [data-testid="stAppViewContainer"], .stApp {{
+        background-image: url('{BG_LOGIN_URL}') !important;
         background-size: cover !important;
+        background-position: center center !important;
+        background-repeat: no-repeat !important;
+        background-attachment: fixed !important;
     }}
-    /* Remove qualquer cor de fundo padrão que possa estar a tapar a imagem */
-    .main, [data-testid="stMainBlockContainer"], [data-testid="stAppViewBlockContainer"] {{
+    /* Torna os containers internos transparentes para exibir a imagem de fundo */
+    .main, [data-testid="stMainBlockContainer"], [data-testid="stAppViewBlockContainer"], header[data-testid="stHeader"] {{
         background: transparent !important;
     }}
     /* Caixa de login translúcida e elegante destacando sobre a imagem */
@@ -117,14 +121,20 @@ if not st.session_state.get("logado", False):
         box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6) !important;
         backdrop-filter: blur(8px) !important;
     }}
+    </style>
     """
 else:
     estilo_fundo_login = f"""
+    <style>
     html, body, [data-testid="stAppViewContainer"], .stApp {{ 
         background-color: {COR_CHAPA} !important; 
         font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif !important;
     }}
+    </style>
     """
+
+# Injeta o estilo ativo na página
+st.markdown(estilo_fundo_login, unsafe_allow_html=True)
 
 # --- 2. FUNÇÕES DE SUPORTE E BANCO ---
 @st.cache_resource
