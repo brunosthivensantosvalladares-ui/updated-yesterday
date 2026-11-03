@@ -99,7 +99,7 @@ def formatar_acao_infinitivo(texto_bruto):
 NOME_SISTEMA = "Updated Yesterday"
 SLOGAN = "Nós não dependemos de sorte.<br>Planejamento é o que nos move."
 # Nova URL da imagem de fundo atualizada
-BG_LOGIN_URL = "https://i.postimg.cc/6pGmdXf9/Na-Updated-Yesterday-nao-dependemos-da-sorte-O-planejamento-e-que-nos-move-(3).jpg"
+BG_LOGIN_URL = "https://i.postimg.cc/wjqmQb0p/3.jpg"
 
 # Estilização Global Dinâmica (Verifica se está logado para aplicar o fundo da tela de login ou o tema padrão)
 estilo_fundo_login = ""
@@ -133,7 +133,7 @@ if not st.session_state.get("logado", False):
     /* Aumenta o tamanho e deixa o nome da plataforma em destaque (branco) */
     .login-brand-title, div[data-testid="stVerticalBlock"] h1, div[data-testid="stVerticalBlock"] h2, div[data-testid="stVerticalBlock"] h3 {{
         color: #FFFFFF !important;
-        font-size: 40px !important;
+        font-size: 50px !important;
         font-weight: 700 !important;
         text-shadow: 0 2px 4px rgba(0,0,0,0.4) !important;
     }}
