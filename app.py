@@ -1258,27 +1258,22 @@ if not st.session_state["logado"]:
             <div style='text-align: center; margin-bottom: 25px;'>
                 <div class='logo-container-circular' style='width: 90px; height: 90px;'>
                 </div>
-                <h1 style='
-                    color: #FFFFFF !important; 
-                    -webkit-text-fill-color: #FFFFFF !important;
-                    font-size: 55px !important; 
+                <h1 class='login-brand-title' style='
+                    font-size: 40px !important; 
                     font-weight: 800 !important; 
                     letter-spacing: 2px !important; 
                     margin: 0 !important; 
                     text-transform: uppercase !important;
-                    text-shadow: 0 2px 8px rgba(0,0,0,0.9) !important;
                     font-family: "Cinzel", serif !important;
                 '>
                     {NOME_SISTEMA}
                 </h1>
                 <p style='
-                    color: #FFFFFF !important; 
-                    -webkit-text-fill-color: #FFFFFF !important;
-                    font-size: 18px !important; 
-                    font-style: italic !important; 
-                    font-weight: 600 !important;
-                    margin-top: 10px !important; 
-                    text-shadow: 0 1px 5px rgba(0,0,0,0.9) !important;
+                    text-align: center; 
+                    font-style: italic; 
+                    color: #8F847B; 
+                    margin: 4px 0 30px 0; 
+                    font-size: 12px !important;
                 '>
                     {SLOGAN}
                 </p>
