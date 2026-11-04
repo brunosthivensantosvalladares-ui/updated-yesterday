@@ -1128,8 +1128,8 @@ div.stHorizontalBlock button[kind="primary"] div {{
     line-height: 1;
     margin-top: 4px;
 }}
-# Certifique-se de que este comando st.markdown está ABRINDO antes das regras CSS:
-st.markdown("""
+# Bloco CSS isolado em string para evitar qualquer erro de sintaxe no Python
+css_estilo_cards = """
 <style>
     .metric-label {
         font-size: 0.9rem;
@@ -1137,17 +1137,20 @@ st.markdown("""
         font-weight: 600;
     }
 
+    /* Fundo amarelo pastel para os cards/caixas da interface */
     .metric-card {
         background-color: #e3c684 !important;
         border-color: #c9ab68 !important;
     }
 
+    /* Garante que os títulos e textos dentro das caixas fiquem escuros para contraste */
     .metric-card *, .metric-value, .metric-label {
         color: #231F20 !important;
         -webkit-text-fill-color: #231F20 !important;
     }
 </style>
-""", unsafe_allow_html=True)
+"""
+st.markdown(css_estilo_cards, unsafe_allow_html=True)
 
 def exibir_painel_pagamento_pro(origem):
     with st.container(border=True):
