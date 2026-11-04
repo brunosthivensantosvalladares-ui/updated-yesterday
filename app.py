@@ -166,7 +166,7 @@ else:
     estilo_fundo_login = f"""
     <style>
     html, body, [data-testid="stAppViewContainer"], .stApp {{ 
-        background-color: {COR_CHAPA} !important; 
+        background-color: #301c08 !important; 
         font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif !important;
     }}
     </style>
