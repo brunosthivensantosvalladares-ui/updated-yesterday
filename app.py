@@ -1128,6 +1128,7 @@ div.stHorizontalBlock button[kind="primary"] div {{
     line-height: 1;
     margin-top: 4px;
 }}
+# Certifique-se de que este comando st.markdown está ABRINDO antes das regras CSS:
 st.markdown("""
 <style>
     .metric-label {
@@ -1136,13 +1137,11 @@ st.markdown("""
         font-weight: 600;
     }
 
-    /* Fundo amarelo pastel para os cards/caixas da interface */
     .metric-card {
         background-color: #e3c684 !important;
         border-color: #c9ab68 !important;
     }
 
-    /* Garante que os títulos e textos dentro das caixas fiquem escuros para contraste */
     .metric-card *, .metric-value, .metric-label {
         color: #231F20 !important;
         -webkit-text-fill-color: #231F20 !important;
