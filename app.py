@@ -163,10 +163,17 @@ if not st.session_state.get("logado", False):
     </style>
     """
 else:
+    # Defina a nova URL da imagem para o pós-login aqui:
+    BG_LOGADO_URL = "https://i.postimg.cc/2yKkfFVt/Na-Updated-Yesterday-nao-dependemos-da-sorte-O-planejamento-e-que-nos-move-(8).jpg"
+    
     estilo_fundo_login = f"""
     <style>
     html, body, [data-testid="stAppViewContainer"], .stApp {{ 
-        background-color: {COR_CHAPA} !important; 
+        background: linear-gradient(rgba(254, 252, 245, 0.08), rgba(254, 252, 245, 0.08)), url('{BG_LOGADO_URL}') !important;
+        background-size: cover !important;
+        background-position: center center !important;
+        background-repeat: no-repeat !important;
+        background-attachment: fixed !important;
         font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif !important;
     }}
     </style>
@@ -790,7 +797,7 @@ st.markdown(f"""
 @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&display=swap');
 
 html, body, [data-testid="stAppViewContainer"], .stApp {{ 
-    background-color: {COR_CHAPA} !important; 
+    background-color: {COR_CHAPA} !important;  <-- REMOVA OU COMENTE ESTA LINHA DE BACKGROUND-COLOR
     font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif !important;
 }}
 
