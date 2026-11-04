@@ -855,6 +855,9 @@ div[data-testid="stForm"]:has(input[aria-label="payload_baixa"]) {{
     box-shadow: 0 0 0 1px #9B783E !important;
 }}
 
+# Bloco CSS global completo e blindado contra erros de sintaxe
+css_global_sistema = f"""
+<style>
 /* Botões Primários Globais Estilo Premium (Amarelo Pastel) */
 .main button[kind="primary"], .main button[data-testid="stBaseButton-primary"],
 section[data-testid="stSidebar"] button[kind="primary"],
@@ -1128,29 +1131,25 @@ div.stHorizontalBlock button[kind="primary"] div {{
     line-height: 1;
     margin-top: 4px;
 }}
-# Bloco CSS isolado em string para evitar qualquer erro de sintaxe no Python
-css_estilo_cards = """
-<style>
-    .metric-label {
-        font-size: 0.9rem;
-        color: #8F847B;
-        font-weight: 600;
-    }
+.metric-label {{
+    font-size: 0.9rem;
+    color: #8F847B;
+    font-weight: 600;
+}}
 
-    /* Fundo amarelo pastel para os cards/caixas da interface */
-    .metric-card {
-        background-color: #e3c684 !important;
-        border-color: #c9ab68 !important;
-    }
+/* Fundo amarelo pastel para os cards/caixas de métricas */
+.metric-card {{
+    background-color: #e3c684 !important;
+    border-color: #c9ab68 !important;
+}}
 
-    /* Garante que os títulos e textos dentro das caixas fiquem escuros para contraste */
-    .metric-card *, .metric-value, .metric-label {
-        color: #231F20 !important;
-        -webkit-text-fill-color: #231F20 !important;
-    }
+.metric-card *, .metric-value, .metric-label {{
+    color: #231F20 !important;
+    -webkit-text-fill-color: #231F20 !important;
+}}
 </style>
 """
-st.markdown(css_estilo_cards, unsafe_allow_html=True)
+st.markdown(css_global_sistema, unsafe_allow_html=True)
 
 def exibir_painel_pagamento_pro(origem):
     with st.container(border=True):
