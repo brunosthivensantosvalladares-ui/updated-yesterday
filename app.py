@@ -1128,11 +1128,23 @@ div.stHorizontalBlock button[kind="primary"] div {{
     line-height: 1;
     margin-top: 4px;
 }}
-.metric-label {{
-    font-size: 0.9rem;
-    color: #8F847B;
-    font-weight: 600;
-}}
+.metric-label {
+        font-size: 0.9rem;
+        color: #8F847B;
+        font-weight: 600;
+    }
+
+    /* Fundo amarelo pastel para os cards/caixas da interface */
+    .metric-card {
+        background-color: #e3c684 !important;
+        border-color: #c9ab68 !important;
+    }
+
+    /* Garante que os títulos e textos dentro das caixas fiquem escuros para contraste */
+    .metric-card *, .metric-value, .metric-label {
+        color: #231F20 !important;
+        -webkit-text-fill-color: #231F20 !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
