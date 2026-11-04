@@ -857,9 +857,9 @@ div[data-testid="stForm"]:has(input[aria-label="payload_baixa"]) {{
 }}
 
 /* Botões Primários Globais Estilo Premium */
-.main button[kind="primary"], .main button[data-testid="stBaseButton-primary"] {{
-    background-color: #C5A059 !important;
-    color: #FFFFFF !important;
+.main button[kind="primary"], .main button[data-testid="stBaseButton-primary"] {
+    background-color: #e3c684 !important;
+    color: #231F20 !important;
     font-weight: bold !important;
     border: none !important;
     border-radius: 6px !important;
@@ -868,16 +868,16 @@ div[data-testid="stForm"]:has(input[aria-label="payload_baixa"]) {{
     font-size: 14px !important;
     min-height: 40px !important;
     height: auto !important;
-}}
-.main button[kind="primary"]:hover, .main button[data-testid="stBaseButton-primary"]:hover {{
-    background-color: #9B783E !important;
-    color: #FFFFFF !important;
-}}
-.main button[kind="primary"] p, .main button[data-testid="stBaseButton-primary"] p {{
-    color: #FFFFFF !important;
+}
+.main button[kind="primary"]:hover, .main button[data-testid="stBaseButton-primary"]:hover {
+    background-color: #d1b473 !important;
+    color: #231F20 !important;
+}
+.main button[kind="primary"] p, .main button[data-testid="stBaseButton-primary"] p {
+    color: #231F20 !important;
     font-weight: bold !important;
     font-size: 14px !important;
-}}
+}
 
 /* =========================================================
    3. CABEÇALHO, TOPO FIXO E SIDEBAR
