@@ -163,16 +163,28 @@ if not st.session_state.get("logado", False):
     </style>
     """
 else:
-    estilo_fundo_login = f"""
-    <style>
-    html, body, [data-testid="stAppViewContainer"], .stApp {{ 
-        background-color: #301c08 !important; 
-        font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif !important;
-    }}
-    </style>
-    """
+    # Fundo global unificado com a imagem e a cor #301c08 para transição perfeita
+estilo_fundo_login = f"""
+<style>
+/* Aplica a imagem de fundo e a cor #301c08 em todas as telas (login e sistema logado) */
+html, body, [data-testid="stAppViewContainer"], .stApp {{
+    background-color: #301c08 !important;
+    background-image: linear-gradient(rgba(48, 28, 8, 0.2), rgba(48, 28, 8, 0.2)), url('{BG_LOGIN_URL}') !important;
+    background-size: cover !important;
+    background-position: center center !important;
+    background-repeat: no-repeat !important;
+    background-attachment: fixed !important;
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif !important;
+}}
 
-# Injeta o estilo ativo na página
+/* Torna os containers internos transparentes para exibir a imagem de fundo por trás */
+.main, [data-testid="stMainBlockContainer"], [data-testid="stAppViewBlockContainer"], header[data-testid="stHeader"] {{
+    background: transparent !important;
+}}
+</style>
+"""
+
+# Injeta o estilo unificado na página
 st.markdown(estilo_fundo_login, unsafe_allow_html=True)
 
 # --- 2. FUNÇÕES DE SUPORTE E BANCO ---
