@@ -162,11 +162,9 @@ if not st.session_state.get("logado", False):
     }}
     </style>
     """
-else:
     # Fundo global unificado com a imagem e a cor #301c08 para transição perfeita
 estilo_fundo_login = f"""
 <style>
-/* Aplica a imagem de fundo e a cor #301c08 em todas as telas (login e sistema logado) */
 html, body, [data-testid="stAppViewContainer"], .stApp {{
     background-color: #301c08 !important;
     background-image: linear-gradient(rgba(48, 28, 8, 0.2), rgba(48, 28, 8, 0.2)), url('{BG_LOGIN_URL}') !important;
@@ -177,7 +175,6 @@ html, body, [data-testid="stAppViewContainer"], .stApp {{
     font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif !important;
 }}
 
-/* Torna os containers internos transparentes para exibir a imagem de fundo por trás */
 .main, [data-testid="stMainBlockContainer"], [data-testid="stAppViewBlockContainer"], header[data-testid="stHeader"] {{
     background: transparent !important;
 }}
