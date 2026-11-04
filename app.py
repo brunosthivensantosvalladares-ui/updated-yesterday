@@ -856,8 +856,14 @@ div[data-testid="stForm"]:has(input[aria-label="payload_baixa"]) {{
     box-shadow: 0 0 0 1px #9B783E !important;
 }}
 
+st.markdown("""
+<style>
+/* ... outros estilos ... */
+
 /* Botões Primários Globais Estilo Premium */
-.main button[kind="primary"], .main button[data-testid="stBaseButton-primary"] {
+.main button[kind="primary"], .main button[data-testid="stBaseButton-primary"],
+section[data-testid="stSidebar"] button[kind="primary"],
+section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"] {{
     background-color: #e3c684 !important;
     color: #231F20 !important;
     font-weight: bold !important;
@@ -868,16 +874,25 @@ div[data-testid="stForm"]:has(input[aria-label="payload_baixa"]) {{
     font-size: 14px !important;
     min-height: 40px !important;
     height: auto !important;
-}
-.main button[kind="primary"]:hover, .main button[data-testid="stBaseButton-primary"]:hover {
+}}
+
+.main button[kind="primary"]:hover, .main button[data-testid="stBaseButton-primary"]:hover,
+section[data-testid="stSidebar"] button[kind="primary"]:hover,
+section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"]:hover {{
     background-color: #d1b473 !important;
     color: #231F20 !important;
-}
-.main button[kind="primary"] p, .main button[data-testid="stBaseButton-primary"] p {
+}}
+
+.main button[kind="primary"] p, .main button[kind="primary"] span,
+.main button[data-testid="stBaseButton-primary"] p, .main button[data-testid="stBaseButton-primary"] span,
+section[data-testid="stSidebar"] button[kind="primary"] p, section[data-testid="stSidebar"] button[kind="primary"] span {{
     color: #231F20 !important;
-    font-weight: bold !important;
-    font-size: 14px !important;
-}
+    -webkit-text-fill-color: #231F20 !important;
+    font-weight: 700 !important;
+}}
+
+</style>
+""", unsafe_allow_html=True)
 
 /* =========================================================
    3. CABEÇALHO, TOPO FIXO E SIDEBAR
