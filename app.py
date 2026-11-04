@@ -162,12 +162,12 @@ if not st.session_state.get("logado", False):
     }}
     </style>
     """
-    # Fundo global unificado com a imagem e a cor #301c08 para transição perfeita
+    # Fundo global unificado com a imagem original e nítida
 estilo_fundo_login = f"""
 <style>
 html, body, [data-testid="stAppViewContainer"], .stApp {{
     background-color: #301c08 !important;
-    background-image: linear-gradient(rgba(48, 28, 8, 0.2), rgba(48, 28, 8, 0.2)), url('{BG_LOGIN_URL}') !important;
+    background-image: url('{BG_LOGIN_URL}') !important;
     background-size: cover !important;
     background-position: center center !important;
     background-repeat: no-repeat !important;
