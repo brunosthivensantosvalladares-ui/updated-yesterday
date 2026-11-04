@@ -17,7 +17,7 @@ import streamlit.components.v1 as components
 NOME_SISTEMA = "Updated Yesterday"
 SLOGAN = "Nós não dependemos de sorte.<br>Planejamento é o que nos move."
 LOGO_URL = "https://i.postimg.cc/rwQs1cpc/Design-sem-nome-(2).png"
-BG_LOGIN_URL = "https://i.postimg.cc/RhyzZ0Xr/Na-Updated-Yesterday-nao-dependemos-da-sorte-O-planejamento-e-que-nos-move-(1).jpg"
+BG_LOGIN_URL = "https://i.postimg.cc/Gm7Hnm3c/Na-Updated-Yesterday-nao-dependemos-da-sorte-O-planejamento-e-que-nos-move-(7).jpg"
 
 COR_BRONZE = "#4A3C31"  
 COR_OURO = "#C5A059"    
@@ -98,17 +98,15 @@ def formatar_acao_infinitivo(texto_bruto):
 # --- 1. CONFIGURAÇÕES E ESTILOS ---
 NOME_SISTEMA = "Updated Yesterday"
 SLOGAN = "Nós não dependemos de sorte.<br>Planejamento é o que nos move."
-# Nova URL da imagem de fundo atualizada
-BG_LOGIN_URL = "https://i.postimg.cc/Gm7Hnm3c/Na-Updated-Yesterday-nao-dependemos-da-sorte-O-planejamento-e-que-nos-move-(7).jpg"
 
-# Estilização Global Dinâmica (Verifica se está logado para aplicar o fundo da tela de login ou o tema padrão)
 estilo_fundo_login = ""
 if not st.session_state.get("logado", False):
     estilo_fundo_login = f"""
     <style>
-    /* Fundo com a imagem e película suave */
-    root, html, body, [data-testid="stAppViewContainer"], .stApp {{
-        background: linear-gradient(rgba(254, 252, 245, 0.08), rgba(254, 252, 245, 0.08)), url('{BG_LOGIN_URL}') !important;
+    /* Cor de fundo imediata #301c08 para evitar clarão branco e carregamento perfeito da imagem */
+    html, body, [data-testid="stAppViewContainer"], .stApp {{
+        background-color: #301c08 !important;
+        background-image: url('{BG_LOGIN_URL}') !important;
         background-size: cover !important;
         background-position: center center !important;
         background-repeat: no-repeat !important;
@@ -128,60 +126,58 @@ if not st.session_state.get("logado", False):
         backdrop-filter: blur(6px) !important;
     }}
     
-    /* Força o tamanho do título em qualquer tag interna */
-.login-brand-title, .login-brand-title * {{
-    font-size: 65px !important;
-    font-weight: 1100 !important;
-    color: #FFFFFF !important;
-    text-transform: uppercase !important;
-    letter-spacing: 2px !important;
-    text-shadow: 0 2px 6px rgba(0,0,0,0.7) !important;
-    line-height: 1.2 !important;
-}}
+    /* Degradê dourado elegante original do título */
+    .login-brand-title, .login-brand-title * {{
+        font-family: 'Cinzel', serif !important;
+        font-weight: 800 !important;
+        font-size: 45px !important;
+        letter-spacing: 2px !important;
+        background: linear-gradient(135deg, #E6C875 0%, #C5A059 50%, #9B783E 100%) !important;
+        -webkit-background-clip: text !important;
+        -webkit-text-fill-color: transparent !important;
+        text-align: center !important;
+        text-transform: uppercase !important;
+        line-height: 1.2 !important;
+        display: block !important;
+        margin: 0 auto !important;
+    }}
 
-/* Força o tamanho do slogan */
-.login-brand-subtitle, .login-brand-subtitle * {{
-    font-size: 35px !important;
-    color: #FFFFFF !important;
-    font-weight: 800 !important;
-    text-shadow: 0 1px 4px rgba(0,0,0,0.7) !important;
-}}
-    
-    /* Deixa os rótulos (E-mail ou Usuário, Senha) na cor branca */
-    .stTextInput label, [data-testid="stWidgetLabel"] p, label {{
-        color: #FFFFFF !important;
+    /* Slogan na cor original */
+    .login-brand-subtitle, .login-brand-subtitle * {{
+        font-style: italic !important;
+        color: #8F847B !important;
+        -webkit-text-fill-color: #8F847B !important;
+        font-size: 20px !important;
         font-weight: 600 !important;
-        text-shadow: 0 1px 2px rgba(0,0,0,0.4) !important;
+        text-align: center !important;
+        margin: 4px 0 20px 0 !important;
+        display: block !important;
     }}
     
-    /* Deixa os textos do botão de rádio (Acessar / Criar Conta) na cor branca */
-    .stRadio label span {{
-        color: #FFFFFF !important;
+    /* Deixa os rótulos na cor escura ou legíveis */
+    .stTextInput label, [data-testid="stWidgetLabel"] p, label {{
+        color: #4A3C31 !important;
         font-weight: 600 !important;
-        text-shadow: 0 1px 2px rgba(0,0,0,0.4) !important;
+    }}
+    
+    /* Deixa os textos do botão de rádio legíveis */
+    .stRadio label span {{
+        color: #4A3C31 !important;
+        font-weight: 600 !important;
     }}
     </style>
     """
-    # Fundo global unificado com a imagem original e nítida
-estilo_fundo_login = f"""
-<style>
-html, body, [data-testid="stAppViewContainer"], .stApp {{
-    background-color: #301c08 !important;
-    background-image: url('{BG_LOGIN_URL}') !important;
-    background-size: cover !important;
-    background-position: center center !important;
-    background-repeat: no-repeat !important;
-    background-attachment: fixed !important;
-    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif !important;
-}}
+else:
+    estilo_fundo_login = f"""
+    <style>
+    html, body, [data-testid="stAppViewContainer"], .stApp {{ 
+        background-color: {COR_CHAPA} !important; 
+        font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif !important;
+    }}
+    </style>
+    """
 
-.main, [data-testid="stMainBlockContainer"], [data-testid="stAppViewBlockContainer"], header[data-testid="stHeader"] {{
-    background: transparent !important;
-}}
-</style>
-"""
-
-# Injeta o estilo unificado na página
+# Injeta o estilo ativo na página
 st.markdown(estilo_fundo_login, unsafe_allow_html=True)
 
 # --- 2. FUNÇÕES DE SUPORTE E BANCO ---
@@ -320,7 +316,6 @@ def renderizar_modulo_sincronizacao_offline(emp_id):
                             const payloadStr = JSON.stringify(pendentes);
                             const doc = window.parent.document;
                             
-                            // Busca robusta e imune ao CSS display: none
                             const inputOffline = doc.querySelector('input[aria-label="payload_offline"]');
                             
                             if (inputOffline) {{
@@ -693,7 +688,7 @@ def gerar_pdf_manual_oficial_pro():
     pdf.ln(10)
     pdf.set_font("Arial", "I", 14)
     pdf.set_text_color(80, 80, 80)
-    pdf.set_font("Arial", "", 10)  # Garanta que a fonte está definida
+    pdf.set_font("Arial", "", 10)
     pdf.cell(190, 6, "Nós não dependemos de sorte.", ln=True, align='c')
     pdf.cell(190, 6, "Planejamento é o que nos move.", ln=True, align='c')
     pdf.add_page()
@@ -768,7 +763,6 @@ def gerar_pdf_manual_oficial_pro():
     pdf.set_font("Arial", "", 11)
     pdf.multi_cell(190, 7, "O Assistente monitora a integridade dos prazos. O alarme visual no topo indica que ha pendencias de datas passadas. O botao 'Resolver' permite ao gestor dar baixa imediata ou reagendar tarefas para o presente com um unico clique.")
 
-    # Tratamento seguro de bytes compatível com qualquer versão do FPDF
     res = pdf.output(dest='S')
     if isinstance(res, str):
         return res.encode('latin-1', 'replace')
@@ -786,11 +780,6 @@ def obter_proxima_os(engine, emp_id):
     except Exception:
         return 1001
 
-COR_BRONZE = "#4A3C31"  
-COR_OURO = "#C5A059"    
-COR_CHAPA = "#F7F5F0"   
-COR_TEXTO = "#231F20"   
-
 st.set_page_config(page_title=f"{NOME_SISTEMA} - Painel de Controle", layout="wide", page_icon="⚙️")
 puxar_topo_para_cima()
 
@@ -803,9 +792,6 @@ html, body, [data-testid="stAppViewContainer"], .stApp {{
     font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif !important;
 }}
 
-/* =========================================================
-   1. OCULTAÇÃO DEFINITIVA DOS FORMULÁRIOS PONTE
-   ========================================================= */
 div[data-testid="stForm"]:has(input[aria-label="payload_offline"]),
 div[data-testid="stForm"]:has(input[aria-label="payload_cadastro"]),
 div[data-testid="stForm"]:has(input[aria-label="p_sync"]),
@@ -818,9 +804,6 @@ div[data-testid="stForm"]:has(input[aria-label="payload_baixa"]) {{
     border: none !important;
 }}
 
-/* =========================================================
-   2. ESTILIZAÇÃO GLOBAL NATIVA STREAMLIT (Campos, Labels e Inputs)
-   ========================================================= */
 .main div[data-testid="stTextInput"] label p,
 .main div[data-testid="stSelectbox"] label p,
 .main div[data-testid="stNumberInput"] label p,
@@ -851,14 +834,6 @@ div[data-testid="stForm"]:has(input[aria-label="payload_baixa"]) {{
     box-shadow: none !important;
 }}
 
-.main div[data-testid="stTextInput"] input:focus,
-.main div[data-testid="stSelectbox"] div[data-baseweb="select"] > div:focus-within,
-.main div[data-testid="stTextArea"] textarea:focus {{
-    border-color: #9B783E !important;
-    box-shadow: 0 0 0 1px #9B783E !important;
-}}
-
-/* Botões Primários Globais Estilo Premium */
 .main button[kind="primary"], .main button[data-testid="stBaseButton-primary"] {{
     background-color: #C5A059 !important;
     color: #FFFFFF !important;
@@ -875,15 +850,7 @@ div[data-testid="stForm"]:has(input[aria-label="payload_baixa"]) {{
     background-color: #9B783E !important;
     color: #FFFFFF !important;
 }}
-.main button[kind="primary"] p, .main button[data-testid="stBaseButton-primary"] p {{
-    color: #FFFFFF !important;
-    font-weight: bold !important;
-    font-size: 14px !important;
-}}
 
-/* =========================================================
-   3. CABEÇALHO, TOPO FIXO E SIDEBAR
-   ========================================================= */
 header[data-testid="stHeader"] {{
     background: transparent !important;
     visibility: visible !important;
@@ -915,14 +882,6 @@ section[data-testid="stSidebar"] * {{
     color: #F0EDE6 !important;
 }}
 
-section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] {{
-    gap: 0 !important;
-}}
-section[data-testid="stSidebar"] hr {{
-    margin: 2px 0 20px 0 !important;
-    border-color: rgba(197, 160, 89, 0.25) !important;
-}}
-
 .logo-container-circular {{
     margin: 0 auto !important;
     border-radius: 50%;
@@ -940,7 +899,7 @@ section[data-testid="stSidebar"] hr {{
     border-radius: 50%;
 }}
 
-.brand-title-gold, .login-brand-title {{
+.brand-title-gold {{
     font-family: 'Cinzel', serif !important;
     font-weight: 800 !important;
     font-size: 0.92rem !important;
@@ -965,8 +924,7 @@ section[data-testid="stSidebar"] hr {{
 }}
 
 section[data-testid="stSidebar"] button[kind="secondary"],
-section[data-testid="stSidebar"] button[data-testid="stBaseButton-secondary"],
-section[data-testid="stSidebar"] div[data-testid="stButton"] button[kind="secondary"] {{
+section[data-testid="stSidebar"] button[data-testid="stBaseButton-secondary"] {{
     width: 100% !important;
     min-height: 30px !important;
     height: 30px !important;
@@ -974,42 +932,18 @@ section[data-testid="stSidebar"] div[data-testid="stButton"] button[kind="second
     padding: 2px 8px !important;
     border-radius: 8px !important;
     font-size: 0.90rem !important;
-    line-height: 1 !important;
-    justify-content: flex-start !important;
-    text-align: left !important;
-    box-sizing: border-box !important;
     background: transparent !important;
     border-color: transparent !important;
-}}
-
-section[data-testid="stSidebar"] button[kind="secondary"] p,
-section[data-testid="stSidebar"] button[kind="secondary"] span,
-section[data-testid="stSidebar"] button[kind="secondary"] div,
-section[data-testid="stSidebar"] button[data-testid="stBaseButton-secondary"] p,
-section[data-testid="stSidebar"] button[data-testid="stBaseButton-secondary"] span,
-section[data-testid="stSidebar"] button[data-testid="stBaseButton-secondary"] div {{
-    font-size: 0.90rem !important;
-    line-height: 1 !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    color: #FFFFFF !important;
-    -webkit-text-fill-color: #FFFFFF !important;
     text-align: left !important;
     justify-content: flex-start !important;
 }}
-
-section[data-testid="stSidebar"] button[kind="secondary"]:hover,
-section[data-testid="stSidebar"] button[data-testid="stBaseButton-secondary"]:hover,
-section[data-testid="stSidebar"] button[kind="primary"]:hover,
-section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"]:hover {{
-    background: rgba(0, 0, 0, 0.38) !important;
-    border-color: rgba(197, 160, 89, 0.55) !important;
-    box-shadow: inset 0 0 0 1px rgba(197, 160, 89, 0.18), 0 2px 8px rgba(0, 0, 0, 0.22) !important;
+section[data-testid="stSidebar"] button[kind="secondary"] p {{
+    color: #FFFFFF !important;
+    -webkit-text-fill-color: #FFFFFF !important;
 }}
 
 section[data-testid="stSidebar"] button[kind="primary"],
-section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"],
-section[data-testid="stSidebar"] div[data-testid="stButton"] button[kind="primary"] {{
+section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"] {{
     width: 100% !important;
     min-height: 30px !important;
     height: 30px !important;
@@ -1017,57 +951,15 @@ section[data-testid="stSidebar"] div[data-testid="stButton"] button[kind="primar
     padding: 2px 8px !important;
     border-radius: 8px !important;
     font-size: 0.90rem !important;
-    line-height: 1 !important;
-    justify-content: flex-start !important;
-    text-align: left !important;
-    box-sizing: border-box !important;
     background: rgba(197, 160, 89, 0.32) !important;
     border-color: rgba(197, 160, 89, 0.6) !important;
     font-weight: 700 !important;
+    text-align: left !important;
+    justify-content: flex-start !important;
 }}
-
-section[data-testid="stSidebar"] button[kind="primary"] p,
-section[data-testid="stSidebar"] button[kind="primary"] span,
-section[data-testid="stSidebar"] button[kind="primary"] div,
-section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"] p,
-section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"] span,
-section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"] div {{
-    font-size: 0.90rem !important;
-    line-height: 1 !important;
-    margin: 0 !important;
-    padding: 0 !important;
+section[data-testid="stSidebar"] button[kind="primary"] p {{
     color: #FFFFFF !important;
     -webkit-text-fill-color: #FFFFFF !important;
-    text-align: left !important;
-    justify-content: flex-start !important;
-}}
-
-section[data-testid="stSidebar"] button:not([key^="nav_btn_"]) {{
-    padding: 0.30rem 0.6rem !important;
-    min-height: 30px !important;
-    font-size: 0.84rem !important;
-    text-align: left !important;
-    justify-content: flex-start !important;
-}}
-
-button:not(.arrow-btn), 
-button[kind="primary"]:not(.arrow-btn), 
-button[kind="secondary"]:not(.arrow-btn), 
-[data-testid="stBaseButton-primary"]:not(.arrow-btn), 
-[data-testid="stBaseButton-secondary"]:not(.arrow-btn) {{
-    border-radius: 6px !important;
-}}
-
-div.stHorizontalBlock button[kind="primary"] {{
-    background-color: {COR_OURO} !important;
-    border: 2px solid {COR_BRONZE} !important;
-}}
-
-div.stHorizontalBlock button[kind="primary"] p, 
-div.stHorizontalBlock button[kind="primary"] span, 
-div.stHorizontalBlock button[kind="primary"] div {{
-    color: {COR_TEXTO} !important;
-    -webkit-text-fill-color: {COR_TEXTO} !important;
 }}
 
 .top-fixed-section {{
@@ -1086,15 +978,6 @@ div.stHorizontalBlock button[kind="primary"] div {{
     padding-right: 1.5rem !important;
     margin-bottom: 10px !important;
     transform: translateY(-115px) !important; 
-}}
-
-.top-fixed-section div[data-testid="stTextInput"] {{
-    margin-top: -2px !important;
-}}
-.top-fixed-section div[data-testid="stPopover"] button {{
-    padding: 4px 10px !important;
-    min-height: 38px !important;
-    font-size: 0.85rem !important;
 }}
 
 .metric-card {{
@@ -1267,8 +1150,8 @@ if not st.session_state["logado"]:
             <div style='text-align: center; margin-bottom: 5px;'>
                 <div class='logo-container-circular' style='width: 90px; height: 90px;'>
                 </div>
-                <p class='login-brand-title'>UPDATED YESTERDAY</p>
-                <p style='text-align: center; font-style: italic; color: #8F847B; margin: 4px 0 30px 0; font-size: 0.78rem;'>{SLOGAN}</p>
+                <h1 class='login-brand-title'>UPDATED YESTERDAY</h1>
+                <p class='login-brand-subtitle'>{SLOGAN}</p>
             </div>
         """, unsafe_allow_html=True)
         
@@ -1512,7 +1395,6 @@ else:
                         {"eid": str(emp_id)}
                     ).scalar() or 0
                     
-                    # Preventivas próximas do vencimento (vencem hoje ou nos próximos 3 dias)
                     qtd_preventivas = conn.execute(
                         text("SELECT COUNT(*) FROM planos_preventivas WHERE ativo = TRUE AND proxima_data_vencimento <= :limite AND empresa_id = :eid"),
                         {"limite": limite_alerta, "eid": str(emp_id)}
@@ -1545,7 +1427,6 @@ else:
                 args=(opcao,)
             )
             
-            # Se for Cadastro Direto e estiver selecionado, exibe os subitens com recuo e setinha orientadora
             if opcao == "🗎  Cadastro Direto" and st.session_state.opcao_selecionada == "🗎  Cadastro Direto":
                 sub_opcoes_sidebar = [
                     ("↳ 📝 Agendamento Direto", 0), 
@@ -1779,7 +1660,6 @@ else:
                 overflow: hidden;
             }}
             
-            /* Ajustes responsivos para telas de celular (evita cortes e travamentos de toque) */
             @media (max-width: 768px) {{
                 .card {{
                     flex: 0 0 calc((100% - 10px) / 2);
@@ -1807,7 +1687,6 @@ else:
             const btnPrev = document.getElementById('btnPrev');
             const btnNext = document.getElementById('btnNext');
             
-            // Ajusta o número de cartões visíveis dinamicamente dependendo da largura da tela
             let visibleCount = window.innerWidth <= 768 ? Math.min(2, cardsData.length) : 3;
             let currentIndex = 0;
             let intervalTimer = null;
@@ -1892,10 +1771,6 @@ else:
 
     aba_ativa = st.session_state.opcao_selecionada
     
-# Captura segura da aba ativa selecionada no menu
-    aba_ativa = st.session_state.opcao_selecionada
-    
-    # Blindagem do Mr. Halley para nunca abrir sozinho ao trocar de aba
     if "mr_halley_aberto" not in st.session_state:
         st.session_state.mr_halley_aberto = False
 
@@ -1946,7 +1821,6 @@ else:
 
         st.markdown("<br>", unsafe_allow_html=True)
 
-        # --- PAINEL DE MONITORAMENTO DE VENCIMENTOS DE PLANOS NO DASHBOARD ---
         st.divider()
         st.markdown("<h4 style='color: #2D241E; font-weight: 700; margin-bottom: 12px;'>⏳ Controle de Vencimentos de Planos por Veículo</h4>", unsafe_allow_html=True)
         st.caption("Acompanhamento preditivo e preventivo do saldo restante, exibindo a próxima meta de preventiva. Ordenado por urgência.")
@@ -1973,7 +1847,6 @@ else:
                             med_odo_reg = float(primeira_med.get('odometro') or 0.0)
                             data_med_reg = str(primeira_med.get('data_leitura') or "-")
 
-                        # Busca tarefas atreladas especificamente a este veículo E a este plano
                         tarefas_veiculo = df_tarefas_all[
                             (df_tarefas_all['prefixo'].astype(str).str.lower() == str(pref).lower()) & 
                             (df_tarefas_all['descricao'].astype(str).str.contains(str(p['nome_plano']), case=False, na=False))
@@ -2122,12 +1995,10 @@ else:
         nome_motorista = st.session_state.get("usuario_ativo", "Motorista")
         hoje_str = datetime.now().strftime("%Y-%m-%d")
 
-        # Exibe o aviso de sucesso armazenado na sessão
         if st.session_state.get("sucesso_solicitacao"):
             st.success(st.session_state.sucesso_solicitacao)
             del st.session_state.sucesso_solicitacao
 
-        # Formulário Oculto Exclusivo da Aba (A ponte local)
         with st.form("form_sync_oculto_aba", clear_on_submit=True):
             p_sync = st.text_input("p_sync", key="p_sync_aba", label_visibility="collapsed")
             d_sync = st.text_input("d_sync", key="d_sync_aba", label_visibility="collapsed")
@@ -2232,7 +2103,6 @@ else:
             </script>
         """, height=280)
 
-        # Oculta o formulário Python que serve apenas de ponte
         st.markdown("""
             <style>
                 div[data-testid="stForm"]:has(input[aria-label="p_sync"]) { display: none !important; }
@@ -2288,7 +2158,6 @@ else:
                 st.write(f"🚜 **Veículo:** {os_data['prefixo']}")
                 st.write(f"📝 **Serviço Planejado:** {os_data['descricao']}")
                 
-                # Formulário Oculto de Ponte (Para comunicação Online)
                 with st.form("form_sync_baixa_oculta", clear_on_submit=True):
                     payload_baixa = st.text_input("payload_baixa", key="payload_baixa_aba", label_visibility="collapsed")
                     btn_sync_baixa = st.form_submit_button("SyncBaixaTecnica", use_container_width=True)
@@ -2335,7 +2204,6 @@ else:
                         except Exception:
                             pass
 
-                # Criação dos campos extras dinâmicos
                 extra_html = ""
                 if tipo_os_atual == "Preditiva":
                     extra_html = """<div><label>🔍 Valor Medido</label><input type="number" step="0.1" id="off_val_medido"></div>"""
@@ -2344,7 +2212,6 @@ else:
 
                 hoje_str = datetime.now().strftime("%Y-%m-%d")
                 
-                # Formulário Híbrido Blindado (Offline + Compacto)
                 st.components.v1.html(f"""
                     <style>
                         body {{ font-family: 'Segoe UI', sans-serif; color: #231F20; padding: 5px; margin: 0; background: transparent; }}
@@ -2609,7 +2476,6 @@ else:
 
         st.divider()
         
-        # Caixa única unificada em azul destacada
         st.info("✍️ **Logística:** Preencha **Início** ou **Fim**. **PCM:** Defina **Área** ou **Executor**. \n💡 **Dica de Horários:** Digite apenas os números (ex: 800, Salva como 08:00).")
         
         df_a = carregar_tarefas_empresa(emp_id)
@@ -2716,7 +2582,6 @@ else:
                                 except Exception: 
                                     pass
                     conn.commit()
-                # Força a limpeza do cache e recarregamento imediato para refletir os horários formatados na tela
                 st.cache_data.clear()
                 st.success("✅ Alterações salvas com sucesso na Agenda Principal!")
                 time_module.sleep(0.3)
@@ -2742,8 +2607,6 @@ else:
         st.divider()
 
         if sub_aba_escolhida == 0:
-            
-            # --- 1. NOTIFICAÇÃO DE SUCESSO E NÚMERO DA OS ---
             if "os_gerada_agora" in st.session_state:
                 os_info = st.session_state.os_gerada_agora
                 st.success(f"✅ SERVIÇO AGENDADO! A OS Gerada foi a de Nº {os_info}")
@@ -2758,7 +2621,6 @@ else:
                     import json
                     try:
                         dados_brutos = json.loads(payload_cadastro)
-                        # Garante compatibilidade caso venha em lista ou dicionário único
                         dados_cad = dados_brutos[0] if isinstance(dados_brutos, list) else dados_brutos
                         
                         nova_os = obter_proxima_os(engine, emp_id)
@@ -2870,7 +2732,6 @@ else:
                 </script>
             """, height=410)
             
-            # --- LISTA GERAL COM A COLUNA Nº OS READICIONADA ---
             st.divider()
             st.subheader("📋 Lista geral de serviços")
             df_lista = carregar_tarefas_empresa(emp_id)
@@ -2917,7 +2778,6 @@ else:
             st.markdown("### 📚 Gestão de Planos Master e Serviços")
             st.info("💡 Cadastre o plano, defina a periodicidade, a área e adicione os serviços.")
             
-            # --- FORMULÁRIO 1: CRIAR O PLANO MASTER COM ÁREA E ESTADO REATIVO ---
             with st.form("form_novo_plano", clear_on_submit=True):
                 st.markdown("#### ➕ Criar Novo Plano Master")
                 p_nome = st.text_input("Nome do Plano (Ex: Preventiva Quinzenal)")
@@ -2962,9 +2822,7 @@ else:
 
             st.divider()
 
-            # --- FORMULÁRIO 2: ADICIONAR SERVIÇOS ---
             st.markdown("#### ➕ Adicionar Serviços a um Plano Existente")
-            
             df_m_box = pd.read_sql(text("SELECT id, nome_plano, tipo_os FROM planos_master WHERE empresa_id = :eid"), engine, params={"eid": str(emp_id)})
             
             if not df_m_box.empty:
@@ -3008,7 +2866,6 @@ else:
             st.divider()
             st.subheader("📋 Planos Cadastrados (Clique para Expandir e Gerenciar)")
             
-            # --- LISTAGEM COM ACORDEÃO SEGURO ---
             df_planos_master = carregar_planos_master_empresa(emp_id)
             
             if not df_planos_master.empty:
@@ -3175,7 +3032,6 @@ else:
                         else:
                             st.warning("Digite um nome.")
 
-            # Injeta CSS para diminuir a fonte da tabela e otimizar o espaço para caber tudo sem rolar para o lado
             st.markdown("""
                 <style>
                     div[data-testid="stDataEditor"] table {
@@ -3207,7 +3063,6 @@ else:
                     return str(val)
                 return "00:00"
 
-            # Busca a lista unificada de executores do banco
             executores_cadastrados = [""]
             try:
                 with engine.connect() as conn:
@@ -3320,7 +3175,6 @@ else:
                                 "Última Preventiva (Leitura)": f"{ultima_preventiva_val:,.1f}".replace(",", ".") if (crit != "Dias" and ultima_preventiva_val > 0) else "-",
                                 "Próxima Preventiva": f"{proxima_preventiva_val:,.1f} {'km' if crit=='Odômetro' else 'h'}".replace(",", ".") if (crit != "Dias" and proxima_preventiva_val > 0) else "-",
                                 "Saldo Restante": f"{saldo_restante:,.1f} {'km' if crit=='Odômetro' else 'h' if crit=='Horímetro' else 'dias'}".replace(",", ".") if (crit == "Dias" or tem_leitura_sistema) else "Aguardando",
-                                # Campos operacionais com valores reais recuperados:
                                 "Área": area_atual,
                                 "Turno": turno_atual,
                                 "Executor": exec_atual,
@@ -3353,7 +3207,6 @@ else:
                                     "Última Preventiva (Leitura)": st.column_config.TextColumn("Últ. Prev.", width="small", disabled=True),
                                     "Próxima Preventiva": st.column_config.TextColumn("Prox. Prev.", width="small", disabled=True),
                                     "Saldo Restante": st.column_config.TextColumn("Saldo", width="small", disabled=True),
-                                    # Campos editáveis compactos:
                                     "Área": st.column_config.SelectboxColumn("Área", options=ORDEM_AREAS, width="small"),
                                     "Turno": st.column_config.SelectboxColumn("Turno", options=LISTA_TURNOS, width="small"),
                                     "Executor": st.column_config.SelectboxColumn("Executor", options=executores_cadastrados, width="small"),
@@ -3458,7 +3311,6 @@ else:
         if not df_med.empty:
             st.dataframe(df_med, use_container_width=True, hide_index=True)
             
-            # Botão de Exportação para Excel
             excel_bytes = to_excel_native(df_med)
             st.download_button(
                 label="📊 Exportar Leituras para Excel",
@@ -3487,7 +3339,6 @@ else:
                 4. **Finalizar:** Marque a coluna **OK** nos chamados desejados e clique no botão **💾 Salvar e Processar Agendamentos em Lote** na parte inferior.
             """)
 
-        # Aviso destacado em azul no padrão do site
         st.info("💡 **Dica de Preenchimento:** Digite apenas os números nos horários (ex: 800, Salva como 08:00).")
 
         col_espaco, col_btn1, col_btn2 = st.columns([0.45, 0.28, 0.27])
@@ -3608,7 +3459,6 @@ else:
                 selecionados = ed_c[ed_c['Aprovar'] == True]
                 
                 if not selecionados.empty:
-                    # Exibe feedback visual imediato na tela para o usuário saber que está processando
                     with st.spinner("⏳ Processando lote de chamados e salvando na Agenda Principal... Por favor, aguarde."):
                         try:
                             with engine.connect() as conn:
@@ -3638,7 +3488,6 @@ else:
                                     })
                                     ids_chamados_concluir.append(int(r['id']))
 
-                                # Bulk Insert otimizado no PostgreSQL
                                 if tarefas_para_inserir:
                                     conn.execute(
                                         text("""
@@ -3648,7 +3497,6 @@ else:
                                         tarefas_para_inserir
                                     )
                                 
-                                # Atualiza status dos chamados em lote
                                 if ids_chamados_concluir:
                                     conn.execute(
                                         text("UPDATE chamados SET status = 'Agendado' WHERE id = ANY(:ids) AND empresa_id = :eid"),
@@ -3866,5 +3714,4 @@ if st.session_state.get("logado") and "empresa" in st.session_state:
     if "Chat Mr. Halley" not in st.session_state.get("opcao_selecionada", ""):
         renderizar_chat_flutuante(st.session_state["empresa"])
 
-    # Chamada do módulo offline devidamente indentada no mesmo bloco
     renderizar_modulo_sincronizacao_offline(emp_id)
