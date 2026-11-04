@@ -1128,7 +1128,9 @@ div.stHorizontalBlock button[kind="primary"] div {{
     line-height: 1;
     margin-top: 4px;
 }}
-.metric-label {
+st.markdown("""
+<style>
+    .metric-label {
         font-size: 0.9rem;
         color: #8F847B;
         font-weight: 600;
