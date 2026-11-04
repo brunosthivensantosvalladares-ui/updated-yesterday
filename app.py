@@ -861,7 +861,7 @@ css_global_sistema = f"""
 /* Botões Primários Globais Estilo Premium (Amarelo Pastel) */
 .main button[kind="primary"], .main button[data-testid="stBaseButton-primary"],
 section[data-testid="stSidebar"] button[kind="primary"],
-section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"] {{
+section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"] {
     background-color: #e3c684 !important;
     color: #231F20 !important;
     font-weight: bold !important;
@@ -872,7 +872,7 @@ section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"] {{
     font-size: 14px !important;
     min-height: 40px !important;
     height: auto !important;
-}}
+}
 
 .main button[kind="primary"]:hover, .main button[data-testid="stBaseButton-primary"]:hover,
 section[data-testid="stSidebar"] button[kind="primary"]:hover,
