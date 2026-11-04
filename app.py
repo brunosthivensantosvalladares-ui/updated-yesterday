@@ -797,7 +797,6 @@ st.markdown(f"""
 @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&display=swap');
 
 html, body, [data-testid="stAppViewContainer"], .stApp {{ 
-    background-color: {COR_CHAPA} !important;  <-- REMOVA OU COMENTE ESTA LINHA DE BACKGROUND-COLOR
     font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif !important;
 }}
 
@@ -856,11 +855,7 @@ div[data-testid="stForm"]:has(input[aria-label="payload_baixa"]) {{
     box-shadow: 0 0 0 1px #9B783E !important;
 }}
 
-st.markdown("""
-<style>
-/* ... outros estilos ... */
-
-/* Botões Primários Globais Estilo Premium */
+/* Botões Primários Globais Estilo Premium (Amarelo Pastel) */
 .main button[kind="primary"], .main button[data-testid="stBaseButton-primary"],
 section[data-testid="stSidebar"] button[kind="primary"],
 section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"] {{
@@ -890,9 +885,6 @@ section[data-testid="stSidebar"] button[kind="primary"] p, section[data-testid="
     -webkit-text-fill-color: #231F20 !important;
     font-weight: 700 !important;
 }}
-
-</style>
-""", unsafe_allow_html=True)
 
 /* =========================================================
    3. CABEÇALHO, TOPO FIXO E SIDEBAR
