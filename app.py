@@ -909,7 +909,7 @@ header[data-testid="stHeader"] {{
 }}
 
 section[data-testid="stSidebar"] {{ 
-    background: linear-gradient(180deg, #2A211B 0%, #1D1612 100%) !important; 
+    background_estilo = "background: linear-gradient(180deg, #2A211B 0%, #1D1612 100%) !important;" 
     border-right: 1px solid #3D3128 !important;
     overflow: hidden !important;
 }}
