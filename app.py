@@ -858,21 +858,22 @@ COR_OURO = "#e3c684"
 COR_BRONZE = "#c9ab68"
 COR_TEXTO = "#231F20"
 
-# 2. Bloco CSS Puro carregado em uma lista de textos para evitar erros de aspas triplas
+# # 2. Bloco CSS Puro carregado em uma lista de textos
 css_linhas = [
-    "<style>",
-    "/* 1. FOCOS DE INPUTS E CAIXAS SELETORAS */",
-    ".main div[data-testid='stTextInput'] input:focus,",
-    ".main div[data-testid='stSelectbox'] div[data-baseweb='select'] > div:focus-within,",
-    ".main div[data-testid='stTextArea'] textarea:focus {",
-    "    border-color: #9B783E !important;",
-    "    box-shadow: 0 0 0 1px #9B783E !important;",
-    "}",
-    "",
-    "/* 2. BOTÕES PRIMÁRIOS GLOBAIS ESTILO PREMIUM (AMARELO PASTEL) */",
-    ".main button[kind='primary'], .main button[data-testid='stBaseButton-primary'],",
-    "section[data-testid='stSidebar'] button[kind='primary'],",
-    "section[data-testid='stSidebar'] button[data-testid='stBaseButton-primary'] {",
+    '<style>',
+    '/* 1. FOCOS DE INPUTS E CAIXAS SELETORAS */',
+    '.main div[data-testid="stTextInput"] input:focus,',
+    '.main div[data-testid="stSelectbox"] div[data-baseweb="select"] > div:focus-within,',
+    '.main div[data-testid="stTextArea"] textarea:focus {',
+    '    border-color: #9B783E !important;',
+    '    box-shadow: 0 0 0 1px #9B783E !important;',
+    '}',
+    '',
+    '/* 2. BOTÕES PRIMÁRIOS GLOBAIS ESTILO PREMIUM (AMARELO PASTEL) */',
+    '.main button[kind="primary"], .main button[data-testid="stBaseButton-primary"],',
+    'section[data-testid="stSidebar"] button[kind="primary"],',
+    'section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"] {'
+
     "    background-color: #e3c684 !important;",
     "    color: #231F20 !important;",
     "    font-weight: bold !important;",
