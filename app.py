@@ -860,8 +860,7 @@ COR_BRONZE = "#c9ab68"
 COR_TEXTO = "#231F20"
 
 # 2. Bloco CSS Puro (Sem f-string para evitar conflito com Python)
-css_global_sistema = """
-<style>
+css_global_sistema = """<style>
 /* 1. FOCOS DE INPUTS E CAIXAS SELETORAS */
 .main div[data-testid="stTextInput"] input:focus,
 .main div[data-testid="stSelectbox"] div[data-baseweb="select"] > div:focus-within,
@@ -869,6 +868,7 @@ css_global_sistema = """
     border-color: #9B783E !important;
     box-shadow: 0 0 0 1px #9B783E !important;
 }
+"""
 
 /* 2. BOTÕES PRIMÁRIOS GLOBAIS ESTILO PREMIUM (AMARELO PASTEL) */
 .main button[kind="primary"], .main button[data-testid="stBaseButton-primary"],
