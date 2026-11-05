@@ -848,6 +848,18 @@ div[data-testid="stForm"]:has(input[aria-label="payload_baixa"]) {{
     box-shadow: none !important;
 }}
 
+import streamlit as st
+
+# Certifique-se de que estas variáveis de cores existem no seu código. 
+# Se não existirem, você pode definir seus valores hexadecimais aqui:
+COR_OURO = "#e3c684"
+COR_BRONZE = "#c9ab68"
+COR_TEXTO = "#231F20"
+
+# Bloco CSS global completo e blindado contra erros de sintaxe
+css_global_sistema = f"""
+<style>
+/* 1. FOCOS DE INPUTS E CAIXAS SELETORAS */
 .main div[data-testid="stTextInput"] input:focus,
 .main div[data-testid="stSelectbox"] div[data-baseweb="select"] > div:focus-within,
 .main div[data-testid="stTextArea"] textarea:focus {{
@@ -855,15 +867,10 @@ div[data-testid="stForm"]:has(input[aria-label="payload_baixa"]) {{
     box-shadow: 0 0 0 1px #9B783E !important;
 }}
 
-# Bloco CSS global completo e blindado contra erros de sintaxe
-css_global_sistema = f"""
-<style>
-# Botões Primários Globais Estilo Premium (Amarelo Pastel)
+/* 2. BOTÕES PRIMÁRIOS GLOBAIS ESTILO PREMIUM (AMARELO PASTEL) */
 .main button[kind="primary"], .main button[data-testid="stBaseButton-primary"],
-st.markdown("""
-<style>
 section[data-testid="stSidebar"] button[kind="primary"],
-section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"] {
+section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"] {{
     background-color: #e3c684 !important;
     color: #231F20 !important;
     font-weight: bold !important;
@@ -874,9 +881,7 @@ section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"] {
     font-size: 14px !important;
     min-height: 40px !important;
     height: auto !important;
-}
-</style>
-""", unsafe_allow_html=True)
+}}
 
 .main button[kind="primary"]:hover, .main button[data-testid="stBaseButton-primary"]:hover,
 section[data-testid="stSidebar"] button[kind="primary"]:hover,
@@ -893,31 +898,23 @@ section[data-testid="stSidebar"] button[kind="primary"] p, section[data-testid="
     font-weight: 700 !important;
 }}
 
-/* =========================================================
-   3. CABEÇALHO, TOPO FIXO E SIDEBAR
-   ========================================================= */
+/* 3. CABEÇALHO, TOPO FIXO E SIDEBAR */
 header[data-testid="stHeader"] {{
     background: transparent !important;
     visibility: visible !important;
     display: block !important;
-    estilo = "height: 3rem !important;"
+    height: 3rem !important;
 }}
 
 .main, .main .block-container, div[data-testid="stMainBlockContainer"], div[data-testid="stAppViewBlockContainer"] {{
-    padding_estilo = "padding-top: 0rem !important;"
-    margin_estilo = "margin-top: 0rem !important;" 
+    padding-top: 0rem !important;
+    margin-top: 0rem !important; 
 }}
 
 section[data-testid="stSidebar"] {{ 
-    background_estilo = "background: linear-gradient(180deg, #2A211B 0%, #1D1612 100%) !important;" 
-    border_estilo = "border-right: 1px solid #3D3128 !important;"
+    background: linear-gradient(180deg, #2A211B 0%, #1D1612 100%) !important; 
+    border-right: 1px solid #3D3128 !important;
     overflow: hidden !important;
-}}
-section[data-testid="stSidebar"] > div:first-child {{
-    overflow: hidden !important;
-css_global_sistema = f"""
-<style>
-section[data-testid="stSidebar"] {{    
     padding-top: 0rem !important;
     padding-bottom: 0.4rem !important;
     padding-left: 0.6rem !important;
@@ -926,18 +923,25 @@ section[data-testid="stSidebar"] {{
     flex-direction: column !important;
     height: 100vh !important;
 }}
+
 section[data-testid="stSidebar"] * {{
     color: #F0EDE6 !important;
+}}
+
+section[data-testid="stSidebar"] > div:first-child {{
+    overflow: hidden !important;
 }}
 
 section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] {{
     gap: 0 !important;
 }}
+
 section[data-testid="stSidebar"] hr {{
     margin: 2px 0 20px 0 !important;
     border-color: rgba(197, 160, 89, 0.25) !important;
 }}
 
+/* 4. ELEMENTOS DE LOGO E MARCA */
 .logo-container-circular {{
     margin: 0 auto !important;
     border-radius: 50%;
@@ -946,6 +950,7 @@ section[data-testid="stSidebar"] hr {{
     align-items: center !important;
     justify-content: center !important;
 }}
+
 .logo-img-crop {{
     width: 100%;
     height: 100%;
@@ -979,6 +984,7 @@ section[data-testid="stSidebar"] hr {{
     color: #F0EDE6 !important;
 }}
 
+/* 5. BOTÕES DA SIDEBAR (SECUNDÁRIOS) */
 section[data-testid="stSidebar"] button[kind="secondary"],
 section[data-testid="stSidebar"] button[data-testid="stBaseButton-secondary"],
 section[data-testid="stSidebar"] div[data-testid="stButton"] button[kind="secondary"] {{
@@ -1014,47 +1020,10 @@ section[data-testid="stSidebar"] button[data-testid="stBaseButton-secondary"] di
 }}
 
 section[data-testid="stSidebar"] button[kind="secondary"]:hover,
-section[data-testid="stSidebar"] button[data-testid="stBaseButton-secondary"]:hover,
-section[data-testid="stSidebar"] button[kind="primary"]:hover,
-section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"]:hover {{
+section[data-testid="stSidebar"] button[data-testid="stBaseButton-secondary"]:hover {{
     background: rgba(0, 0, 0, 0.38) !important;
     border-color: rgba(197, 160, 89, 0.55) !important;
     box-shadow: inset 0 0 0 1px rgba(197, 160, 89, 0.18), 0 2px 8px rgba(0, 0, 0, 0.22) !important;
-}}
-
-section[data-testid="stSidebar"] button[kind="primary"],
-section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"],
-section[data-testid="stSidebar"] div[data-testid="stButton"] button[kind="primary"] {{
-    width: 100% !important;
-    min-height: 30px !important;
-    height: 30px !important;
-    margin: 0 !important;
-    padding: 2px 8px !important;
-    border-radius: 8px !important;
-    font-size: 0.90rem !important;
-    line-height: 1 !important;
-    justify-content: flex-start !important;
-    text-align: left !important;
-    box-sizing: border-box !important;
-    background: rgba(197, 160, 89, 0.32) !important;
-    border-color: rgba(197, 160, 89, 0.6) !important;
-    font-weight: 700 !important;
-}}
-
-section[data-testid="stSidebar"] button[kind="primary"] p,
-section[data-testid="stSidebar"] button[kind="primary"] span,
-section[data-testid="stSidebar"] button[kind="primary"] div,
-section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"] p,
-section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"] span,
-section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"] div {{
-    font-size: 0.90rem !important;
-    line-height: 1 !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    color: #FFFFFF !important;
-    -webkit-text-fill-color: #FFFFFF !important;
-    text-align: left !important;
-    justify-content: flex-start !important;
 }}
 
 section[data-testid="stSidebar"] button:not([key^="nav_btn_"]) {{
@@ -1073,6 +1042,7 @@ button[kind="secondary"]:not(.arrow-btn),
     border-radius: 6px !important;
 }}
 
+/* 6. BLOCOS HORIZONTAIS DE BOTÕES */
 div.stHorizontalBlock button[kind="primary"] {{
     background-color: {COR_OURO} !important;
     border: 2px solid {COR_BRONZE} !important;
@@ -1085,6 +1055,7 @@ div.stHorizontalBlock button[kind="primary"] div {{
     -webkit-text-fill-color: {COR_TEXTO} !important;
 }}
 
+/* 7. SEÇÃO FIXA NO TOPO */
 .top-fixed-section {{
     position: -webkit-sticky !important;
     position: sticky !important;
@@ -1106,14 +1077,17 @@ div.stHorizontalBlock button[kind="primary"] div {{
 .top-fixed-section div[data-testid="stTextInput"] {{
     margin-top: -2px !important;
 }}
+
 .top-fixed-section div[data-testid="stPopover"] button {{
     padding: 4px 10px !important;
     min-height: 38px !important;
     font-size: 0.85rem !important;
 }}
 
+/* 8. METRIC CARDS (ESTILO PREMIUM AMARLO PASTEL) */
 .metric-card {{
-    background: #FFFFFF;
+    background-color: #e3c684 !important;
+    border-color: #c9ab68 !important;
     border-radius: 18px;
     padding: 22px;
     border: 1px solid #EFEAE1;
@@ -1122,6 +1096,7 @@ div.stHorizontalBlock button[kind="primary"] div {{
     align-items: center;
     justify-content: space-between;
 }}
+
 .metric-icon-box {{
     width: 58px;
     height: 58px;
@@ -1131,23 +1106,17 @@ div.stHorizontalBlock button[kind="primary"] div {{
     justify-content: center;
     font-size: 1.9rem;
 }}
+
 .metric-value {{
     font-size: 2.2rem;
     font-weight: 800;
-    color: #1F1915;
     line-height: 1;
     margin-top: 4px;
 }}
+
 .metric-label {{
     font-size: 0.9rem;
-    color: #8F847B;
     font-weight: 600;
-}}
-
-/* Fundo amarelo pastel para os cards/caixas de métricas */
-.metric-card {{
-    background-color: #e3c684 !important;
-    border-color: #c9ab68 !important;
 }}
 
 .metric-card *, .metric-value, .metric-label {{
@@ -1157,6 +1126,7 @@ div.stHorizontalBlock button[kind="primary"] div {{
 </style>
 """
 
+# Renderiza todo o CSS customizado de forma segura no Streamlit
 st.markdown(css_global_sistema, unsafe_allow_html=True)
 
 def exibir_painel_pagamento_pro(origem):
