@@ -900,7 +900,7 @@ header[data-testid="stHeader"] {{
     background: transparent !important;
     visibility: visible !important;
     display: block !important;
-    height: 3rem !important;
+    estilo = "height: 3rem !important;"
 }}
 
 .main, .main .block-container, div[data-testid="stMainBlockContainer"], div[data-testid="stAppViewBlockContainer"] {{
