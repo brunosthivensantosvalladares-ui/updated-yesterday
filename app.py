@@ -863,7 +863,7 @@ css_global_sistema = """
 .main div[data-testid="stSelectbox"] div[data-baseweb="select"] > div:focus-within,
 .main div[data-testid="stTextArea"] textarea:focus {
     border-color: #9B783E !important;
-    shadow_estilo = "box-shadow: 0 0 0 1px #9B783E !important; }"
+    box-shadow: 0 0 0 1px #9B783E !important;
 }
 
 /* 2. BOTÕES PRIMÁRIOS GLOBAIS ESTILO PREMIUM (AMARELO PASTEL) */
@@ -874,7 +874,7 @@ section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"] {
     color: #231F20 !important;
     font-weight: bold !important;
     border: none !important;
-    border_radius_estilo = "border-radius: 6px !important;"
+    border-radius: 6px !important;
     padding: 8px 16px !important;
     transition: 0.2s !important;
     font-size: 14px !important;
@@ -1083,7 +1083,7 @@ div.stHorizontalBlock button[kind="primary"] div {
     font-size: 0.85rem !important;
 }
 
-/* 8. METRIC CARDS (ESTILO PREMIUM AMARLO PASTEL) */
+/* 8. METRIC CARDS (ESTILO PREMIUM AMARELO PASTEL) */
 .metric-card {
     background-color: #e3c684 !important;
     border-color: #c9ab68 !important;
@@ -1125,7 +1125,7 @@ div.stHorizontalBlock button[kind="primary"] div {
 </style>
 """
 
-# Substitui as variáveis de cor de forma manual e segura (evitando o conflito de chaves do Python)
+# Substitui as variáveis de cor de forma manual e segura
 css_global_sistema = css_global_sistema.replace("COR_OURO_PLACEHOLDER", COR_OURO)
 css_global_sistema = css_global_sistema.replace("COR_BRONZE_PLACEHOLDER", COR_BRONZE)
 css_global_sistema = css_global_sistema.replace("COR_TEXTO_PLACEHOLDER", COR_TEXTO)
