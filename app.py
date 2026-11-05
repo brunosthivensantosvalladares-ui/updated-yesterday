@@ -915,6 +915,9 @@ section[data-testid="stSidebar"] {{
 }}
 section[data-testid="stSidebar"] > div:first-child {{
     overflow: hidden !important;
+css_global_sistema = f"""
+<style>
+section[data-testid="stSidebar"] {{    
     padding-top: 0rem !important;
     padding-bottom: 0.4rem !important;
     padding-left: 0.6rem !important;
