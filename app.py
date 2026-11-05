@@ -858,7 +858,7 @@ COR_TEXTO = "#231F20"
 # Removido o 'f' do início para o Python ignorar as chaves do CSS
 css_global_sistema = """
 <style>
-/* 1. FOCOS DE INPUTS E CAIXAS SELETORAS */
+# 1. FOCOS DE INPUTS E CAIXAS SELETORAS (Formato correto)
 .main div[data-testid="stTextInput"] input:focus,
 .main div[data-testid="stSelectbox"] div[data-baseweb="select"] > div:focus-within,
 .main div[data-testid="stTextArea"] textarea:focus {
