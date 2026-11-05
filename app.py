@@ -905,7 +905,7 @@ header[data-testid="stHeader"] {{
 
 .main, .main .block-container, div[data-testid="stMainBlockContainer"], div[data-testid="stAppViewBlockContainer"] {{
     padding_estilo = "padding-top: 0rem !important;"
-    margin-top: 0rem !important; 
+    margin_estilo = "margin-top: 0rem !important;" 
 }}
 
 section[data-testid="stSidebar"] {{ 
