@@ -1153,6 +1153,7 @@ div.stHorizontalBlock button[kind="primary"] div {{
 }}
 </style>
 """
+
 st.markdown(css_global_sistema, unsafe_allow_html=True)
 
 def exibir_painel_pagamento_pro(origem):
