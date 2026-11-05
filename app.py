@@ -850,15 +850,19 @@ div[data-testid="stForm"]:has(input[aria-label="payload_baixa"]) {{
 
 import streamlit as st
 
-# Variáveis de cores
+# ==========================================
+# CONFIGURAÇÃO DE ESTILO INTERFACE PREMIUM
+# ==========================================
+
+# 1. Definição das cores do sistema
 COR_OURO = "#e3c684"
 COR_BRONZE = "#c9ab68"
 COR_TEXTO = "#231F20"
 
-# Removido o 'f' do início para o Python ignorar as chaves do CSS
+# 2. Bloco CSS Puro (Sem f-string para evitar conflito com Python)
 css_global_sistema = """
 <style>
-# 1. FOCOS DE INPUTS E CAIXAS SELETORAS (Formato correto)
+/* 1. FOCOS DE INPUTS E CAIXAS SELETORAS */
 .main div[data-testid="stTextInput"] input:focus,
 .main div[data-testid="stSelectbox"] div[data-baseweb="select"] > div:focus-within,
 .main div[data-testid="stTextArea"] textarea:focus {
@@ -1125,12 +1129,12 @@ div.stHorizontalBlock button[kind="primary"] div {
 </style>
 """
 
-# Substitui as variáveis de cor de forma manual e segura
+# 3. Injeção das cores de forma manual e segura para o Python
 css_global_sistema = css_global_sistema.replace("COR_OURO_PLACEHOLDER", COR_OURO)
 css_global_sistema = css_global_sistema.replace("COR_BRONZE_PLACEHOLDER", COR_BRONZE)
 css_global_sistema = css_global_sistema.replace("COR_TEXTO_PLACEHOLDER", COR_TEXTO)
 
-# Renderiza o CSS no aplicativo
+# 4. Renderização final no Streamlit
 st.markdown(css_global_sistema, unsafe_allow_html=True)
 
 def exibir_painel_pagamento_pro(origem):
