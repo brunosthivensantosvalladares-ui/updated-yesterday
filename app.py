@@ -874,7 +874,7 @@ section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"] {
     color: #231F20 !important;
     font-weight: bold !important;
     border: none !important;
-    border-radius: 6px !important;
+    border_radius_estilo = "border-radius: 6px !important;"
     padding: 8px 16px !important;
     transition: 0.2s !important;
     font-size: 14px !important;
