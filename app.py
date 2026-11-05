@@ -858,7 +858,7 @@ div[data-testid="stForm"]:has(input[aria-label="payload_baixa"]) {{
 # Bloco CSS global completo e blindado contra erros de sintaxe
 css_global_sistema = f"""
 <style>
-/* Botões Primários Globais Estilo Premium (Amarelo Pastel) */
+# Botões Primários Globais Estilo Premium (Amarelo Pastel)
 .main button[kind="primary"], .main button[data-testid="stBaseButton-primary"],
 st.markdown("""
 <style>
