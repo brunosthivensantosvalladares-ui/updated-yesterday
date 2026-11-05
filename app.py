@@ -868,7 +868,6 @@ css_global_sistema = """<style>
     border-color: #9B783E !important;
     box-shadow: 0 0 0 1px #9B783E !important;
 }
-"""
 
 /* 2. BOTÕES PRIMÁRIOS GLOBAIS ESTILO PREMIUM (AMARELO PASTEL) */
 .main button[kind="primary"], .main button[data-testid="stBaseButton-primary"],
