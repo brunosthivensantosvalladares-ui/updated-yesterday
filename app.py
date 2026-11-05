@@ -108,7 +108,7 @@ if not st.session_state.get("logado", False):
     <style>
     /* Fundo com a imagem e película suave */
     root, html, body, [data-testid="stAppViewContainer"], .stApp {{
-        background: linear-gradient(rgba(254, 252, 245, 0.08), rgba(254, 252, 245, 0.08)), url('{BG_LOGIN_URL}') !important;
+        background: url('{BG_LOGIN_URL}') !important;
         background-size: cover !important;
         background-position: center center !important;
         background-repeat: no-repeat !important;
@@ -827,7 +827,7 @@ div[data-testid="stForm"]:has(input[aria-label="payload_baixa"]) {{
 .main div[data-testid="stMultiSelect"] label p {{
     font-size: 13px !important;
     font-weight: 600 !important;
-    color: #4A3C31 !important;
+    color: #231F20 !important;
     margin-bottom: 2px !important;
 }}
 
@@ -1148,6 +1148,95 @@ div.stHorizontalBlock button[kind="primary"] div {{
 """
 st.markdown(css_global_sistema, unsafe_allow_html=True)
 
+# Barra superior (Share, favoritos, editar, menu) sempre em branco
+css_topo_branco = """
+<style>
+header[data-testid="stHeader"], header[data-testid="stHeader"] *,
+[data-testid="stToolbar"], [data-testid="stToolbar"] *,
+[data-testid="stMainMenu"] button, [data-testid="stMainMenu"] span {
+    color: #FFFFFF !important;
+}
+header[data-testid="stHeader"] svg, [data-testid="stToolbar"] svg { color: #FFFFFF !important; }
+</style>
+"""
+st.markdown(css_topo_branco, unsafe_allow_html=True)
+
+# Contraste (somente logado): textos soltos no fundo em branco, caixas na paleta da plataforma
+_EXCL = ('button, label, summary, [data-testid="stAlert"], [data-testid="stExpander"], '
+         '[data-testid="stWidgetLabel"], [data-testid="stVerticalBlockBorderWrapper"], '
+         '[data-testid="stForm"], [data-testid="stMetric"], [data-testid="stPopover"], '
+         '[data-testid="stDataFrame"], [role="tooltip"], .top-fixed-section')
+_bare = []
+for _t in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'ul li', 'ol li']:
+    _bare.append(f'.main [data-testid="stMarkdownContainer"]:not(:is({_EXCL}) *) > {_t}')
+_bare.append(f'.main [data-testid="stHeading"]:not(:is({_EXCL}) *), .main [data-testid="stHeading"]:not(:is({_EXCL}) *) *')
+_bare.append(f'.main [data-testid="stCaptionContainer"]:not(:is({_EXCL}) *), .main [data-testid="stCaptionContainer"]:not(:is({_EXCL}) *) *')
+_bare_sel = ",\n".join(_bare)
+
+css_contraste = f"""
+<style>
+/* Textos soltos sobre a imagem de fundo: branco com sombra */
+{_bare_sel} {{
+    color: #FFFFFF !important;
+    -webkit-text-fill-color: #FFFFFF !important;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.7) !important;
+}}
+
+/* Caixas: chapa clara (#F7F5F0) com borda ouro e texto escuro */
+.main div[data-testid="stVerticalBlockBorderWrapper"],
+.main div[data-testid="stForm"],
+.main div[data-testid="stExpander"] {{
+    background-color: {COR_CHAPA} !important;
+    border: 1px solid rgba(197, 160, 89, 0.6) !important;
+    border-radius: 12px !important;
+}}
+.main div[data-testid="stVerticalBlockBorderWrapper"] [data-testid="stMarkdownContainer"] > p,
+.main div[data-testid="stVerticalBlockBorderWrapper"] [data-testid="stCaptionContainer"],
+.main div[data-testid="stForm"] [data-testid="stCaptionContainer"],
+.main div[data-testid="stExpander"] [data-testid="stCaptionContainer"] {{
+    color: {COR_BRONZE} !important;
+}}
+.main p[style*="#8F847B"], .main p[style*="#A89C91"], .main span[style*="#8A7E75"] {{
+    color: {COR_BRONZE} !important;
+}}
+
+/* Métricas */
+.main div[data-testid="stMetric"] {{
+    background-color: #E3C684 !important;
+    border-radius: 12px !important;
+    padding: 12px 16px !important;
+}}
+.main div[data-testid="stMetric"] * {{
+    color: {COR_TEXTO} !important;
+    -webkit-text-fill-color: {COR_TEXTO} !important;
+}}
+
+/* Avisos (info / sucesso / atenção / erro) com a paleta da plataforma */
+div[data-testid="stAlert"] {{
+    background-color: {COR_CHAPA} !important;
+    border: 1px solid rgba(197, 160, 89, 0.6) !important;
+    border-left: 6px solid {COR_OURO} !important;
+    border-radius: 10px !important;
+}}
+div[data-testid="stAlert"]:has([data-testid="stAlertContentSuccess"]) {{
+    background-color: #C8E6C9 !important; border-left-color: #2E7D32 !important;
+}}
+div[data-testid="stAlert"]:has([data-testid="stAlertContentWarning"]) {{
+    background-color: #F4E8D1 !important; border-left-color: #9B783E !important;
+}}
+div[data-testid="stAlert"]:has([data-testid="stAlertContentError"]) {{
+    background-color: #FFCDD2 !important; border-left-color: #B71C1C !important;
+}}
+div[data-testid="stAlert"] * {{
+    color: {COR_TEXTO} !important;
+    -webkit-text-fill-color: {COR_TEXTO} !important;
+    text-shadow: none !important;
+}}
+</style>
+"""
+if st.session_state.get("logado", False):
+    st.markdown(css_contraste, unsafe_allow_html=True)
+
 def exibir_painel_pagamento_pro(origem):
     with st.container(border=True):
         st.markdown(f"""
@@ -1281,11 +1370,11 @@ if not st.session_state["logado"]:
     _, col_login, _ = st.columns([1.2, 1, 1.2])
     with col_login:
         st.markdown(f"""
-            <div style='text-align: center; margin-bottom: 5px;'>
+            <div style='text-align: center; margin-bottom: 5px; position: relative; top: -100px;'>
                 <div class='logo-container-circular' style='width: 90px; height: 90px;'>
                 </div>
                 <p class='login-brand-title'>UPDATED YESTERDAY</p>
-                <p style='text-align: center; font-style: italic; color: #8F847B; margin: 4px 0 30px 0; font-size: 0.78rem;'>{SLOGAN}</p>
+                <p style='text-align: center; font-style: italic; color: #F7F5F0; text-shadow: 0 1px 3px rgba(0,0,0,0.6); margin: 4px 0 30px 0; font-size: 0.85rem;'>{SLOGAN}</p>
             </div>
         """, unsafe_allow_html=True)
         
@@ -1545,7 +1634,7 @@ else:
                     <img src='{LOGO_URL}' class='logo-img-crop'>
                 </div>
                 <p class='brand-title-gold'>UPDATED YESTERDAY</p>
-                <p style='color: #A89C91; font-size: 0.72rem; margin: 2px 0 20px 0; text-align: center;'>{SLOGAN}</p>
+                <p style='color: #E6DFD3; font-size: 0.75rem; margin: 2px 0 20px 0; text-align: center;'>{SLOGAN}</p>
             </div>
         """, unsafe_allow_html=True)
         st.divider()
@@ -1681,8 +1770,8 @@ else:
     st.markdown(
         """
         <div style='display: flex; align-items: center; justify-content: space-between; margin: 2px 0 2px 0;'>
-            <span style='color: #2D241E; font-weight: 700; font-size: 0.88rem;'>Acesso Rápido</span>
-            <span style='color: #8A7E75; font-size: 0.72rem;'>Hover de 2s para rolar continuamente ou clique no card</span>
+            <span style='color: #FFFFFF; text-shadow: 0 1px 3px rgba(0,0,0,0.6); font-weight: 700; font-size: 0.88rem;'>Acesso Rápido</span>
+            <span style='color: #F7F5F0; text-shadow: 0 1px 3px rgba(0,0,0,0.6); font-size: 0.75rem;'>Hover de 2s para rolar continuamente ou clique no card</span>
         </div>
         """,
         unsafe_allow_html=True
@@ -1766,7 +1855,7 @@ else:
                 align-items: center;
                 justify-content: center;
                 font-size: 1.2rem;
-                color: #8C7355;
+                color: #4A3C31;
                 flex-shrink: 0;
             }}
             .card-texts {{
@@ -1788,7 +1877,7 @@ else:
             .card-sub {{
                 margin: 1px 0 0 0;
                 font-size: 0.70rem;
-                color: #8A7E75;
+                color: #4A3C31;
                 line-height: 1.15;
                 display: -webkit-box;
                 -webkit-line-clamp: 2;
