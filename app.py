@@ -213,6 +213,46 @@ else:
         background: {TK['bg']} !important;
         font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif !important;
     }}
+
+    /* Transição pós-login: enquanto a tela de login antiga ainda está na página,
+       mantém o fundo com a imagem da marca e esconde o conteúdo até o painel carregar */
+    .stApp:has(.login-brand-title) {{
+        background: url('{BG_LOGIN_URL}') center center / cover no-repeat fixed !important;
+    }}
+    .stApp:has(.login-brand-title) [data-testid="stAppViewContainer"],
+    .stApp:has(.login-brand-title) [data-testid="stMain"],
+    .stApp:has(.login-brand-title) .main,
+    .stApp:has(.login-brand-title) [data-testid="stMainBlockContainer"],
+    .stApp:has(.login-brand-title) header[data-testid="stHeader"] {{
+        background: transparent !important;
+    }}
+    .stApp:has(.login-brand-title) [data-testid="stMainBlockContainer"],
+    .stApp:has(.login-brand-title) section[data-testid="stSidebar"] {{
+        visibility: hidden !important;
+    }}
+    .stApp:has(.login-brand-title)::after {{
+        content: "UPDATED YESTERDAY\\A Carregando seu painel…";
+        white-space: pre;
+        text-align: center;
+        position: fixed;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 1000000;
+        pointer-events: none;
+        font-family: 'Cinzel', serif;
+        font-weight: 700;
+        font-size: 1.5rem;
+        letter-spacing: 3px;
+        line-height: 1.8;
+        color: #E3C684;
+        text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
+        animation: uy-pulso 1.4s ease-in-out infinite;
+    }}
+    @keyframes uy-pulso {{
+        0%, 100% {{ opacity: 0.65; }}
+        50% {{ opacity: 1; }}
+    }}
     </style>
     """
 
@@ -1196,6 +1236,7 @@ header[data-testid="stHeader"], header[data-testid="stHeader"] *,
 """, unsafe_allow_html=True)
 
 # Tema dinâmico (somente logado): todas as cores vêm dos tokens de TEMAS
+_M = ':is([data-testid="stMain"], .main)'
 css_tema = f"""
 <style>
 :root {{ color-scheme: {TK['scheme']}; }}
@@ -1208,62 +1249,62 @@ css_tema = f"""
 header[data-testid="stHeader"] {{ background: transparent !important; }}
 header[data-testid="stHeader"] *, [data-testid="stToolbar"] *,
 [data-testid="stMainMenu"] button, [data-testid="stMainMenu"] span {{ color: {TK['text']} !important; }}
-.main .top-fixed-section {{ background-color: {TK['surface']} !important; border-bottom: 1.5px solid {TK['line']} !important; }}
+{_M} .top-fixed-section {{ background-color: {TK['surface']} !important; border-bottom: 1.5px solid {TK['line']} !important; }}
 
 /* Textos */
-.main h1, .main h2, .main h3, .main h4, .main h5, .main h6,
-.main [data-testid="stHeading"] *,
-.main [data-testid="stMarkdownContainer"] > p,
-.main [data-testid="stMarkdownContainer"] > ul li,
-.main [data-testid="stMarkdownContainer"] > ol li,
-.main [data-testid="stWidgetLabel"] p, .main label p, .main label span,
-.main [data-testid="stExpander"] summary, .main [data-testid="stExpander"] summary * {{
+{_M} h1, {_M} h2, {_M} h3, {_M} h4, {_M} h5, {_M} h6,
+{_M} [data-testid="stHeading"] *,
+{_M} [data-testid="stMarkdownContainer"] > p,
+{_M} [data-testid="stMarkdownContainer"] > ul li,
+{_M} [data-testid="stMarkdownContainer"] > ol li,
+{_M} [data-testid="stWidgetLabel"] p, {_M} label p, {_M} label span,
+{_M} [data-testid="stExpander"] summary, {_M} [data-testid="stExpander"] summary * {{
     color: {TK['text']} !important;
     -webkit-text-fill-color: {TK['text']} !important;
     text-shadow: none !important;
 }}
-.main [data-testid="stCaptionContainer"], .main [data-testid="stCaptionContainer"] * {{
+{_M} [data-testid="stCaptionContainer"], {_M} [data-testid="stCaptionContainer"] * {{
     color: {TK['muted']} !important;
     -webkit-text-fill-color: {TK['muted']} !important;
 }}
-.main [data-testid="stMarkdownContainer"] a {{ color: {TK['link']} !important; }}
-.main [data-testid="stMarkdownContainer"] code {{ background: {TK['surface2']} !important; color: {TK['text']} !important; }}
-.main hr, .main [data-testid="stDivider"] hr {{ border-color: {TK['line']} !important; background-color: {TK['line']} !important; }}
+{_M} [data-testid="stMarkdownContainer"] a {{ color: {TK['link']} !important; }}
+{_M} [data-testid="stMarkdownContainer"] code {{ background: {TK['surface2']} !important; color: {TK['text']} !important; }}
+{_M} hr, {_M} [data-testid="stDivider"] hr {{ border-color: {TK['line']} !important; background-color: {TK['line']} !important; }}
 
 /* Caixas, formulários, expanders e chat */
-.main div[data-testid="stVerticalBlockBorderWrapper"],
-.main div[data-testid="stForm"],
-.main div[data-testid="stExpander"],
-.main div[data-testid="stChatMessage"] {{
+{_M} div[data-testid="stVerticalBlockBorderWrapper"],
+{_M} div[data-testid="stForm"],
+{_M} div[data-testid="stExpander"],
+{_M} div[data-testid="stChatMessage"] {{
     background-color: {TK['surface']} !important;
     border: 1px solid {TK['line']} !important;
     border-radius: 12px !important;
 }}
-.main div[data-testid="stMetric"] {{
+{_M} div[data-testid="stMetric"] {{
     background-color: {TK['btn_bg']} !important;
     border-radius: 12px !important;
     padding: 12px 16px !important;
 }}
-.main div[data-testid="stMetric"] * {{ color: {TK['btn_text']} !important; -webkit-text-fill-color: {TK['btn_text']} !important; }}
+{_M} div[data-testid="stMetric"] * {{ color: {TK['btn_text']} !important; -webkit-text-fill-color: {TK['btn_text']} !important; }}
 .metric-card {{ background-color: {TK['btn_bg']} !important; border-color: {TK['btn_hover']} !important; }}
 .metric-card *, .metric-value, .metric-label {{ color: {TK['btn_text']} !important; -webkit-text-fill-color: {TK['btn_text']} !important; }}
 
 /* Campos */
-.main div[data-testid="stTextInput"] input, .main div[data-testid="stNumberInput"] input,
-.main div[data-testid="stDateInput"] input, .main div[data-testid="stTimeInput"] input,
-.main div[data-testid="stTextArea"] textarea, .main div[data-testid="stChatInput"] textarea,
-.main div[data-testid="stSelectbox"] div[data-baseweb="select"] > div,
-.main div[data-testid="stMultiSelect"] div[data-baseweb="select"] > div,
-.main div[data-baseweb="input"], .main div[data-baseweb="base-input"], .main div[data-baseweb="textarea"] {{
+{_M} div[data-testid="stTextInput"] input, {_M} div[data-testid="stNumberInput"] input,
+{_M} div[data-testid="stDateInput"] input, {_M} div[data-testid="stTimeInput"] input,
+{_M} div[data-testid="stTextArea"] textarea, {_M} div[data-testid="stChatInput"] textarea,
+{_M} div[data-testid="stSelectbox"] div[data-baseweb="select"] > div,
+{_M} div[data-testid="stMultiSelect"] div[data-baseweb="select"] > div,
+{_M} div[data-baseweb="input"], {_M} div[data-baseweb="base-input"], {_M} div[data-baseweb="textarea"] {{
     background-color: {TK['input_bg']} !important;
     color: {TK['input_text']} !important;
     -webkit-text-fill-color: {TK['input_text']} !important;
     border-color: {TK['border']} !important;
 }}
-.main div[data-baseweb="select"] *, .main div[data-testid="stChatInput"] * {{ color: {TK['input_text']} !important; -webkit-text-fill-color: {TK['input_text']} !important; }}
-.main div[data-baseweb="select"] svg, .main div[data-baseweb="input"] svg {{ fill: {TK['input_text']} !important; }}
-.main input::placeholder, .main textarea::placeholder {{ color: {TK['placeholder']} !important; -webkit-text-fill-color: {TK['placeholder']} !important; opacity: 1 !important; }}
-.main div[data-testid="stNumberInput"] button {{ background: {TK['surface2']} !important; color: {TK['text']} !important; }}
+{_M} div[data-baseweb="select"] *, {_M} div[data-testid="stChatInput"] * {{ color: {TK['input_text']} !important; -webkit-text-fill-color: {TK['input_text']} !important; }}
+{_M} div[data-baseweb="select"] svg, {_M} div[data-baseweb="input"] svg {{ fill: {TK['input_text']} !important; }}
+{_M} input::placeholder, {_M} textarea::placeholder {{ color: {TK['placeholder']} !important; -webkit-text-fill-color: {TK['placeholder']} !important; opacity: 1 !important; }}
+{_M} div[data-testid="stNumberInput"] button {{ background: {TK['surface2']} !important; color: {TK['text']} !important; }}
 
 /* Menus suspensos e popovers (renderizados fora do .main) */
 ul[role="listbox"], div[data-baseweb="menu"], [data-testid="stPopoverBody"] {{
@@ -1275,18 +1316,18 @@ ul[role="listbox"] li, ul[role="listbox"] li *, [role="option"], [role="option"]
 [data-testid="stPopoverBody"] [data-testid="stMarkdownContainer"] p, [data-testid="stPopoverBody"] label p {{ color: {TK['text']} !important; }}
 
 /* Botões */
-.main button[kind="secondary"], .main button[data-testid="stBaseButton-secondary"],
-.main button[data-testid="stPopoverButton"] {{
+{_M} button[kind="secondary"], {_M} button[data-testid="stBaseButton-secondary"],
+{_M} button[data-testid="stPopoverButton"] {{
     background-color: {TK['sec_bg']} !important;
     border: 1px solid {TK['border']} !important;
     color: {TK['sec_text']} !important;
 }}
-.main button[kind="secondary"] *, .main button[data-testid="stBaseButton-secondary"] *,
-.main button[data-testid="stPopoverButton"] * {{ color: {TK['sec_text']} !important; -webkit-text-fill-color: {TK['sec_text']} !important; }}
-.main button[kind="secondary"]:hover, .main button[data-testid="stBaseButton-secondary"]:hover {{ border-color: {TK['accent']} !important; background-color: {TK['surface2']} !important; }}
-.main button[kind="primary"], .main button[data-testid="stBaseButton-primary"] {{ background-color: {TK['btn_bg']} !important; border: 1px solid {TK['border']} !important; }}
-.main button[kind="primary"]:hover, .main button[data-testid="stBaseButton-primary"]:hover {{ background-color: {TK['btn_hover']} !important; }}
-.main button[kind="primary"] *, .main button[data-testid="stBaseButton-primary"] * {{ color: {TK['btn_text']} !important; -webkit-text-fill-color: {TK['btn_text']} !important; }}
+{_M} button[kind="secondary"] *, {_M} button[data-testid="stBaseButton-secondary"] *,
+{_M} button[data-testid="stPopoverButton"] * {{ color: {TK['sec_text']} !important; -webkit-text-fill-color: {TK['sec_text']} !important; }}
+{_M} button[kind="secondary"]:hover, {_M} button[data-testid="stBaseButton-secondary"]:hover {{ border-color: {TK['accent']} !important; background-color: {TK['surface2']} !important; }}
+{_M} button[kind="primary"], {_M} button[data-testid="stBaseButton-primary"] {{ background-color: {TK['btn_bg']} !important; border: 1px solid {TK['border']} !important; }}
+{_M} button[kind="primary"]:hover, {_M} button[data-testid="stBaseButton-primary"]:hover {{ background-color: {TK['btn_hover']} !important; }}
+{_M} button[kind="primary"] *, {_M} button[data-testid="stBaseButton-primary"] * {{ color: {TK['btn_text']} !important; -webkit-text-fill-color: {TK['btn_text']} !important; }}
 
 /* Avisos */
 div[data-testid="stAlert"] {{ background-color: {TK['info_bg']} !important; border: 1px solid {TK['info_bd']} !important; border-left: 6px solid {TK['info_bd']} !important; border-radius: 10px !important; }}
@@ -1297,6 +1338,23 @@ div[data-testid="stAlert"] * {{ color: {TK['info_text']} !important; -webkit-tex
 div[data-testid="stAlert"]:has([data-testid="stAlertContentSuccess"]) * {{ color: {TK['ok_text']} !important; -webkit-text-fill-color: {TK['ok_text']} !important; }}
 div[data-testid="stAlert"]:has([data-testid="stAlertContentWarning"]) * {{ color: {TK['warn_text']} !important; -webkit-text-fill-color: {TK['warn_text']} !important; }}
 div[data-testid="stAlert"]:has([data-testid="stAlertContentError"]) * {{ color: {TK['err_text']} !important; -webkit-text-fill-color: {TK['err_text']} !important; }}
+/* Avisos: o fundo do contêiner interno do Streamlit fica transparente (a cor vem do alerta externo) */
+div[data-testid="stAlert"] > div, div[data-testid="stAlert"] [data-testid="stAlertContainer"] {{ background-color: transparent !important; }}
+
+/* Barra fixa de busca */
+html body .top-fixed-section {{ background-color: {TK['surface']} !important; border-bottom: 1.5px solid {TK['line']} !important; box-shadow: none !important; }}
+
+/* Chat flutuante do Mr. Halley */
+html body div.st-key-chat_flutuante_expander div[data-testid="stExpander"] {{
+    background-color: {TK['surface']} !important;
+    border: 2px solid {TK['border']} !important;
+}}
+html body div.st-key-chat_flutuante_expander div[data-testid="stExpander"] summary,
+html body div.st-key-chat_flutuante_expander div[data-testid="stExpander"] summary * {{
+    color: {TK['text']} !important;
+    -webkit-text-fill-color: {TK['text']} !important;
+}}
+html body div.st-key-chat_flutuante_expander div[data-testid="stChatMessage"] {{ background-color: {TK['surface2']} !important; }}
 </style>
 """
 if st.session_state.get("logado", False):
