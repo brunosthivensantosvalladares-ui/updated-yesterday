@@ -101,6 +101,47 @@ SLOGAN = "Nós não dependemos de sorte.<br>Planejamento é o que nos move."
 # Nova URL da imagem de fundo atualizada
 BG_LOGIN_URL = "https://i.postimg.cc/Gm7Hnm3c/Na-Updated-Yesterday-nao-dependemos-da-sorte-O-planejamento-e-que-nos-move-(7).jpg"
 
+# --- TEMA CLARO / ESCURO (paleta Updated Yesterday) ---
+TEMAS = {
+    "claro": {
+        "scheme": "light",
+        "bg": "#F7F5F0", "surface": "#FFFFFF", "surface2": "#FBF8F3",
+        "text": "#231F20", "muted": "#4A3C31",
+        "border": "#9B783E", "line": "#E2D9CB", "accent": "#C5A059",
+        "input_bg": "#FFFFFF", "input_text": "#231F20", "placeholder": "#6B5A4B",
+        "link": "#7A5A1E",
+        "btn_bg": "#E3C684", "btn_text": "#231F20", "btn_hover": "#D1B473",
+        "sec_bg": "#FFFFFF", "sec_text": "#231F20",
+        "info_bg": "#FBF8F3", "info_text": "#231F20", "info_bd": "#9B783E",
+        "ok_bg": "#C8E6C9", "ok_text": "#231F20", "ok_bd": "#2E7D32",
+        "warn_bg": "#F4E8D1", "warn_text": "#231F20", "warn_bd": "#9B783E",
+        "err_bg": "#FFCDD2", "err_text": "#231F20", "err_bd": "#B71C1C",
+    },
+    "escuro": {
+        "scheme": "dark",
+        "bg": "#1F1915", "surface": "#2D241E", "surface2": "#3B2E25",
+        "text": "#F0EDE6", "muted": "#D9CFC2",
+        "border": "#C5A059", "line": "#4A3C31", "accent": "#C5A059",
+        "input_bg": "#1F1915", "input_text": "#F7F5F0", "placeholder": "#BFB2A3",
+        "link": "#E3C684",
+        "btn_bg": "#E3C684", "btn_text": "#231F20", "btn_hover": "#D1B473",
+        "sec_bg": "#3B2E25", "sec_text": "#F0EDE6",
+        "info_bg": "#2D241E", "info_text": "#F0EDE6", "info_bd": "#C5A059",
+        "ok_bg": "#1F3A25", "ok_text": "#E8F5E9", "ok_bd": "#81C784",
+        "warn_bg": "#3B2E25", "warn_text": "#F4E8D1", "warn_bd": "#E3C684",
+        "err_bg": "#4A1F1F", "err_text": "#FFCDD2", "err_bd": "#EF9A9A",
+    },
+}
+
+if "tema" not in st.session_state:
+    _tema_url = None
+    try:
+        _tema_url = st.query_params.get("tema")
+    except Exception:
+        pass
+    st.session_state["tema"] = _tema_url if _tema_url in ("claro", "escuro") else "claro"
+TK = TEMAS[st.session_state["tema"]]
+
 # Estilização Global Dinâmica (Verifica se está logado para aplicar o fundo da tela de login ou o tema padrão)
 estilo_fundo_login = ""
 if not st.session_state.get("logado", False):
@@ -169,11 +210,7 @@ else:
     estilo_fundo_login = f"""
     <style>
     html, body, [data-testid="stAppViewContainer"], .stApp {{ 
-        background: linear-gradient(rgba(254, 252, 245, 0.08), rgba(254, 252, 245, 0.08)), url('{BG_LOGADO_URL}') !important;
-        background-size: cover !important;
-        background-position: center center !important;
-        background-repeat: no-repeat !important;
-        background-attachment: fixed !important;
+        background: {TK['bg']} !important;
         font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif !important;
     }}
     </style>
@@ -1148,94 +1185,122 @@ div.stHorizontalBlock button[kind="primary"] div {{
 """
 st.markdown(css_global_sistema, unsafe_allow_html=True)
 
-# Barra superior (Share, favoritos, editar, menu) sempre em branco
-css_topo_branco = """
+# Barra superior na tela de login (fundo é imagem): ícones brancos
+if not st.session_state.get("logado", False):
+    st.markdown("""
 <style>
 header[data-testid="stHeader"], header[data-testid="stHeader"] *,
 [data-testid="stToolbar"], [data-testid="stToolbar"] *,
-[data-testid="stMainMenu"] button, [data-testid="stMainMenu"] span {
-    color: #FFFFFF !important;
-}
-header[data-testid="stHeader"] svg, [data-testid="stToolbar"] svg { color: #FFFFFF !important; }
+[data-testid="stMainMenu"] button, [data-testid="stMainMenu"] span { color: #FFFFFF !important; }
 </style>
-"""
-st.markdown(css_topo_branco, unsafe_allow_html=True)
+""", unsafe_allow_html=True)
 
-# Contraste (somente logado): textos soltos no fundo em branco, caixas na paleta da plataforma
-_EXCL = ('button, label, summary, [data-testid="stAlert"], [data-testid="stExpander"], '
-         '[data-testid="stWidgetLabel"], [data-testid="stVerticalBlockBorderWrapper"], '
-         '[data-testid="stForm"], [data-testid="stMetric"], [data-testid="stPopover"], '
-         '[data-testid="stDataFrame"], [role="tooltip"], .top-fixed-section')
-_bare = []
-for _t in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'ul li', 'ol li']:
-    _bare.append(f'.main [data-testid="stMarkdownContainer"]:not(:is({_EXCL}) *) > {_t}')
-_bare.append(f'.main [data-testid="stHeading"]:not(:is({_EXCL}) *), .main [data-testid="stHeading"]:not(:is({_EXCL}) *) *')
-_bare.append(f'.main [data-testid="stCaptionContainer"]:not(:is({_EXCL}) *), .main [data-testid="stCaptionContainer"]:not(:is({_EXCL}) *) *')
-_bare_sel = ",\n".join(_bare)
-
-css_contraste = f"""
+# Tema dinâmico (somente logado): todas as cores vêm dos tokens de TEMAS
+css_tema = f"""
 <style>
-/* Textos soltos sobre a imagem de fundo: branco com sombra */
-{_bare_sel} {{
-    color: #FFFFFF !important;
-    -webkit-text-fill-color: #FFFFFF !important;
-    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.7) !important;
-}}
+:root {{ color-scheme: {TK['scheme']}; }}
+.stApp, [data-testid="stAppViewContainer"], [data-testid="stMain"], .main,
+[data-testid="stMainBlockContainer"], [data-testid="stBottom"] > div,
+[data-testid="stBottomBlockContainer"] {{ background: {TK['bg']} !important; }}
+.stApp {{ color: {TK['text']}; }}
 
-/* Caixas: chapa clara (#F7F5F0) com borda ouro e texto escuro */
+/* Barra superior */
+header[data-testid="stHeader"] {{ background: transparent !important; }}
+header[data-testid="stHeader"] *, [data-testid="stToolbar"] *,
+[data-testid="stMainMenu"] button, [data-testid="stMainMenu"] span {{ color: {TK['text']} !important; }}
+.main .top-fixed-section {{ background-color: {TK['surface']} !important; border-bottom: 1.5px solid {TK['line']} !important; }}
+
+/* Textos */
+.main h1, .main h2, .main h3, .main h4, .main h5, .main h6,
+.main [data-testid="stHeading"] *,
+.main [data-testid="stMarkdownContainer"] > p,
+.main [data-testid="stMarkdownContainer"] > ul li,
+.main [data-testid="stMarkdownContainer"] > ol li,
+.main [data-testid="stWidgetLabel"] p, .main label p, .main label span,
+.main [data-testid="stExpander"] summary, .main [data-testid="stExpander"] summary * {{
+    color: {TK['text']} !important;
+    -webkit-text-fill-color: {TK['text']} !important;
+    text-shadow: none !important;
+}}
+.main [data-testid="stCaptionContainer"], .main [data-testid="stCaptionContainer"] * {{
+    color: {TK['muted']} !important;
+    -webkit-text-fill-color: {TK['muted']} !important;
+}}
+.main [data-testid="stMarkdownContainer"] a {{ color: {TK['link']} !important; }}
+.main [data-testid="stMarkdownContainer"] code {{ background: {TK['surface2']} !important; color: {TK['text']} !important; }}
+.main hr, .main [data-testid="stDivider"] hr {{ border-color: {TK['line']} !important; background-color: {TK['line']} !important; }}
+
+/* Caixas, formulários, expanders e chat */
 .main div[data-testid="stVerticalBlockBorderWrapper"],
 .main div[data-testid="stForm"],
-.main div[data-testid="stExpander"] {{
-    background-color: {COR_CHAPA} !important;
-    border: 1px solid rgba(197, 160, 89, 0.6) !important;
+.main div[data-testid="stExpander"],
+.main div[data-testid="stChatMessage"] {{
+    background-color: {TK['surface']} !important;
+    border: 1px solid {TK['line']} !important;
     border-radius: 12px !important;
 }}
-.main div[data-testid="stVerticalBlockBorderWrapper"] [data-testid="stMarkdownContainer"] > p,
-.main div[data-testid="stVerticalBlockBorderWrapper"] [data-testid="stCaptionContainer"],
-.main div[data-testid="stForm"] [data-testid="stCaptionContainer"],
-.main div[data-testid="stExpander"] [data-testid="stCaptionContainer"] {{
-    color: {COR_BRONZE} !important;
-}}
-.main p[style*="#8F847B"], .main p[style*="#A89C91"], .main span[style*="#8A7E75"] {{
-    color: {COR_BRONZE} !important;
-}}
-
-/* Métricas */
 .main div[data-testid="stMetric"] {{
-    background-color: #E3C684 !important;
+    background-color: {TK['btn_bg']} !important;
     border-radius: 12px !important;
     padding: 12px 16px !important;
 }}
-.main div[data-testid="stMetric"] * {{
-    color: {COR_TEXTO} !important;
-    -webkit-text-fill-color: {COR_TEXTO} !important;
-}}
+.main div[data-testid="stMetric"] * {{ color: {TK['btn_text']} !important; -webkit-text-fill-color: {TK['btn_text']} !important; }}
+.metric-card {{ background-color: {TK['btn_bg']} !important; border-color: {TK['btn_hover']} !important; }}
+.metric-card *, .metric-value, .metric-label {{ color: {TK['btn_text']} !important; -webkit-text-fill-color: {TK['btn_text']} !important; }}
 
-/* Avisos (info / sucesso / atenção / erro) com a paleta da plataforma */
-div[data-testid="stAlert"] {{
-    background-color: {COR_CHAPA} !important;
-    border: 1px solid rgba(197, 160, 89, 0.6) !important;
-    border-left: 6px solid {COR_OURO} !important;
-    border-radius: 10px !important;
+/* Campos */
+.main div[data-testid="stTextInput"] input, .main div[data-testid="stNumberInput"] input,
+.main div[data-testid="stDateInput"] input, .main div[data-testid="stTimeInput"] input,
+.main div[data-testid="stTextArea"] textarea, .main div[data-testid="stChatInput"] textarea,
+.main div[data-testid="stSelectbox"] div[data-baseweb="select"] > div,
+.main div[data-testid="stMultiSelect"] div[data-baseweb="select"] > div,
+.main div[data-baseweb="input"], .main div[data-baseweb="base-input"], .main div[data-baseweb="textarea"] {{
+    background-color: {TK['input_bg']} !important;
+    color: {TK['input_text']} !important;
+    -webkit-text-fill-color: {TK['input_text']} !important;
+    border-color: {TK['border']} !important;
 }}
-div[data-testid="stAlert"]:has([data-testid="stAlertContentSuccess"]) {{
-    background-color: #C8E6C9 !important; border-left-color: #2E7D32 !important;
+.main div[data-baseweb="select"] *, .main div[data-testid="stChatInput"] * {{ color: {TK['input_text']} !important; -webkit-text-fill-color: {TK['input_text']} !important; }}
+.main div[data-baseweb="select"] svg, .main div[data-baseweb="input"] svg {{ fill: {TK['input_text']} !important; }}
+.main input::placeholder, .main textarea::placeholder {{ color: {TK['placeholder']} !important; -webkit-text-fill-color: {TK['placeholder']} !important; opacity: 1 !important; }}
+.main div[data-testid="stNumberInput"] button {{ background: {TK['surface2']} !important; color: {TK['text']} !important; }}
+
+/* Menus suspensos e popovers (renderizados fora do .main) */
+ul[role="listbox"], div[data-baseweb="menu"], [data-testid="stPopoverBody"] {{
+    background-color: {TK['surface']} !important;
+    border: 1px solid {TK['border']} !important;
 }}
-div[data-testid="stAlert"]:has([data-testid="stAlertContentWarning"]) {{
-    background-color: #F4E8D1 !important; border-left-color: #9B783E !important;
+ul[role="listbox"] li, ul[role="listbox"] li *, [role="option"], [role="option"] * {{ color: {TK['text']} !important; -webkit-text-fill-color: {TK['text']} !important; }}
+[role="option"]:hover, li[aria-selected="true"] {{ background-color: {TK['surface2']} !important; }}
+[data-testid="stPopoverBody"] [data-testid="stMarkdownContainer"] p, [data-testid="stPopoverBody"] label p {{ color: {TK['text']} !important; }}
+
+/* Botões */
+.main button[kind="secondary"], .main button[data-testid="stBaseButton-secondary"],
+.main button[data-testid="stPopoverButton"] {{
+    background-color: {TK['sec_bg']} !important;
+    border: 1px solid {TK['border']} !important;
+    color: {TK['sec_text']} !important;
 }}
-div[data-testid="stAlert"]:has([data-testid="stAlertContentError"]) {{
-    background-color: #FFCDD2 !important; border-left-color: #B71C1C !important;
-}}
-div[data-testid="stAlert"] * {{
-    color: {COR_TEXTO} !important;
-    -webkit-text-fill-color: {COR_TEXTO} !important;
-    text-shadow: none !important;
-}}
+.main button[kind="secondary"] *, .main button[data-testid="stBaseButton-secondary"] *,
+.main button[data-testid="stPopoverButton"] * {{ color: {TK['sec_text']} !important; -webkit-text-fill-color: {TK['sec_text']} !important; }}
+.main button[kind="secondary"]:hover, .main button[data-testid="stBaseButton-secondary"]:hover {{ border-color: {TK['accent']} !important; background-color: {TK['surface2']} !important; }}
+.main button[kind="primary"], .main button[data-testid="stBaseButton-primary"] {{ background-color: {TK['btn_bg']} !important; border: 1px solid {TK['border']} !important; }}
+.main button[kind="primary"]:hover, .main button[data-testid="stBaseButton-primary"]:hover {{ background-color: {TK['btn_hover']} !important; }}
+.main button[kind="primary"] *, .main button[data-testid="stBaseButton-primary"] * {{ color: {TK['btn_text']} !important; -webkit-text-fill-color: {TK['btn_text']} !important; }}
+
+/* Avisos */
+div[data-testid="stAlert"] {{ background-color: {TK['info_bg']} !important; border: 1px solid {TK['info_bd']} !important; border-left: 6px solid {TK['info_bd']} !important; border-radius: 10px !important; }}
+div[data-testid="stAlert"]:has([data-testid="stAlertContentSuccess"]) {{ background-color: {TK['ok_bg']} !important; border-color: {TK['ok_bd']} !important; }}
+div[data-testid="stAlert"]:has([data-testid="stAlertContentWarning"]) {{ background-color: {TK['warn_bg']} !important; border-color: {TK['warn_bd']} !important; }}
+div[data-testid="stAlert"]:has([data-testid="stAlertContentError"]) {{ background-color: {TK['err_bg']} !important; border-color: {TK['err_bd']} !important; }}
+div[data-testid="stAlert"] * {{ color: {TK['info_text']} !important; -webkit-text-fill-color: {TK['info_text']} !important; text-shadow: none !important; }}
+div[data-testid="stAlert"]:has([data-testid="stAlertContentSuccess"]) * {{ color: {TK['ok_text']} !important; -webkit-text-fill-color: {TK['ok_text']} !important; }}
+div[data-testid="stAlert"]:has([data-testid="stAlertContentWarning"]) * {{ color: {TK['warn_text']} !important; -webkit-text-fill-color: {TK['warn_text']} !important; }}
+div[data-testid="stAlert"]:has([data-testid="stAlertContentError"]) * {{ color: {TK['err_text']} !important; -webkit-text-fill-color: {TK['err_text']} !important; }}
 </style>
 """
 if st.session_state.get("logado", False):
-    st.markdown(css_contraste, unsafe_allow_html=True)
+    st.markdown(css_tema, unsafe_allow_html=True)
 
 def exibir_painel_pagamento_pro(origem):
     with st.container(border=True):
@@ -1680,6 +1745,16 @@ else:
             </div>
         """, unsafe_allow_html=True)
         
+        _escuro = st.toggle("🌙 Modo escuro", value=(st.session_state["tema"] == "escuro"), key="toggle_tema")
+        _novo_tema = "escuro" if _escuro else "claro"
+        if _novo_tema != st.session_state["tema"]:
+            st.session_state["tema"] = _novo_tema
+            try:
+                st.query_params["tema"] = _novo_tema
+            except Exception:
+                pass
+            st.rerun()
+
         if st.button("Sair da Conta", type="primary", use_container_width=True): 
             st.session_state["logado"] = False
             st.rerun()
@@ -1768,10 +1843,10 @@ else:
         ]
 
     st.markdown(
-        """
+        f"""
         <div style='display: flex; align-items: center; justify-content: space-between; margin: 2px 0 2px 0;'>
-            <span style='color: #FFFFFF; text-shadow: 0 1px 3px rgba(0,0,0,0.6); font-weight: 700; font-size: 0.88rem;'>Acesso Rápido</span>
-            <span style='color: #F7F5F0; text-shadow: 0 1px 3px rgba(0,0,0,0.6); font-size: 0.75rem;'>Hover de 2s para rolar continuamente ou clique no card</span>
+            <span style='color: {TK["text"]}; font-weight: 700; font-size: 0.88rem;'>Acesso Rápido</span>
+            <span style='color: {TK["muted"]}; font-size: 0.75rem;'>Hover de 2s para rolar continuamente ou clique no card</span>
         </div>
         """,
         unsafe_allow_html=True
@@ -1826,8 +1901,8 @@ else:
             .card {{
                 flex: 0 0 calc((100% - 20px) / 3);
                 min-width: 0;
-                background: #FFFFFF;
-                border: 1.2px solid #EDE8DF;
+                background: {TK['surface']};
+                border: 1.2px solid {TK['border']};
                 border-radius: 12px;
                 padding: 6px 10px;
                 display: flex;
@@ -1848,14 +1923,14 @@ else:
             .icon-box {{
                 width: 34px;
                 height: 34px;
-                background: #FBF8F3;
-                border: 1px solid #EAE3D5;
+                background: {TK['surface2']};
+                border: 1px solid {TK['line']};
                 border-radius: 8px;
                 display: flex;
                 align-items: center;
                 justify-content: center;
                 font-size: 1.2rem;
-                color: #4A3C31;
+                color: {TK['text']};
                 flex-shrink: 0;
             }}
             .card-texts {{
@@ -1868,7 +1943,7 @@ else:
                 margin: 0;
                 font-size: 0.84rem;
                 font-weight: 700;
-                color: #2D241E;
+                color: {TK['text']};
                 white-space: nowrap;
                 overflow: hidden;
                 text-overflow: ellipsis;
@@ -1877,7 +1952,7 @@ else:
             .card-sub {{
                 margin: 1px 0 0 0;
                 font-size: 0.70rem;
-                color: #4A3C31;
+                color: {TK['muted']};
                 line-height: 1.15;
                 display: -webkit-box;
                 -webkit-line-clamp: 2;
@@ -2255,13 +2330,13 @@ else:
         st.components.v1.html(f"""
             <div style="display:none;">{time_module.time()}</div>
             <style>
-                body {{ font-family: 'Segoe UI', sans-serif; padding: 5px; margin: 0; color: #231F20; }}
-                label {{ font-size: 13px; font-weight: 600; margin-bottom: 4px; display: block; color: #4A3C31; }}
-                input, textarea {{ width: 100%; padding: 6px 10px; margin-bottom: 12px; border: 1px solid #C5A059; border-radius: 6px; box-sizing: border-box; font-size: 14px; background: #FFF; }}
-                input:focus, textarea:focus {{ border-color: #9B783E; outline: none; box-shadow: 0 0 0 1px #9B783E; }}
+                body {{ font-family: 'Segoe UI', sans-serif; padding: 5px; margin: 0; color: {TK['text']}; color-scheme: {TK['scheme']}; }}
+                label {{ font-size: 13px; font-weight: 600; margin-bottom: 4px; display: block; color: {TK['text']}; }}
+                input, textarea {{ width: 100%; padding: 6px 10px; margin-bottom: 12px; border: 1px solid {TK['border']}; border-radius: 6px; box-sizing: border-box; font-size: 14px; background: {TK['input_bg']}; color: {TK['input_text']}; }}
+                input:focus, textarea:focus {{ border-color: {TK['accent']}; outline: none; box-shadow: 0 0 0 1px {TK['accent']}; }}
                 .btn-container {{ text-align: right; margin-top: 5px; }}
-                button {{ padding: 8px 16px; background: #C5A059; color: #FFF; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; transition: 0.2s; width: auto; min-width: 180px; display: inline-block; }}
-                button:hover {{ background: #9B783E; }}
+                button {{ padding: 8px 16px; background: {TK['btn_bg']}; color: {TK['btn_text']}; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; transition: 0.2s; width: auto; min-width: 180px; display: inline-block; }}
+                button:hover {{ background: {TK['btn_hover']}; }}
                 #msg-feedback {{ margin-top: 10px; padding: 10px; border-radius: 6px; display: none; text-align: center; font-size: 14px; font-weight: bold; }}
             </style>
             <div id="form-container">
@@ -2453,14 +2528,14 @@ else:
                 # Formulário Híbrido Blindado (Offline + Compacto)
                 st.components.v1.html(f"""
                     <style>
-                        body {{ font-family: 'Segoe UI', sans-serif; color: #231F20; padding: 5px; margin: 0; background: transparent; }}
-                        label {{ font-size: 13px; font-weight: 600; margin-bottom: 4px; display: block; color: #4A3C31; }}
-                        input, select, textarea {{ width: 100%; padding: 8px; margin-bottom: 12px; border: 1px solid #C5A059; border-radius: 6px; box-sizing: border-box; background: #FFF; font-size: 14px; }}
-                        input:focus, select:focus, textarea:focus {{ border-color: #9B783E; outline: none; box-shadow: 0 0 0 1px #9B783E; }}
+                        body {{ font-family: 'Segoe UI', sans-serif; color: {TK['text']}; color-scheme: {TK['scheme']}; padding: 5px; margin: 0; background: transparent; }}
+                        label {{ font-size: 13px; font-weight: 600; margin-bottom: 4px; display: block; color: {TK['text']}; }}
+                        input, select, textarea {{ width: 100%; padding: 8px; margin-bottom: 12px; border: 1px solid {TK['border']}; border-radius: 6px; box-sizing: border-box; background: {TK['input_bg']}; color: {TK['input_text']}; font-size: 14px; }}
+                        input:focus, select:focus, textarea:focus {{ border-color: {TK['accent']}; outline: none; box-shadow: 0 0 0 1px {TK['accent']}; }}
                         .grid-3 {{ display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }}
                         .btn-wrapper {{ text-align: right; margin-top: 5px; }}
-                        button {{ width: auto; min-width: 200px; padding: 12px 24px; background: #C5A059; color: #FFF; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; transition: 0.2s; font-size: 15px; display: inline-block; }}
-                        button:hover {{ background: #9B783E; }}
+                        button {{ width: auto; min-width: 200px; padding: 12px 24px; background: {TK['btn_bg']}; color: {TK['btn_text']}; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; transition: 0.2s; font-size: 15px; display: inline-block; }}
+                        button:hover {{ background: {TK['btn_hover']}; }}
                         #msg-feedback {{ margin-top: 10px; padding: 10px; border-radius: 6px; display: none; text-align: center; font-size: 14px; font-weight: bold; }}
                     </style>
                     <div id="form-container">
@@ -2897,15 +2972,15 @@ else:
             st.components.v1.html(f"""
                 <div style="display:none;">{time_module.time()}</div>
                 <style>
-                    body {{ font-family: 'Segoe UI', sans-serif; color: #231F20; padding: 5px; margin: 0; }}
-                    label {{ font-size: 13px; font-weight: 600; margin-bottom: 4px; display: block; color: #4A3C31; }}
-                    input, select, textarea {{ width: 100%; padding: 6px 10px; margin-bottom: 12px; border: 1px solid #C5A059; border-radius: 6px; box-sizing: border-box; font-size: 14px; background: #FFF; }}
-                    input:focus, select:focus, textarea:focus {{ border-color: #9B783E; outline: none; box-shadow: 0 0 0 1px #9B783E; }}
+                    body {{ font-family: 'Segoe UI', sans-serif; color: {TK['text']}; color-scheme: {TK['scheme']}; padding: 5px; margin: 0; }}
+                    label {{ font-size: 13px; font-weight: 600; margin-bottom: 4px; display: block; color: {TK['text']}; }}
+                    input, select, textarea {{ width: 100%; padding: 6px 10px; margin-bottom: 12px; border: 1px solid {TK['border']}; border-radius: 6px; box-sizing: border-box; font-size: 14px; background: {TK['input_bg']}; color: {TK['input_text']}; }}
+                    input:focus, select:focus, textarea:focus {{ border-color: {TK['accent']}; outline: none; box-shadow: 0 0 0 1px {TK['accent']}; }}
                     .grid-5 {{ display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr; gap: 10px; }}
                     .grid-4 {{ display: grid; grid-template-columns: 1fr 1fr 2fr; gap: 10px; }}
                     .btn-container {{ text-align: right; margin-top: 5px; }}
-                    button {{ padding: 8px 16px; background: #C5A059; color: #FFF; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; transition: 0.2s; font-size: 14px; width: auto; display: inline-block; }}
-                    button:hover {{ background: #9B783E; }}
+                    button {{ padding: 8px 16px; background: {TK['btn_bg']}; color: {TK['btn_text']}; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; transition: 0.2s; font-size: 14px; width: auto; display: inline-block; }}
+                    button:hover {{ background: {TK['btn_hover']}; }}
                     #msg-feedback {{ margin-top: 10px; padding: 10px; border-radius: 6px; display: none; text-align: center; font-size: 14px; font-weight: bold; }}
                 </style>
                 <div id="form-container">
