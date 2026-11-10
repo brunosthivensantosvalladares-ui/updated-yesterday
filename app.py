@@ -851,6 +851,43 @@ def gerar_pdf_manual_oficial_pro():
         return bytes(res)
     return res
 
+def registrar_historico_logistica(
+    solicitacao_id,
+    usuario,
+    acao,
+    detalhe
+):
+    engine = get_engine()
+
+    with engine.connect() as conn:
+
+        conn.execute(
+            text("""
+                INSERT INTO historico_logistica
+                (
+                    solicitacao_id,
+                    usuario,
+                    acao,
+                    detalhe
+                )
+                VALUES
+                (
+                    :sid,
+                    :usr,
+                    :acao,
+                    :det
+                )
+            """),
+            {
+                "sid": solicitacao_id,
+                "usr": usuario,
+                "acao": acao,
+                "det": detalhe
+            }
+        )
+
+        conn.commit()
+
 def obter_proxima_os(engine, emp_id):
     try:
         with engine.connect() as conn:
@@ -4047,6 +4084,14 @@ else:
             )
 
             conn.commit()
+
+        # REGISTRA O RESPALDO OPERACIONAL
+        registrar_historico_logistica(
+            row["id"],
+            usuario_ativo,
+            "RECUSA_LOGISTICA",
+            "Veículo mantido em operação por decisão logística."
+        )
 
         st.warning("Solicitação recusada.")
         st.rerun()
