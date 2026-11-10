@@ -1404,6 +1404,50 @@ def inicializar_banco():
             except Exception: pass
             conn.commit()
     except Exception: pass
+    
+conn.execute(text("""
+CREATE TABLE IF NOT EXISTS solicitacoes_logistica (
+    id SERIAL PRIMARY KEY,
+
+    empresa_id TEXT NOT NULL,
+
+    tipo_solicitacao VARCHAR(30),
+
+    numero_os INTEGER,
+
+    prefixo TEXT NOT NULL,
+
+    status VARCHAR(30) DEFAULT 'Pendente',
+
+    data_sugerida DATE,
+    data_contraproposta DATE,
+
+    tempo_box_horas NUMERIC(10,2),
+
+    justificativa TEXT,
+
+    criado_por TEXT,
+    aprovado_por TEXT,
+
+    data_criacao TIMESTAMP DEFAULT NOW(),
+    data_decisao TIMESTAMP
+)
+"""))
+
+conn.execute(text("""
+CREATE TABLE IF NOT EXISTS historico_logistica (
+    id SERIAL PRIMARY KEY,
+
+    solicitacao_id INTEGER,
+
+    usuario TEXT,
+    acao TEXT,
+
+    detalhe TEXT,
+
+    data_evento TIMESTAMP DEFAULT NOW()
+)
+"""))
 
 def obter_medidor_proximo(engine, emp_id, prefixo, data_os):
     try:
@@ -4022,7 +4066,7 @@ else:
                 with st.form("f_u", clear_on_submit=True):
                     u = st.text_input("Login")
                     s = st.text_input("Senha", type="password")
-                    p = st.selectbox("Cargo", ["motorista", "admin"])
+                    p = st.selectbox("Cargo", ["motorista", "pcm", "logistica", "admin"])
                     if st.form_submit_button("Criar Acesso"):
                         if u and s:
                             senha_hash = gerar_hash_senha(s)
@@ -4071,7 +4115,7 @@ else:
                 column_config={
                     "id": None, 
                     "Exc": st.column_config.CheckboxColumn("Excluir", width="small"), 
-                    "cargo": st.column_config.SelectboxColumn("Cargo", options=["motorista", "admin"])
+                    "cargo": st.column_config.SelectboxColumn("Cargo", options=["motorista", "pcm", "logistica", "admin"])
                 }, 
                 key="editor_equipe"
             )
