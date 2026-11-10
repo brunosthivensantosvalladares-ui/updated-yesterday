@@ -1682,6 +1682,7 @@ else:
             "🗎  Cadastro Direto",
             "⚡  Alimentar Horímetros/Odômetros",
             "🗀  Chamados Oficina",
+            "🚛 Solicitações Logística",
             "🗩  Chat Mr. Halley",
             "⧖  OSs Pendentes",
             "✓  OSs Concluídas",
@@ -1790,9 +1791,24 @@ else:
                         text("SELECT COUNT(*) FROM planos_preventivas WHERE ativo = TRUE AND proxima_data_vencimento <= :limite AND empresa_id = :eid"),
                         {"limite": limite_alerta, "eid": str(emp_id)}
                     ).scalar() or 0
+                    qtd_logistica = conn.execute(
+                        text("""
+                        SELECT COUNT(*)
+                        FROM solicitacoes_logistica
+                        WHERE status='Pendente'
+                        AND empresa_id=:eid
+                        """),
+                        {"eid": str(emp_id)}
+                    ).scalar() or 0
+
         except Exception:
             pass
-        return int(qtd_atrasadas), int(qtd_chamados), int(qtd_preventivas)
+        return (
+            int(qtd_atrasadas),
+            int(qtd_chamados),
+            int(qtd_preventivas),
+            int(qtd_logistica)
+        )
 
     with st.sidebar:
         st.markdown(f"""
