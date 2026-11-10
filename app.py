@@ -684,8 +684,7 @@ FUNCIONALIDADES E PASSO A PASSO DA PLATAFORMA UP 2 TODAY:
 5. OSs Pendentes (Baixa Técnica): Aba onde o gestor clica na linha da OS para preencher a execução e dar a baixa técnica.
 6. OSs Concluídas: Histórico e relatórios exportáveis de serviços finalizados.
 7. Perfil Motorista / Abrir Solicitação: Aba onde o motorista preenche o prefixo e a descrição para abrir novos chamados de forma remota.
-8. Solicitações à Logística: Fluxos de emergência, janelas preventivas e corretivas maiores, com decisões e histórico entre PCM e Logística.
-9. Chat Mr. Halley: Assistente virtual integrado para triagem de falhas, consulta de histórico e abertura conversacional de Ordens de Serviço (OS).
+8. Chat Mr. Halley: Assistente virtual integrado para triagem de falhas, consulta de histórico e abertura conversacional de Ordens de Serviço (OS).
 """
 
     template_geral = f"""
@@ -1403,213 +1402,8 @@ def inicializar_banco():
             except Exception: pass
             try: conn.execute(text("ALTER TABLE chamados ADD COLUMN IF NOT EXISTS empresa_id TEXT DEFAULT 'U2T_MATRIZ'"))
             except Exception: pass
-            # Fluxos formais de alinhamento entre PCM e Logística
-            conn.execute(text("""CREATE TABLE IF NOT EXISTS solicitacoes_logistica (
-                id SERIAL PRIMARY KEY, empresa_id TEXT NOT NULL, tipo TEXT NOT NULL,
-                prefixo TEXT NOT NULL, descricao TEXT NOT NULL, justificativa_tecnica TEXT,
-                data_sugerida DATE, hora_inicio TEXT, hora_fim TEXT, tempo_box_horas NUMERIC,
-                status TEXT NOT NULL DEFAULT 'Pendente', data_contraproposta DATE,
-                hora_inicio_contraproposta TEXT, hora_fim_contraproposta TEXT,
-                justificativa_logistica TEXT, solicitado_por TEXT NOT NULL,
-                decidido_por TEXT, criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                decidido_em TIMESTAMP, tarefa_id INTEGER, numero_os INTEGER
-            )"""))
-            conn.execute(text("""CREATE TABLE IF NOT EXISTS historico_solicitacoes_logistica (
-                id BIGSERIAL PRIMARY KEY, empresa_id TEXT NOT NULL,
-                solicitacao_id INTEGER NOT NULL, acao TEXT NOT NULL,
-                status_anterior TEXT, status_novo TEXT, responsavel TEXT NOT NULL,
-                justificativa TEXT, detalhes TEXT, criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )"""))
-            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_sol_log_empresa_status ON solicitacoes_logistica (empresa_id, status)"))
-            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_hist_sol_log_id ON historico_solicitacoes_logistica (solicitacao_id, criado_em)"))
-            conn.execute(text("""CREATE OR REPLACE FUNCTION uy_bloquear_alteracao_historico_logistica()
-                RETURNS trigger AS $$ BEGIN
-                    RAISE EXCEPTION 'O histórico de solicitações é imutável; novos eventos devem ser inseridos.';
-                END; $$ LANGUAGE plpgsql"""))
-            conn.execute(text("DROP TRIGGER IF EXISTS trg_historico_logistica_imutavel ON historico_solicitacoes_logistica"))
-            conn.execute(text("""CREATE TRIGGER trg_historico_logistica_imutavel
-                BEFORE UPDATE OR DELETE ON historico_solicitacoes_logistica
-                FOR EACH ROW EXECUTE FUNCTION uy_bloquear_alteracao_historico_logistica()"""))
             conn.commit()
     except Exception: pass
-
-def registrar_evento_logistica(conn, emp_id, solicitacao_id, acao, responsavel,
-                                  status_anterior=None, status_novo=None, justificativa=None, detalhes=None):
-    """Histórico append-only pela aplicação: eventos são inseridos, nunca editados pela interface."""
-    conn.execute(text("""INSERT INTO historico_solicitacoes_logistica
-        (empresa_id, solicitacao_id, acao, status_anterior, status_novo, responsavel, justificativa, detalhes)
-        VALUES (:eid, :sid, :acao, :sa, :sn, :resp, :just, :det)"""),
-        {"eid": str(emp_id), "sid": int(solicitacao_id), "acao": acao,
-         "sa": status_anterior, "sn": status_novo, "resp": responsavel,
-         "just": justificativa, "det": detalhes})
-
-
-def criar_solicitacao_logistica(engine, emp_id, dados, responsavel):
-    """Cria solicitação e registra auditoria. Emergência aprovada pelo PCM gera OS imediatamente."""
-    with engine.begin() as conn:
-        res = conn.execute(text("""INSERT INTO solicitacoes_logistica
-            (empresa_id, tipo, prefixo, descricao, justificativa_tecnica, data_sugerida,
-             hora_inicio, hora_fim, tempo_box_horas, status, solicitado_por)
-            VALUES (:eid,:tipo,:pref,:desc,:just,:dt,:hi,:hf,:box,:status,:resp) RETURNING id"""),
-            {"eid": str(emp_id), "tipo": dados["tipo"], "pref": dados["prefixo"],
-             "desc": dados["descricao"], "just": dados.get("justificativa"),
-             "dt": dados.get("data"), "hi": dados.get("inicio"), "hf": dados.get("fim"),
-             "box": dados.get("box"),
-             "status": "Pendente" if dados["tipo"] != "Urgente" else "Pendente de triagem PCM",
-             "resp": responsavel})
-        sid = int(res.scalar())
-        registrar_evento_logistica(conn, emp_id, sid, "Solicitação criada", responsavel,
-                                   status_novo="Pendente" if dados["tipo"] != "Urgente" else "Pendente de triagem PCM",
-                                   justificativa=dados.get("justificativa"), detalhes=f"Tipo: {dados['tipo']} | Prefixo: {dados['prefixo']}")
-    return sid
-
-
-def gerar_os_solicitacao_logistica(engine, emp_id, solicitacao, executor, area, data_exec, inicio, fim):
-    """Insere a OS vinculada à solicitação; valida conflito de box por área/horário."""
-    with engine.begin() as conn:
-        conflito = conn.execute(text("""SELECT COUNT(*) FROM tarefas
-            WHERE empresa_id=:eid AND data=:dt AND COALESCE(area,'')=:area
-              AND COALESCE(realizado,FALSE)=FALSE
-              AND COALESCE(inicio_disp,'') < :fim AND COALESCE(fim_disp,'') > :inicio"""),
-            {"eid": str(emp_id), "dt": str(data_exec), "area": area, "inicio": inicio or "00:00", "fim": fim or "23:59"}).scalar() or 0
-        if conflito:
-            raise ValueError("Já existe uma OS não concluída com sobreposição de horário nessa área/box. Ajuste a janela antes de aprovar.")
-        numero = conn.execute(text("SELECT COALESCE(MAX(numero_os),1000)+1 FROM tarefas WHERE empresa_id=:eid"), {"eid": str(emp_id)}).scalar()
-        tarefa_id = conn.execute(text("""INSERT INTO tarefas
-            (data, executor, prefixo, inicio_disp, fim_disp, descricao, area, tipo_os, turno,
-             realizado, origem, empresa_id, numero_os)
-            VALUES (:dt,:ex,:pref,:hi,:hf,:desc,:area,:tipo,'Não definido',FALSE,'Solicitação Logística',:eid,:nos)
-            RETURNING id"""),
-            {"dt": str(data_exec), "ex": executor, "pref": solicitacao["prefixo"],
-             "hi": inicio or "", "hf": fim or "", "desc": solicitacao["descricao"],
-             "area": area, "tipo": "Corretiva" if solicitacao["tipo"] == "Urgente" else ("Preventiva" if solicitacao["tipo"] == "Preventiva" else "Intervenção programada"),
-             "eid": str(emp_id), "nos": int(numero)}).fetchone()[0]
-    return int(tarefa_id), int(numero)
-
-
-def renderizar_solicitacoes_logistica(engine, emp_id, perfil, usuario_ativo):
-    st.subheader("🤝 Solicitações à Logística | PCM")
-    st.caption("Formalize emergências, janelas preventivas e paradas maiores, mantendo as decisões rastreáveis entre as equipes.")
-    if perfil in ("admin", "pcm"):
-        with st.expander("＋ Nova solicitação de janela / parada", expanded=True):
-            with st.form("form_nova_solicitacao_logistica", clear_on_submit=True):
-                tipo = st.selectbox("Tipo de solicitação", ["Urgente", "Preventiva", "Corretiva maior / Reforma"])
-                c1,c2 = st.columns(2)
-                prefixo = c1.text_input("Prefixo / identificação do veículo")
-                data_sug = c2.date_input("Data sugerida", value=datetime.now().date() + timedelta(days=1))
-                descricao = st.text_area("Serviço / necessidade identificada")
-                justificativa = st.text_area("Justificativa técnica (risco, prazo, plano, garantia etc.)")
-                c3,c4,c5 = st.columns(3)
-                hora_i = c3.text_input("Início da janela (HH:MM)", value="08:00")
-                hora_f = c4.text_input("Fim da janela (HH:MM)", value="12:00")
-                box_h = c5.number_input("Tempo estimado de box (h)", min_value=0.0, value=2.0, step=0.5)
-                enviar = st.form_submit_button("Enviar solicitação à Logística", type="primary", use_container_width=True)
-                if enviar:
-                    if not prefixo.strip() or not descricao.strip() or not justificativa.strip():
-                        st.warning("Informe veículo, serviço e justificativa técnica.")
-                    elif not re.match(r"^([01]\d|2[0-3]):[0-5]\d$", hora_i) or not re.match(r"^([01]\d|2[0-3]):[0-5]\d$", hora_f) or hora_f <= hora_i:
-                        st.warning("Informe horários válidos no formato HH:MM e com fim posterior ao início.")
-                    else:
-                        try:
-                            sid = criar_solicitacao_logistica(engine, emp_id,
-                                {"tipo": tipo, "prefixo": prefixo.strip(), "descricao": descricao.strip(),
-                                 "justificativa": justificativa.strip(), "data": data_sug,
-                                 "inicio": hora_i, "fim": hora_f, "box": box_h}, usuario_ativo)
-                            st.success(f"Solicitação #{sid} enviada para análise da Logística.")
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"Não foi possível criar a solicitação: {e}")
-
-    try:
-        df = pd.read_sql(text("""SELECT id, tipo, prefixo, descricao, justificativa_tecnica,
-            data_sugerida, hora_inicio, hora_fim, tempo_box_horas, status, data_contraproposta,
-            hora_inicio_contraproposta, hora_fim_contraproposta, justificativa_logistica,
-            solicitado_por, decidido_por, criado_em, tarefa_id, numero_os
-            FROM solicitacoes_logistica WHERE empresa_id=:eid ORDER BY criado_em DESC"""), engine, params={"eid": str(emp_id)})
-    except Exception as e:
-        st.error(f"Erro ao consultar solicitações: {e}"); return
-    if df.empty:
-        st.info("Nenhuma solicitação registrada até o momento."); return
-    pendentes = int(df["status"].isin(["Pendente", "Pendente de triagem PCM", "Agendada - aguardando ciência logística"]).sum())
-    st.metric("Solicitações aguardando ação", pendentes)
-    for _, r in df.iterrows():
-        sid=int(r["id"])
-        with st.expander(f"#{sid} · {r['tipo']} · Veículo {r['prefixo']} · {r['status']}", expanded=(r["status"] in ["Pendente", "Pendente de triagem PCM"])):
-            st.write(f"**Serviço:** {r['descricao']}")
-            st.write(f"**Justificativa técnica:** {r['justificativa_tecnica'] or 'Não informada'}")
-            st.write(f"**Janela sugerida:** {r['data_sugerida']} · {r['hora_inicio']}–{r['hora_fim']} · Box estimado: {r['tempo_box_horas'] or '—'} h")
-            st.caption(f"Solicitado por {r['solicitado_por']} em {r['criado_em']}")
-            # Emergência: PCM faz a triagem e gera a OS; logística registra ciência ou decisão tardia.
-            if perfil in ("admin", "pcm") and r["status"] == "Pendente de triagem PCM":
-                with st.form(f"triagem_urgente_{sid}"):
-                    executor=st.text_input("Executor / equipe", key=f"urg_ex_{sid}")
-                    area=st.selectbox("Área / box", ORDEM_AREAS, key=f"urg_ar_{sid}")
-                    if st.form_submit_button("Aprovar urgência e gerar OS"):
-                        try:
-                            tarefa_id, numero = gerar_os_solicitacao_logistica(engine, emp_id, {"prefixo":r["prefixo"],"descricao":r["descricao"],"tipo":"Urgente"}, executor, area, r["data_sugerida"], r["hora_inicio"], r["hora_fim"])
-                            with engine.begin() as conn:
-                                conn.execute(text("UPDATE solicitacoes_logistica SET status='Agendada - aguardando ciência logística', tarefa_id=:tid, numero_os=:nos, decidido_por=:u, decidido_em=CURRENT_TIMESTAMP WHERE id=:id AND empresa_id=:eid"), {"tid":tarefa_id,"nos":numero,"u":usuario_ativo,"id":sid,"eid":str(emp_id)})
-                                registrar_evento_logistica(conn, emp_id, sid, "Urgência aprovada pelo PCM e OS gerada", usuario_ativo, r["status"], "Agendada - aguardando ciência logística", r["justificativa_tecnica"], f"OS {numero}; tarefa {tarefa_id}")
-                            st.success(f"OS {numero} criada e encaminhada à agenda. A Logística será informada nesta tela."); st.rerun()
-                        except Exception as e: st.error(str(e))
-            elif perfil == "logistica" and r["status"] == "Agendada - aguardando ciência logística":
-                st.warning("⚠️ Parada urgente já encaminhada à oficina. Registre a ciência ou eventual decisão operacional de manter o veículo em operação.")
-                with st.form(f"decisao_urgente_{sid}"):
-                    decisao_urg=st.radio("Retorno da Logística", ["Ciente — manter encaminhamento à oficina", "Manter veículo em operação (recusa tardia)"], key=f"urg_dec_{sid}")
-                    just=st.text_area("Observação / justificativa da decisão logística", key=f"urg_just_{sid}")
-                    if st.form_submit_button("Registrar retorno da Logística"):
-                        if decisao_urg.startswith("Manter veículo") and not just.strip(): st.warning("A justificativa é obrigatória para registrar a manutenção do veículo em operação.")
-                        else:
-                            novo_status_urg = "Ciência logística registrada - OS mantida" if decisao_urg.startswith("Ciente") else "Recusada tardiamente pela Logística - OS mantida"
-                            with engine.begin() as conn:
-                                conn.execute(text("UPDATE solicitacoes_logistica SET status=:st, justificativa_logistica=:j, decidido_por=:u, decidido_em=CURRENT_TIMESTAMP WHERE id=:id AND empresa_id=:eid"), {"st":novo_status_urg,"j":just,"u":usuario_ativo,"id":sid,"eid":str(emp_id)})
-                                registrar_evento_logistica(conn, emp_id, sid, decisao_urg, usuario_ativo, r["status"], novo_status_urg, just, f"OS {r['numero_os']} permanece na agenda; nenhuma decisão logística apaga/cancela automaticamente a OS.")
-                            st.success("Retorno registrado. A OS permanece na agenda e a decisão foi preservada no histórico."); st.rerun()
-            elif perfil == "logistica" and r["status"] == "Pendente":
-                with st.form(f"decisao_log_{sid}"):
-                    decisao=st.radio("Decisão", ["Aprovar janela", "Sugerir outra data", "Recusar solicitação"], horizontal=True)
-                    nova_data=st.date_input("Nova data / contraproposta", value=(pd.to_datetime(r["data_sugerida"]).date() if pd.notna(r["data_sugerida"]) else datetime.now().date()+timedelta(days=1)), key=f"nova_data_{sid}")
-                    novo_inicio=st.text_input("Novo início (HH:MM)", value=str(r["hora_inicio"] or "08:00"), key=f"novo_i_{sid}")
-                    novo_fim=st.text_input("Novo fim (HH:MM)", value=str(r["hora_fim"] or "12:00"), key=f"novo_f_{sid}")
-                    just=st.text_area("Justificativa / motivo", key=f"just_log_{sid}")
-                    if st.form_submit_button("Registrar decisão", type="primary"):
-                        if decisao == "Recusar solicitação" and not just.strip(): st.warning("A justificativa é obrigatória para recusar.")
-                        elif decisao != "Recusar solicitação" and (not re.match(r"^([01]\d|2[0-3]):[0-5]\d$",novo_inicio) or not re.match(r"^([01]\d|2[0-3]):[0-5]\d$",novo_fim) or novo_fim<=novo_inicio): st.warning("Horários inválidos.")
-                        else:
-                            novo_status = "Aprovada pela Logística" if decisao == "Aprovar janela" else ("Contraproposta da Logística" if decisao == "Sugerir outra data" else "Recusada pela Logística")
-                            with engine.begin() as conn:
-                                conn.execute(text("""UPDATE solicitacoes_logistica SET status=:st, data_contraproposta=:dt,
-                                    hora_inicio_contraproposta=:hi, hora_fim_contraproposta=:hf,
-                                    justificativa_logistica=:j, decidido_por=:u, decidido_em=CURRENT_TIMESTAMP
-                                    WHERE id=:id AND empresa_id=:eid"""), {"st":novo_status,"dt":nova_data if decisao!="Recusar solicitação" else None,"hi":novo_inicio if decisao!="Recusar solicitação" else None,"hf":novo_fim if decisao!="Recusar solicitação" else None,"j":just,"u":usuario_ativo,"id":sid,"eid":str(emp_id)})
-                                registrar_evento_logistica(conn, emp_id, sid, decisao, usuario_ativo, r["status"], novo_status, just, f"Data proposta: {nova_data}; janela: {novo_inicio}-{novo_fim}")
-                            st.success("Decisão registrada."); st.rerun()
-            elif perfil in ("admin", "pcm") and r["status"] in ["Aprovada pela Logística", "Contraproposta da Logística"]:
-                if r["status"] == "Contraproposta da Logística":
-                    st.info(f"Logística sugeriu: {r['data_contraproposta']} · {r['hora_inicio_contraproposta']}–{r['hora_fim_contraproposta']}. Confirme ou negocie nova janela.")
-                with st.form(f"fechar_acordo_{sid}"):
-                    usar_contra=st.checkbox("Aceitar a janela sugerida pela Logística", value=(r["status"]=="Contraproposta da Logística"), key=f"contra_{sid}")
-                    executor=st.text_input("Executor / equipe", key=f"exec_{sid}")
-                    area=st.selectbox("Área / box", ORDEM_AREAS, key=f"area_{sid}")
-                    if st.form_submit_button("Confirmar acordo e gerar OS", type="primary"):
-                        dt_exec=r["data_contraproposta"] if usar_contra else r["data_sugerida"]
-                        hi=r["hora_inicio_contraproposta"] if usar_contra else r["hora_inicio"]
-                        hf=r["hora_fim_contraproposta"] if usar_contra else r["hora_fim"]
-                        try:
-                            tarefa_id,numero=gerar_os_solicitacao_logistica(engine,emp_id,{"prefixo":r["prefixo"],"descricao":r["descricao"],"tipo":r["tipo"]},executor,area,dt_exec,hi,hf)
-                            with engine.begin() as conn:
-                                conn.execute(text("UPDATE solicitacoes_logistica SET status='Acordo confirmado - OS gerada', tarefa_id=:tid, numero_os=:nos, decidido_por=:u, decidido_em=CURRENT_TIMESTAMP WHERE id=:id AND empresa_id=:eid"), {"tid":tarefa_id,"nos":numero,"u":usuario_ativo,"id":sid,"eid":str(emp_id)})
-                                registrar_evento_logistica(conn,emp_id,sid,"Acordo confirmado e OS gerada",usuario_ativo,r["status"],"Acordo confirmado - OS gerada",r["justificativa_logistica"],f"OS {numero}; data {dt_exec}; janela {hi}-{hf}")
-                            st.success(f"Acordo confirmado. OS {numero} adicionada à Agenda Principal."); st.rerun()
-                        except Exception as e: st.error(str(e))
-            # Histórico de auditoria por solicitação
-            try:
-                hist=pd.read_sql(text("SELECT criado_em, acao, responsavel, status_anterior, status_novo, justificativa, detalhes FROM historico_solicitacoes_logistica WHERE empresa_id=:eid AND solicitacao_id=:sid ORDER BY criado_em"),engine,params={"eid":str(emp_id),"sid":sid})
-                if not hist.empty:
-                    st.markdown("**Histórico de decisões**")
-                    st.dataframe(hist,hide_index=True,use_container_width=True)
-            except Exception: pass
-
 
 def obter_medidor_proximo(engine, emp_id, prefixo, data_os):
     try:
@@ -1837,15 +1631,10 @@ else:
     
     if st.session_state["perfil"] == "motorista":
         opcoes = ["✍  Abrir Solicitação", "📋  Status"]
-    elif st.session_state["perfil"] == "logistica":
-        opcoes = ["🤝  Solicitações à Logística"]
-    elif st.session_state["perfil"] == "pcm":
-        opcoes = ["⌂  Dashboard", "◰  Agenda Principal", "🤝  Solicitações à Logística", "🗀  Chamados Oficina", "⧖  OSs Pendentes", "✓  OSs Concluídas"]
     else:
         opcoes = [
             "⌂  Dashboard",
             "◰  Agenda Principal",
-            "🤝  Solicitações à Logística",
             "🗎  Cadastro Direto",
             "⚡  Alimentar Horímetros/Odômetros",
             "🗀  Chamados Oficina",
@@ -1937,7 +1726,6 @@ else:
         qtd_atrasadas = 0
         qtd_chamados = 0
         qtd_preventivas = 0
-        qtd_logistica = 0
         try:
             hoje_header = str(datetime.now().date())
             limite_alerta = str(datetime.now().date() + timedelta(days=3))
@@ -1947,28 +1735,20 @@ else:
                     {"hoje": hoje_header, "eid": str(emp_id)}
                 ).scalar() or 0
                 
-                if st.session_state.get("perfil") in ("admin", "logistica", "pcm"):
+                if st.session_state.get("perfil") == "admin":
                     qtd_chamados = conn.execute(
                         text("SELECT COUNT(*) FROM chamados WHERE status = 'Pendente' AND empresa_id = :eid"),
                         {"eid": str(emp_id)}
                     ).scalar() or 0
                     
-                    # Contagem isolada para que a ausência de uma tabela legada não oculte alertas novos.
-                    try:
-                        qtd_preventivas = conn.execute(
-                            text("SELECT COUNT(*) FROM planos_preventivas WHERE ativo = TRUE AND proxima_data_vencimento <= :limite AND empresa_id = :eid"),
-                            {"limite": limite_alerta, "eid": str(emp_id)}
-                        ).scalar() or 0
-                    except Exception:
-                        qtd_preventivas = 0
-                    if st.session_state.get("perfil") in ("admin", "logistica", "pcm"):
-                        try:
-                            qtd_logistica = conn.execute(text("SELECT COUNT(*) FROM solicitacoes_logistica WHERE empresa_id=:eid AND status IN ('Pendente','Pendente de triagem PCM','Agendada - aguardando ciência logística')"), {"eid":str(emp_id)}).scalar() or 0
-                        except Exception:
-                            qtd_logistica = 0
+                    # Preventivas próximas do vencimento (vencem hoje ou nos próximos 3 dias)
+                    qtd_preventivas = conn.execute(
+                        text("SELECT COUNT(*) FROM planos_preventivas WHERE ativo = TRUE AND proxima_data_vencimento <= :limite AND empresa_id = :eid"),
+                        {"limite": limite_alerta, "eid": str(emp_id)}
+                    ).scalar() or 0
         except Exception:
             pass
-        return int(qtd_atrasadas), int(qtd_chamados) + int(qtd_logistica), int(qtd_preventivas)
+        return int(qtd_atrasadas), int(qtd_chamados), int(qtd_preventivas)
 
     with st.sidebar:
         st.markdown(f"""
@@ -2358,10 +2138,7 @@ else:
     if "mr_halley_aberto" not in st.session_state:
         st.session_state.mr_halley_aberto = False
 
-    if "Solicitações à Logística" in aba_ativa:
-        renderizar_solicitacoes_logistica(engine, emp_id, st.session_state["perfil"], usuario_ativo)
-
-    elif "Dashboard" in aba_ativa:
+    if "Dashboard" in aba_ativa:
         st.markdown("<h4 style='color: #2D241E; font-weight: 700; margin-bottom: 16px;'>Cronograma Geral de Manutenção</h4>", unsafe_allow_html=True)
         
         df_dash_stats = carregar_tarefas_empresa(emp_id)
@@ -4245,7 +4022,7 @@ else:
                 with st.form("f_u", clear_on_submit=True):
                     u = st.text_input("Login")
                     s = st.text_input("Senha", type="password")
-                    p = st.selectbox("Cargo", ["motorista", "logistica", "pcm", "admin"])
+                    p = st.selectbox("Cargo", ["motorista", "admin"])
                     if st.form_submit_button("Criar Acesso"):
                         if u and s:
                             senha_hash = gerar_hash_senha(s)
@@ -4294,7 +4071,7 @@ else:
                 column_config={
                     "id": None, 
                     "Exc": st.column_config.CheckboxColumn("Excluir", width="small"), 
-                    "cargo": st.column_config.SelectboxColumn("Cargo", options=["motorista", "logistica", "pcm", "admin"])
+                    "cargo": st.column_config.SelectboxColumn("Cargo", options=["motorista", "admin"])
                 }, 
                 key="editor_equipe"
             )
