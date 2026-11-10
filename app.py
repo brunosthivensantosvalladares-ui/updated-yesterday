@@ -3969,6 +3969,126 @@ else:
                     st.warning("⚠️ Marque a caixa 'OK' em ao menos um chamado antes de processar.")
         else: 
             st.info("Nenhum chamado pendente no momento.")
+
+    elif "Solicitações Logística" in aba_ativa:
+
+    st.subheader("🚛 Solicitações para Logística")
+
+    df_log = pd.read_sql(
+        text("""
+            SELECT *
+            FROM solicitacoes_logistica
+            WHERE empresa_id = :eid
+            ORDER BY id DESC
+        """),
+        engine,
+        params={"eid": str(emp_id)}
+    )
+
+    if not df_log.empty:
+
+        for _, row in df_log.iterrows():
+
+            with st.container(border=True):
+
+                st.write(f"Veículo: {row['prefixo']}")
+                st.write(f"Tipo: {row['tipo_solicitacao']}")
+                st.write(f"Status: {row['status']}")
+
+                c1, c2, c3 = st.columns(3)
+
+                with c1:
+                    if st.button(
+                        "✅ Aprovar",
+                        key=f"aprovar_{row['id']}"
+                    ):
+                        with engine.connect() as conn:
+
+            conn.execute(
+                text("""
+                    UPDATE solicitacoes_logistica
+                    SET
+                        status='Aprovada',
+                        aprovado_por=:usr,
+                        data_decisao=NOW()
+                    WHERE id=:id
+                """),
+                {
+                    "usr": usuario_ativo,
+                    "id": int(row["id"])
+                }
+            )
+
+            conn.commit()
+
+        st.success("Solicitação aprovada.")
+        st.rerun()
+
+                with c2:
+                    if st.button(
+                        "❌ Recusar",
+                        key=f"recusar_{row['id']}"
+                    ):
+                        with engine.connect() as conn:
+
+            conn.execute(
+                text("""
+                    UPDATE solicitacoes_logistica
+                    SET
+                        status='Recusada',
+                        aprovado_por=:usr,
+                        data_decisao=NOW()
+                    WHERE id=:id
+                """),
+                {
+                    "usr": usuario_ativo,
+                    "id": int(row["id"])
+                }
+            )
+
+            conn.commit()
+
+        st.warning("Solicitação recusada.")
+        st.rerun()
+
+                with c3:
+                    if st.button(
+                        "📅 Remarcar",
+                        key=f"remarcar_{row['id']}"
+                    ):
+                        nova_data = st.date_input(
+    "Nova Data",
+    key=f"nova_data_{row['id']}"
+)
+
+if st.button(
+    "📅 Remarcar",
+    key=f"remarcar_{row['id']}"
+):
+
+    with engine.connect() as conn:
+
+        conn.execute(
+            text("""
+                UPDATE solicitacoes_logistica
+                SET
+                    status='Remarcada',
+                    data_contraproposta=:dt,
+                    aprovado_por=:usr,
+                    data_decisao=NOW()
+                WHERE id=:id
+            """),
+            {
+                "dt": nova_data,
+                "usr": usuario_ativo,
+                "id": int(row["id"])
+            }
+        )
+
+        conn.commit()
+
+    st.success("Solicitação remarcada.")
+    st.rerun()
             
     elif "Chat Mr. Halley" in aba_ativa:
         st.subheader("🤖 Conversar com Mr. Halley - Telemetria & IA")
