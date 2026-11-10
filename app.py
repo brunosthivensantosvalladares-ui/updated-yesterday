@@ -1445,27 +1445,18 @@ def inicializar_banco():
 conn.execute(text("""
 CREATE TABLE IF NOT EXISTS solicitacoes_logistica (
     id SERIAL PRIMARY KEY,
-
     empresa_id TEXT NOT NULL,
-
     tipo_solicitacao VARCHAR(30),
-
     numero_os INTEGER,
-
     prefixo TEXT NOT NULL,
-
     status VARCHAR(30) DEFAULT 'Pendente',
-
+    risco_operacional VARCHAR(20) DEFAULT 'Baixo',
     data_sugerida DATE,
     data_contraproposta DATE,
-
     tempo_box_horas NUMERIC(10,2),
-
     justificativa TEXT,
-
     criado_por TEXT,
     aprovado_por TEXT,
-
     data_criacao TIMESTAMP DEFAULT NOW(),
     data_decisao TIMESTAMP
 )
@@ -4010,6 +4001,70 @@ else:
     elif "Solicitações Logística" in aba_ativa:
 
     st.subheader("🚛 Solicitações para Logística")
+
+    prefixo = st.text_input("Veículo")
+
+    tipo_solicitacao = st.selectbox(
+        "Tipo",
+        [
+            "urgente",
+            "preventiva",
+            "corretiva_maior"
+        ]
+    )
+
+    risco_operacional = st.selectbox(
+        "Risco Operacional",
+        [
+            "Baixo",
+            "Moderado",
+            "Alto",
+            "Crítico"
+        ]
+    )
+
+    justificativa = st.text_area(
+        "Justificativa"
+    )
+
+    if st.button("Enviar"):
+
+    with engine.connect() as conn:
+
+        conn.execute(
+            text("""
+                INSERT INTO solicitacoes_logistica
+                (
+                    empresa_id,
+                    prefixo,
+                    tipo_solicitacao,
+                    risco_operacional,
+                    justificativa,
+                    status,
+                    criado_por
+                )
+                VALUES
+                (
+                    :eid,
+                    :pref,
+                    :tipo,
+                    :risco,
+                    :just,
+                    'Pendente',
+                    :usr
+                )
+            """),
+            {
+                "eid": str(emp_id),
+                "pref": prefixo,
+                "tipo": tipo_solicitacao,
+                "risco": risco_operacional,
+                "just": justificativa,
+                "usr": usuario_ativo
+            }
+        )
+
+        conn.commit()
 
     df_log = pd.read_sql(
         text("""
