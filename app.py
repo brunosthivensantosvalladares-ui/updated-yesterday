@@ -20,24 +20,37 @@ LOGO_URL = "https://i.postimg.cc/rwQs1cpc/Design-sem-nome-(2).png"
 BG_LOGIN_URL = "https://i.postimg.cc/RhyzZ0Xr/Na-Updated-Yesterday-nao-dependemos-da-sorte-O-planejamento-e-que-nos-move-(1).jpg"
 
 # ======================================================================================
-# LOGÍSTICA: solicitações PCM <-> Logística (urgente, preventiva, corretiva maior)
+# JANELAS: solicitações PCM <-> Logística (urgente, preventiva, intervenção programada, reforma)
 # ======================================================================================
 LOGISTICA_TIPOS = {
     "urgente": "🚨 Parada urgente",
-    "preventiva": "🛠️ Preventiva programada",
-    "corretiva_maior": "🔧 Corretiva maior / reforma",
+    "preventiva": "🛠️ Preventiva",
+    "intervencao_programada": "🔧 Intervenção programada",
+    "reforma": "🏗️ Reforma",
 }
 LOGISTICA_TIPOS_TXT = {
     "urgente": "Parada urgente",
-    "preventiva": "Preventiva programada",
-    "corretiva_maior": "Corretiva maior",
+    "preventiva": "Preventiva",
+    "intervencao_programada": "Intervenção programada",
+    "reforma": "Reforma",
+    "corretiva_maior": "Corretiva maior",          # tipo antigo (registros já criados)
 }
-LOGISTICA_TIPO_OS = {"urgente": "Corretiva", "preventiva": "Preventiva", "corretiva_maior": "Intervenção programada"}
+LOGISTICA_TIPO_OS = {
+    "urgente": "Corretiva",
+    "preventiva": "Preventiva",
+    "intervencao_programada": "Intervenção programada",
+    "reforma": "Intervenção programada",
+    "corretiva_maior": "Intervenção programada",
+}
 LOGISTICA_RISCOS = ["Baixo", "Moderado", "Alto", "Crítico"]
 LOGISTICA_STATUS_ICONE = {"Pendente": "🟡", "Aprovada": "🟢", "Recusada": "🔴", "Remarcada": "🟠", "Cancelada": "⚪"}
-LOGISTICA_ANTECEDENCIA_MIN_H = 24   # recusar/remarcar com menos horas que isso conta como "tardia"
+LOGISTICA_ANTECEDENCIA_MIN_H = 24   # decidir com menos horas que isso antes do fim do período conta como "tardio"
 PERFIS_PCM = ("admin", "pcm")
 PERFIS_DECISAO_LOGISTICA = ("logistica", "admin")
+
+
+def _rotulo_tipo(tipo):
+    return LOGISTICA_TIPOS.get(tipo) or "🔧 " + LOGISTICA_TIPOS_TXT.get(tipo, str(tipo))
 
 
 def garantir_tabelas_logistica(engine):
@@ -64,6 +77,12 @@ def garantir_tabelas_logistica(engine):
         "ALTER TABLE solicitacoes_logistica ADD COLUMN IF NOT EXISTS id_tarefa INTEGER",
         "ALTER TABLE solicitacoes_logistica ADD COLUMN IF NOT EXISTS recusa_tardia BOOLEAN DEFAULT FALSE",
         "ALTER TABLE solicitacoes_logistica ADD COLUMN IF NOT EXISTS justificativa_decisao TEXT",
+        "ALTER TABLE solicitacoes_logistica ADD COLUMN IF NOT EXISTS data_sugerida_fim DATE",
+        "ALTER TABLE solicitacoes_logistica ADD COLUMN IF NOT EXISTS data_aprovada DATE",
+        "ALTER TABLE solicitacoes_logistica ADD COLUMN IF NOT EXISTS id_chamado INTEGER",
+        "ALTER TABLE solicitacoes_logistica ADD COLUMN IF NOT EXISTS area_destino TEXT",
+        "ALTER TABLE solicitacoes_logistica ADD COLUMN IF NOT EXISTS executor TEXT",
+        "ALTER TABLE solicitacoes_logistica ADD COLUMN IF NOT EXISTS tipo_os TEXT",
         """CREATE TABLE IF NOT EXISTS historico_logistica (
             id SERIAL PRIMARY KEY,
             solicitacao_id INTEGER,
@@ -145,6 +164,20 @@ def _flag(valor):
         return False
 
 
+def _val(obj, chave, padrao=None):
+    """Lê um campo de dict/Series tratando ausente/None/NaN."""
+    try:
+        v = obj.get(chave, padrao)
+    except Exception:
+        return padrao
+    try:
+        if v is None or pd.isna(v):
+            return padrao
+    except Exception:
+        pass
+    return v
+
+
 def _como_data(valor):
     return pd.to_datetime(valor).date()
 
@@ -156,6 +189,10 @@ def _horas_ate_data(valor):
         return (alvo - datetime.now()).total_seconds() / 3600
     except Exception:
         return 9999.0
+
+
+def _fim_periodo(row):
+    return _val(row, "data_sugerida_fim") or _val(row, "data_sugerida")
 
 
 def _listar_prefixos(engine, emp_id):
@@ -171,71 +208,116 @@ def _listar_prefixos(engine, emp_id):
         return []
 
 
-def _criar_tarefa_agenda(engine, conn, emp_id, sol, data_execucao):
+def _atualizar_status_chamado(conn, emp_id, id_chamado, novo_status, somente_se=None):
+    if id_chamado is None:
+        return
+    sql = "UPDATE chamados SET status = :s WHERE id = :id AND empresa_id = :eid"
+    params = {"s": novo_status, "id": int(id_chamado), "eid": str(emp_id)}
+    if somente_se:
+        sql += " AND status = :antes"
+        params["antes"] = somente_se
+    conn.execute(text(sql), params)
+
+
+def _criar_tarefa_agenda(engine, conn, emp_id, sol, data_execucao, numero_os=None):
     """Insere a OS na Agenda Principal e devolve (id_tarefa, numero_os)."""
-    numero_os = obter_proxima_os(engine, emp_id)
-    tipo = str(sol["tipo_solicitacao"])
-    partes = [f"Logística - {LOGISTICA_TIPOS_TXT.get(tipo, tipo)}", f"Risco: {sol['risco_operacional']}"]
-    if pd.notna(sol.get("tempo_box_horas")):
+    numero_os = int(numero_os) if numero_os else obter_proxima_os(engine, emp_id)
+    tipo = str(_val(sol, "tipo_solicitacao", ""))
+    id_chamado = _val(sol, "id_chamado")
+    prefixo = str(sol["prefixo"])
+    data_os = _como_data(data_execucao)
+    servico = _txt(_val(sol, "descricao"))
+    partes = [f"[Janela: {LOGISTICA_TIPOS_TXT.get(tipo, tipo)}] {servico}".strip(),
+              f"Risco: {_txt(_val(sol, 'risco_operacional'), '—')}"]
+    if _val(sol, "tempo_box_horas") is not None:
         partes.append(f"Box estimado: {float(sol['tempo_box_horas']):g} h")
-    if _txt(sol.get("descricao")):
-        partes.append(_txt(sol.get("descricao")))
+    h_prox, o_prox = obter_medidor_proximo(engine, emp_id, prefixo, data_os)
+    partes.append(f"[Leitura Ref: Horímetro {h_prox}h, Odômetro {o_prox}km]")
     id_tarefa = conn.execute(text("""
         INSERT INTO tarefas (data, executor, prefixo, inicio_disp, fim_disp, descricao, area, tipo_os,
-                             turno, origem, empresa_id, numero_os)
-        VALUES (:dt, '', :pr, '00:00', '00:00', :ds, 'Mecânica', :tp, 'Não definido', 'Logística', :eid, :nos)
+                             turno, id_chamado, origem, empresa_id, numero_os)
+        VALUES (:dt, :ex, :pr, '00:00', '00:00', :ds, :ar, :tp, 'Não definido', :ic, :og, :eid, :nos)
         RETURNING id
-    """), {"dt": str(_como_data(data_execucao)), "pr": str(sol["prefixo"]), "ds": " | ".join(partes),
-           "tp": LOGISTICA_TIPO_OS.get(tipo, "Corretiva"), "eid": str(emp_id), "nos": int(numero_os)}).scalar()
+    """), {"dt": str(data_os), "ex": _txt(_val(sol, "executor")), "pr": prefixo, "ds": " | ".join(partes),
+           "ar": _txt(_val(sol, "area_destino"), "Mecânica"),
+           "tp": _txt(_val(sol, "tipo_os")) or LOGISTICA_TIPO_OS.get(tipo, "Corretiva"),
+           "ic": None if id_chamado is None else int(id_chamado),
+           "og": "Chamado" if id_chamado is not None else "Logística",
+           "eid": str(emp_id), "nos": numero_os}).scalar()
     return int(id_tarefa), int(numero_os)
 
 
 # ---------------------------------- ações (transações) ----------------------------------
-def _criar_solicitacao(engine, emp_id, usuario, d):
+def _criar_solicitacao(engine, conn, emp_id, usuario, d):
+    """Cria a solicitação dentro da transação `conn` (quem chama faz o commit)."""
     hoje = datetime.now().date()
-    with engine.connect() as conn:
-        data_sug = hoje if d["tipo"] == "urgente" else d["data"]
-        sid = conn.execute(text("""
-            INSERT INTO solicitacoes_logistica
-                (empresa_id, tipo_solicitacao, prefixo, status, risco_operacional, data_sugerida,
-                 tempo_box_horas, descricao, justificativa, criado_por)
-            VALUES (:eid, :tipo, :pref, 'Pendente', :risco, :dt, :box, :desc, :just, :usr)
-            RETURNING id
-        """), {"eid": str(emp_id), "tipo": d["tipo"], "pref": d["prefixo"], "risco": d["risco"], "dt": data_sug,
-               "box": float(d["box"]), "desc": d["descricao"], "just": d["justificativa"], "usr": str(usuario)}).scalar()
-        detalhe = (f"{LOGISTICA_TIPOS_TXT[d['tipo']]} do veículo {d['prefixo']} | risco {d['risco']} | "
-                   f"data {_data_br(data_sug)} | box {float(d['box']):g} h | {d['justificativa']}")
-        if d["tipo"] == "urgente":
+    urgente = d["tipo"] == "urgente"
+    inicio = hoje if urgente else d["inicio"]
+    fim = None if urgente else d["fim"]
+    id_chamado = d.get("id_chamado")
+    sid = conn.execute(text("""
+        INSERT INTO solicitacoes_logistica
+            (empresa_id, tipo_solicitacao, prefixo, status, risco_operacional, data_sugerida, data_sugerida_fim,
+             tempo_box_horas, descricao, justificativa, criado_por, id_chamado, area_destino, executor, tipo_os)
+        VALUES (:eid, :tipo, :pref, 'Pendente', :risco, :ini, :fim, :box, :desc, :obs, :usr, :ic, :ar, :ex, :tp)
+        RETURNING id
+    """), {"eid": str(emp_id), "tipo": d["tipo"], "pref": d["prefixo"], "risco": d["risco"], "ini": inicio, "fim": fim,
+           "box": float(d["box"]), "desc": d["descricao"], "obs": d.get("observacoes", ""), "usr": str(usuario),
+           "ic": None if id_chamado is None else int(id_chamado), "ar": d.get("area"), "ex": d.get("executor"),
+           "tp": d.get("tipo_os")}).scalar()
+    detalhe = (f"{LOGISTICA_TIPOS_TXT[d['tipo']]} do veículo {d['prefixo']} | risco {d['risco']} | "
+               + ("data " + _data_br(inicio) if urgente else f"período {_data_br(inicio)} a {_data_br(fim)}")
+               + f" | box {float(d['box']):g} h | serviço: {d['descricao']}"
+               + (f" | obs.: {d['observacoes']}" if d.get("observacoes") else "")
+               + (f" | origem: chamado #{int(id_chamado)}" if id_chamado is not None else ""))
+    if urgente:
+        existente = d.get("tarefa_existente")
+        if existente:
+            id_tarefa, numero_os = existente
+        else:
             sol = {"tipo_solicitacao": "urgente", "prefixo": d["prefixo"], "risco_operacional": d["risco"],
-                   "tempo_box_horas": float(d["box"]), "descricao": d["descricao"]}
+                   "tempo_box_horas": float(d["box"]), "descricao": d["descricao"], "id_chamado": id_chamado,
+                   "area_destino": d.get("area"), "executor": d.get("executor"), "tipo_os": d.get("tipo_os")}
             id_tarefa, numero_os = _criar_tarefa_agenda(engine, conn, emp_id, sol, hoje)
-            conn.execute(text("UPDATE solicitacoes_logistica SET id_tarefa = :t, numero_os = :n WHERE id = :id"),
-                         {"t": id_tarefa, "n": numero_os, "id": int(sid)})
-            detalhe += f" | OS {numero_os} incluída direto na Agenda"
-        registrar_historico_logistica(sid, usuario, "CRIACAO", detalhe, conn=conn, empresa_id=emp_id)
-        conn.commit()
+            _atualizar_status_chamado(conn, emp_id, id_chamado, "Agendado")
+        conn.execute(text("UPDATE solicitacoes_logistica SET id_tarefa = :t, numero_os = :n WHERE id = :id"),
+                     {"t": int(id_tarefa), "n": int(numero_os), "id": int(sid)})
+        detalhe += f" | OS {numero_os} incluída direto na Agenda"
+    else:
+        _atualizar_status_chamado(conn, emp_id, id_chamado, "Aguardando Janela")
+    registrar_historico_logistica(sid, usuario, "CRIACAO", detalhe, conn=conn, empresa_id=emp_id)
     return int(sid)
 
 
-def _aprovar(engine, emp_id, usuario, row):
+def _aprovar(engine, emp_id, usuario, row, data_escolhida=None):
     sid = int(row["id"])
+    urgente = str(row["tipo_solicitacao"]) == "urgente"
+    if not urgente:
+        hoje = datetime.now().date()
+        ini = max(_como_data(row["data_sugerida"]), hoje)
+        fim = max(_como_data(_fim_periodo(row)), ini)
+        if data_escolhida is None or not (ini <= _como_data(data_escolhida) <= fim):
+            return False, f"Escolha uma data dentro do período ({_data_br(ini)} a {_data_br(fim)})."
     with engine.connect() as conn:
         ok = conn.execute(text("""
-            UPDATE solicitacoes_logistica SET status = 'Aprovada', aprovado_por = :usr, data_decisao = NOW()
+            UPDATE solicitacoes_logistica SET status = 'Aprovada', aprovado_por = :usr, data_decisao = NOW(),
+                   data_aprovada = :da
             WHERE id = :id AND empresa_id = :eid AND status = 'Pendente' RETURNING id
-        """), {"usr": str(usuario), "id": sid, "eid": str(emp_id)}).fetchone()
+        """), {"usr": str(usuario), "id": sid, "eid": str(emp_id),
+               "da": None if urgente else _como_data(data_escolhida)}).fetchone()
         if not ok:
             conn.rollback()
             return False, "Esta solicitação já foi decidida por outra pessoa."
-        if str(row["tipo_solicitacao"]) == "urgente":
+        if urgente:
             detalhe = "Logística ciente da parada urgente; veículo liberado para a oficina."
             msg = "Ciência registrada. Veículo liberado para a oficina."
         else:
-            id_tarefa, numero_os = _criar_tarefa_agenda(engine, conn, emp_id, row, row["data_sugerida"])
+            id_tarefa, numero_os = _criar_tarefa_agenda(engine, conn, emp_id, row, data_escolhida)
             conn.execute(text("UPDATE solicitacoes_logistica SET id_tarefa = :t, numero_os = :n WHERE id = :id"),
                          {"t": id_tarefa, "n": numero_os, "id": sid})
-            detalhe = f"Janela aprovada para {_data_br(row['data_sugerida'])}. OS {numero_os} criada na Agenda."
-            msg = f"Janela aprovada. OS {numero_os} criada na Agenda para {_data_br(row['data_sugerida'])}."
+            _atualizar_status_chamado(conn, emp_id, _val(row, "id_chamado"), "Agendado")
+            detalhe = f"Janela aprovada para {_data_br(data_escolhida)}. OS {numero_os} criada na Agenda."
+            msg = f"Janela aprovada. OS {numero_os} criada na Agenda para {_data_br(data_escolhida)}."
         registrar_historico_logistica(sid, usuario, "APROVACAO", detalhe, conn=conn, empresa_id=emp_id)
         conn.commit()
     return True, msg
@@ -244,7 +326,7 @@ def _aprovar(engine, emp_id, usuario, row):
 def _recusar(engine, emp_id, usuario, row, justificativa):
     sid = int(row["id"])
     urgente = str(row["tipo_solicitacao"]) == "urgente"
-    tardia = (not urgente) and _horas_ate_data(row["data_sugerida"]) < LOGISTICA_ANTECEDENCIA_MIN_H
+    tardia = (not urgente) and _horas_ate_data(_fim_periodo(row)) < LOGISTICA_ANTECEDENCIA_MIN_H
     with engine.connect() as conn:
         ok = conn.execute(text("""
             UPDATE solicitacoes_logistica
@@ -255,14 +337,16 @@ def _recusar(engine, emp_id, usuario, row, justificativa):
         if not ok:
             conn.rollback()
             return False, "Esta solicitação já foi decidida por outra pessoa."
-        if urgente and pd.notna(row.get("id_tarefa")):
+        if urgente and _val(row, "id_tarefa") is not None:
             conn.execute(text("""
                 UPDATE tarefas SET descricao = '[LOGISTICA RECUSOU - veiculo mantido em operacao] ' || COALESCE(descricao, '')
                 WHERE id = :t AND empresa_id = :eid
             """), {"t": int(row["id_tarefa"]), "eid": str(emp_id)})
+        elif not urgente:
+            _atualizar_status_chamado(conn, emp_id, _val(row, "id_chamado"), "Pendente", somente_se="Aguardando Janela")
         detalhe = f"Veículo mantido em operação por decisão logística. Motivo: {justificativa}"
         if tardia:
-            detalhe += f" | RECUSA TARDIA (menos de {LOGISTICA_ANTECEDENCIA_MIN_H} h de antecedência): box pode ficar ocioso"
+            detalhe += f" | RECUSA TARDIA (menos de {LOGISTICA_ANTECEDENCIA_MIN_H} h do fim do período): box pode ficar ocioso"
         registrar_historico_logistica(sid, usuario, "RECUSA_LOGISTICA", detalhe, conn=conn, empresa_id=emp_id)
         conn.commit()
     return True, "Recusa registrada" + (" (marcada como TARDIA)." if tardia else ".")
@@ -270,7 +354,7 @@ def _recusar(engine, emp_id, usuario, row, justificativa):
 
 def _remarcar(engine, emp_id, usuario, row, nova_data, justificativa):
     sid = int(row["id"])
-    tardia = _horas_ate_data(row["data_sugerida"]) < LOGISTICA_ANTECEDENCIA_MIN_H
+    tardia = _horas_ate_data(_fim_periodo(row)) < LOGISTICA_ANTECEDENCIA_MIN_H
     with engine.connect() as conn:
         ok = conn.execute(text("""
             UPDATE solicitacoes_logistica
@@ -282,9 +366,11 @@ def _remarcar(engine, emp_id, usuario, row, nova_data, justificativa):
         if not ok:
             conn.rollback()
             return False, "Esta solicitação já foi decidida por outra pessoa."
-        detalhe = f"Nova data sugerida: {_data_br(nova_data)} (original {_data_br(row['data_sugerida'])}). Motivo: {justificativa}"
+        ini_s, fim_s = _data_br(row["data_sugerida"]), _data_br(_fim_periodo(row))
+        periodo = ini_s if fim_s in ("—", ini_s) else f"{ini_s} a {fim_s}"
+        detalhe = f"Nova data sugerida: {_data_br(nova_data)} (período pedido: {periodo}). Motivo: {justificativa}"
         if tardia:
-            detalhe += f" | REMARCAÇÃO TARDIA (menos de {LOGISTICA_ANTECEDENCIA_MIN_H} h): box pode ficar ocioso"
+            detalhe += f" | REMARCAÇÃO TARDIA (menos de {LOGISTICA_ANTECEDENCIA_MIN_H} h do fim do período): box pode ficar ocioso"
         registrar_historico_logistica(sid, usuario, "REMARCACAO", detalhe, conn=conn, empresa_id=emp_id)
         conn.commit()
     return True, "Nova data enviada ao PCM para aceite."
@@ -294,7 +380,7 @@ def _aceitar_nova_data(engine, emp_id, usuario, row):
     sid = int(row["id"])
     with engine.connect() as conn:
         ok = conn.execute(text("""
-            UPDATE solicitacoes_logistica SET status = 'Aprovada'
+            UPDATE solicitacoes_logistica SET status = 'Aprovada', data_aprovada = data_contraproposta
             WHERE id = :id AND empresa_id = :eid AND status = 'Remarcada' RETURNING id
         """), {"id": sid, "eid": str(emp_id)}).fetchone()
         if not ok:
@@ -303,6 +389,7 @@ def _aceitar_nova_data(engine, emp_id, usuario, row):
         id_tarefa, numero_os = _criar_tarefa_agenda(engine, conn, emp_id, row, row["data_contraproposta"])
         conn.execute(text("UPDATE solicitacoes_logistica SET id_tarefa = :t, numero_os = :n WHERE id = :id"),
                      {"t": id_tarefa, "n": numero_os, "id": sid})
+        _atualizar_status_chamado(conn, emp_id, _val(row, "id_chamado"), "Agendado")
         registrar_historico_logistica(
             sid, usuario, "ACEITE_NOVA_DATA",
             f"PCM aceitou a nova data {_data_br(row['data_contraproposta'])}. OS {numero_os} criada na Agenda.",
@@ -321,6 +408,7 @@ def _cancelar(engine, emp_id, usuario, row, motivo):
         if not ok:
             conn.rollback()
             return False, "Esta solicitação já foi atualizada por outra pessoa."
+        _atualizar_status_chamado(conn, emp_id, _val(row, "id_chamado"), "Pendente", somente_se="Aguardando Janela")
         registrar_historico_logistica(sid, usuario, "CANCELAMENTO", f"Cancelada pelo solicitante. {motivo}".strip(),
                                       conn=conn, empresa_id=emp_id)
         conn.commit()
@@ -341,40 +429,64 @@ def _finalizar_acao(resultado):
     st.rerun()
 
 
-def _secao_nova_solicitacao(engine, emp_id, usuario_ativo):
-    st.markdown("#### ➕ Nova solicitação à Logística")
-    st.caption("🚨 **Urgente:** a OS entra direto na Agenda e a Logística é avisada (ela confirma ciência ou registra objeção).  "
-               "🛠️🔧 **Preventiva / Corretiva maior:** a Logística aprova a janela ou sugere outra data.")
-    prefixos = _listar_prefixos(engine, emp_id)
+def _campos_janela(chave, tipo, servico_padrao=""):
+    """Campos da solicitação de janela (usados na aba e na aprovação de chamados)."""
     hoje = datetime.now().date()
-    with st.form("form_nova_solicitacao_logistica", clear_on_submit=True):
-        c1, c2 = st.columns(2)
-        with c1:
-            if prefixos:
-                prefixo = st.selectbox("Veículo", prefixos, index=None, placeholder="Selecione o veículo")
+    c1, c2 = st.columns(2)
+    with c1:
+        risco = st.selectbox("Risco operacional", LOGISTICA_RISCOS, index=1, key=f"{chave}_risco")
+        box = st.number_input("Tempo estimado de box (horas)", min_value=0.5, max_value=2400.0, value=4.0, step=0.5,
+                              key=f"{chave}_box")
+    inicio = fim = None
+    with c2:
+        if tipo == "urgente":
+            st.info("🚨 A OS entra direto na Agenda hoje e a Logística é avisada.")
+        else:
+            periodo = st.date_input("Período sugerido (início e fim)", value=(hoje + timedelta(days=1), hoje + timedelta(days=7)),
+                                    min_value=hoje, format="DD/MM/YYYY", key=f"{chave}_periodo",
+                                    help="A Logística escolhe uma data dentro deste período ou sugere outra.")
+            if isinstance(periodo, (list, tuple)):
+                if len(periodo) == 2:
+                    inicio, fim = periodo
+                elif len(periodo) == 1:
+                    inicio = fim = periodo[0]
             else:
-                prefixo = st.text_input("Veículo (prefixo)")
-            tipo = st.selectbox("Tipo de solicitação", list(LOGISTICA_TIPOS), format_func=lambda k: LOGISTICA_TIPOS[k])
-            risco = st.selectbox("Risco operacional", LOGISTICA_RISCOS, index=1)
-        with c2:
-            data_sug = st.date_input("Data sugerida para a parada (ignorada nas urgentes)", value=hoje + timedelta(days=7),
-                                     min_value=hoje, format="DD/MM/YYYY")
-            box = st.number_input("Tempo estimado de box (horas)", min_value=0.5, max_value=240.0, value=4.0, step=0.5)
-            descricao = st.text_input("Serviço a executar", placeholder="Ex.: troca do para-brisa / revisão de 250 h")
-        justificativa = st.text_area("Justificativa técnica (embasamento para a Logística)",
-                                     placeholder="Ex.: evitar perda de garantia, risco de quebra em campo...")
+                inicio = fim = periodo
+    servico = st.text_input("Serviço a executar", value=servico_padrao, key=f"{chave}_servico",
+                            placeholder="Ex.: troca do para-brisa / revisão de 250 h")
+    obs = st.text_area("Observações técnicas", key=f"{chave}_obs",
+                       placeholder="Ex.: evitar perda de garantia, risco de quebra em campo...")
+    return {"risco": risco, "box": box, "inicio": inicio, "fim": fim, "descricao": servico.strip(),
+            "observacoes": obs.strip()}
+
+
+def _secao_nova_solicitacao(engine, emp_id, usuario_ativo):
+    st.markdown("#### ➕ Nova solicitação de janela")
+    st.caption("🚨 **Urgente:** a OS entra direto na Agenda e a Logística confirma ciência ou registra objeção.  "
+               "🛠️🔧🏗️ **Preventiva, Intervenção programada e Reforma:** você sugere um período e a Logística "
+               "escolhe uma data dentro dele ou sugere outra.")
+    prefixos = _listar_prefixos(engine, emp_id)
+    tipo = st.selectbox("Tipo de solicitação", list(LOGISTICA_TIPOS), format_func=_rotulo_tipo, key="log_nova_tipo")
+    with st.form("form_nova_solicitacao_logistica", clear_on_submit=True):
+        if prefixos:
+            prefixo = st.selectbox("Veículo", prefixos, index=None, placeholder="Selecione o veículo")
+        else:
+            prefixo = st.text_input("Veículo (prefixo)")
+        campos = _campos_janela("log_nova", tipo)
         enviar = st.form_submit_button("📨 Enviar à Logística", type="primary", use_container_width=True)
     if enviar:
         prefixo = str(prefixo or "").strip()
         if not prefixo:
             st.warning("Informe o veículo.")
-        elif not justificativa.strip():
-            st.warning("Preencha a justificativa técnica: ela é o embasamento da solicitação.")
+        elif not campos["descricao"]:
+            st.warning("Informe o serviço a executar.")
+        elif tipo != "urgente" and not campos["inicio"]:
+            st.warning("Informe o período sugerido (início e fim).")
         else:
             try:
-                sid = _criar_solicitacao(engine, emp_id, usuario_ativo, {
-                    "tipo": tipo, "prefixo": prefixo, "risco": risco, "data": data_sug, "box": box,
-                    "descricao": descricao.strip(), "justificativa": justificativa.strip()})
+                with engine.connect() as conn:
+                    sid = _criar_solicitacao(engine, conn, emp_id, usuario_ativo, {"tipo": tipo, "prefixo": prefixo, **campos})
+                    conn.commit()
                 st.session_state["_logistica_msg"] = ("ok", f"Solicitação #{sid} enviada à Logística.")
                 st.session_state["_logistica_ir_para"] = "📥 Em andamento"
                 st.cache_data.clear()
@@ -386,13 +498,22 @@ def _secao_nova_solicitacao(engine, emp_id, usuario_ativo):
 def _cartao_solicitacao(row):
     tipo = str(row["tipo_solicitacao"])
     icone = LOGISTICA_STATUS_ICONE.get(str(row["status"]), "⚪")
-    st.markdown(f"**{icone} #{int(row['id'])} · {LOGISTICA_TIPOS.get(tipo, tipo)} · Veículo {row['prefixo']}** — {row['status']}")
-    box = f"{float(row['tempo_box_horas']):g} h" if pd.notna(row["tempo_box_horas"]) else "—"
-    st.caption(f"Risco: {row['risco_operacional']} · Data sugerida: {_data_br(row['data_sugerida'])} · Box estimado: {box} · "
-               f"Solicitante: {row['criado_por']} · Criada em {_data_br(row['data_criacao'])}")
+    st.markdown(f"**{icone} #{int(row['id'])} · {_rotulo_tipo(tipo)} · Veículo {row['prefixo']}** — {row['status']}")
+    box = f"{float(row['tempo_box_horas']):g} h" if _val(row, "tempo_box_horas") is not None else "—"
+    ini, fim = row["data_sugerida"], _fim_periodo(row)
+    if tipo == "urgente":
+        quando = f"Hoje ({_data_br(ini)})"
+    elif _data_br(ini) == _data_br(fim):
+        quando = f"Data sugerida: {_data_br(ini)}"
+    else:
+        quando = f"Período sugerido: {_data_br(ini)} a {_data_br(fim)}"
+    origem = f" · Origem: chamado #{int(row['id_chamado'])}" if _val(row, "id_chamado") is not None else ""
+    st.caption(f"Risco: {row['risco_operacional']} · {quando} · Box estimado: {box} · "
+               f"Solicitante: {row['criado_por']} · Criada em {_data_br(row['data_criacao'])}{origem}")
     if _txt(row.get("descricao")):
         st.write(f"**Serviço:** {_txt(row.get('descricao'))}")
-    st.write(f"**Justificativa:** {_txt(row['justificativa'], '—')}")
+    if _txt(row.get("justificativa")):
+        st.write(f"**Observações técnicas:** {_txt(row.get('justificativa'))}")
     if str(row["status"]) == "Remarcada":
         extra = " ⚠️ remarcação tardia" if _flag(row.get("recusa_tardia")) else ""
         st.info(f"📅 A Logística propôs **{_data_br(row['data_contraproposta'])}**{extra}. Motivo: {_txt(row.get('justificativa_decisao'), '—')}")
@@ -401,13 +522,22 @@ def _cartao_solicitacao(row):
 def _acoes_logistica(engine, emp_id, usuario_ativo, row):
     sid = int(row["id"])
     urgente = str(row["tipo_solicitacao"]) == "urgente"
-    if st.button("✅ Ciente — liberar veículo" if urgente else "✅ Aprovar janela", key=f"log_apr_{sid}", type="primary",
-                 use_container_width=True):
-        _finalizar_acao(_aprovar(engine, emp_id, usuario_ativo, row))
-    aviso_tardio = (not urgente) and _horas_ate_data(row["data_sugerida"]) < LOGISTICA_ANTECEDENCIA_MIN_H
+    hoje = datetime.now().date()
+    if urgente:
+        if st.button("✅ Ciente — liberar veículo", key=f"log_apr_{sid}", type="primary", use_container_width=True):
+            _finalizar_acao(_aprovar(engine, emp_id, usuario_ativo, row))
+    else:
+        ini = max(_como_data(row["data_sugerida"]), hoje)
+        fim = max(_como_data(_fim_periodo(row)), ini)
+        with st.expander("✅ Aprovar janela (escolher a data dentro do período)"):
+            data_esc = st.date_input("Data da janela", value=ini, min_value=ini, max_value=fim, format="DD/MM/YYYY",
+                                     key=f"log_apr_dt_{sid}")
+            if st.button("Aprovar nesta data", key=f"log_apr_{sid}", type="primary", use_container_width=True):
+                _finalizar_acao(_aprovar(engine, emp_id, usuario_ativo, row, data_esc))
+    aviso_tardio = (not urgente) and _horas_ate_data(_fim_periodo(row)) < LOGISTICA_ANTECEDENCIA_MIN_H
     with st.expander("⛔ Registrar objeção (veículo segue em operação)" if urgente else "❌ Recusar"):
         if aviso_tardio:
-            st.warning(f"Faltam menos de {LOGISTICA_ANTECEDENCIA_MIN_H} h para a data. Recusar agora será registrado como "
+            st.warning(f"Faltam menos de {LOGISTICA_ANTECEDENCIA_MIN_H} h para o fim do período. Recusar agora será registrado como "
                        "**recusa tardia** (o box pode ficar ocioso).")
         j = st.text_area("Justificativa (obrigatória)", key=f"log_rec_j_{sid}")
         if st.button("Confirmar recusa", key=f"log_rec_b_{sid}", use_container_width=True):
@@ -418,9 +548,9 @@ def _acoes_logistica(engine, emp_id, usuario_ativo, row):
     if not urgente:
         with st.expander("📅 Sugerir outra data"):
             if aviso_tardio:
-                st.warning("Remarcar com menos de 24 h será registrado como **remarcação tardia**.")
-            nova = st.date_input("Nova data", value=datetime.now().date() + timedelta(days=7),
-                                 min_value=datetime.now().date(), format="DD/MM/YYYY", key=f"log_nova_{sid}")
+                st.warning(f"Remarcar com menos de {LOGISTICA_ANTECEDENCIA_MIN_H} h do fim do período será registrado como **remarcação tardia**.")
+            nova = st.date_input("Nova data", value=hoje + timedelta(days=7), min_value=hoje, format="DD/MM/YYYY",
+                                 key=f"log_nova_{sid}")
             j = st.text_area("Motivo (obrigatório)", key=f"log_rem_j_{sid}")
             if st.button("Enviar nova data ao PCM", key=f"log_rem_b_{sid}", use_container_width=True):
                 if not j.strip():
@@ -467,9 +597,9 @@ def _secao_em_andamento(engine, emp_id, usuario_ativo, pode_criar, pode_decidir)
 
 def _secao_historico(engine, emp_id):
     df = pd.read_sql(text("""
-        SELECT id, data_criacao, tipo_solicitacao, prefixo, risco_operacional, data_sugerida, data_contraproposta,
-               tempo_box_horas, status, recusa_tardia, criado_por, aprovado_por, data_decisao, descricao,
-               justificativa, justificativa_decisao
+        SELECT id, data_criacao, tipo_solicitacao, prefixo, risco_operacional, data_sugerida, data_sugerida_fim,
+               data_contraproposta, data_aprovada, tempo_box_horas, status, recusa_tardia, criado_por, aprovado_por,
+               data_decisao, descricao, justificativa, justificativa_decisao, id_chamado
         FROM solicitacoes_logistica WHERE empresa_id = :eid ORDER BY id DESC LIMIT 500
     """), engine, params={"eid": str(emp_id)})
     if df.empty:
@@ -482,21 +612,28 @@ def _secao_historico(engine, emp_id):
     k1.metric("Solicitações", len(df))
     k2.metric("Aprovadas", int((df["status"] == "Aprovada").sum()))
     k3.metric("Recusadas / remarcadas", int(df["status"].isin(["Recusada", "Remarcada"]).sum()))
-    k4.metric("Box ocioso por decisão tardia", f"{horas_ociosas:g} h", help=f"Recusas/remarcações com menos de {LOGISTICA_ANTECEDENCIA_MIN_H} h de antecedência.")
+    k4.metric("Box ocioso por decisão tardia", f"{horas_ociosas:g} h",
+              help=f"Recusas/remarcações com menos de {LOGISTICA_ANTECEDENCIA_MIN_H} h do fim do período sugerido.")
     filtro = st.selectbox("Filtrar por status", ["Todos"] + list(LOGISTICA_STATUS_ICONE), key="log_filtro_status")
     dfv = df if filtro == "Todos" else df[df["status"] == filtro]
+
+    def _periodo(r):
+        ini, fim = _data_br(r["data_sugerida"]), _data_br(r["data_sugerida_fim"])
+        return ini if fim in ("—", ini) else f"{ini} a {fim}"
+
     exibir = pd.DataFrame({
         "#": dfv["id"], "Criada em": dfv["data_criacao"].apply(_data_br),
         "Tipo": dfv["tipo_solicitacao"].map(LOGISTICA_TIPOS_TXT).fillna(dfv["tipo_solicitacao"]),
-        "Veículo": dfv["prefixo"], "Risco": dfv["risco_operacional"], "Data sugerida": dfv["data_sugerida"].apply(_data_br),
-        "Nova data": dfv["data_contraproposta"].apply(_data_br), "Box (h)": dfv["tempo_box_horas"],
+        "Veículo": dfv["prefixo"], "Chamado": dfv["id_chamado"], "Risco": dfv["risco_operacional"],
+        "Período sugerido": dfv.apply(_periodo, axis=1), "Nova data (Logística)": dfv["data_contraproposta"].apply(_data_br),
+        "Data aprovada": dfv["data_aprovada"].apply(_data_br), "Box (h)": dfv["tempo_box_horas"],
         "Status": dfv["status"], "Decisão tardia": dfv["recusa_tardia"].fillna(False).map({True: "Sim", False: ""}),
         "Solicitante": dfv["criado_por"], "Decidido por": dfv["aprovado_por"], "Decisão em": dfv["data_decisao"].apply(_data_br),
         "Motivo da decisão": dfv["justificativa_decisao"],
     })
     st.dataframe(exibir, hide_index=True, use_container_width=True)
     st.download_button("⬇️ Baixar histórico (CSV)", exibir.to_csv(index=False).encode("utf-8-sig"),
-                       file_name="solicitacoes_logistica.csv", mime="text/csv")
+                       file_name="solicitacoes_janelas.csv", mime="text/csv")
     st.divider()
     st.markdown("#### 📜 Linha do tempo (respaldo)")
     opcoes = {int(r["id"]): f"#{int(r['id'])} · {r['prefixo']} · {r['status']}" for _, r in dfv.iterrows()}
@@ -514,12 +651,12 @@ def _secao_historico(engine, emp_id):
 def pagina_solicitacoes_logistica(engine, emp_id, usuario_ativo, perfil):
     pode_criar = perfil in PERFIS_PCM
     pode_decidir = perfil in PERFIS_DECISAO_LOGISTICA
-    st.subheader("🚛 Solicitações para Logística")
-    st.caption("PCM e Logística alinham as paradas dos veículos. Toda decisão fica registrada com usuário, data e hora.")
+    st.subheader("🚛 Solicitações de Janelas")
+    st.caption("PCM e Logística alinham as janelas de parada dos veículos. Toda decisão fica registrada com usuário, data e hora.")
     try:
         _iniciar_logistica_uma_vez()
     except Exception as e:
-        st.error(f"Não foi possível preparar as tabelas da Logística: {e}")
+        st.error(f"Não foi possível preparar as tabelas de janelas: {e}")
         return
     _msg_flash()
     secoes = (["➕ Nova solicitação"] if pode_criar else []) + ["📥 Em andamento", "📜 Histórico e respaldo"]
@@ -1851,17 +1988,22 @@ ul[role="listbox"] li, ul[role="listbox"] li *, [role="option"], [role="option"]
 
 /* Botões */
 {_M} button[kind="secondary"], {_M} button[data-testid="stBaseButton-secondary"],
+{_M} button[kind="secondaryFormSubmit"], {_M} button[data-testid="stBaseButton-secondaryFormSubmit"],
 {_M} button[data-testid="stPopoverButton"] {{
     background-color: {TK['sec_bg']} !important;
     border: 1px solid {TK['border']} !important;
     color: {TK['sec_text']} !important;
 }}
 {_M} button[kind="secondary"] *, {_M} button[data-testid="stBaseButton-secondary"] *,
+{_M} button[kind="secondaryFormSubmit"] *, {_M} button[data-testid="stBaseButton-secondaryFormSubmit"] *,
 {_M} button[data-testid="stPopoverButton"] * {{ color: {TK['sec_text']} !important; -webkit-text-fill-color: {TK['sec_text']} !important; }}
 {_M} button[kind="secondary"]:hover, {_M} button[data-testid="stBaseButton-secondary"]:hover {{ border-color: {TK['accent']} !important; background-color: {TK['surface2']} !important; }}
-{_M} button[kind="primary"], {_M} button[data-testid="stBaseButton-primary"] {{ background-color: {TK['btn_bg']} !important; border: 1px solid {TK['border']} !important; }}
-{_M} button[kind="primary"]:hover, {_M} button[data-testid="stBaseButton-primary"]:hover {{ background-color: {TK['btn_hover']} !important; }}
-{_M} button[kind="primary"] *, {_M} button[data-testid="stBaseButton-primary"] * {{ color: {TK['btn_text']} !important; -webkit-text-fill-color: {TK['btn_text']} !important; }}
+{_M} button[kind="primary"], {_M} button[data-testid="stBaseButton-primary"],
+{_M} button[kind="primaryFormSubmit"], {_M} button[data-testid="stBaseButton-primaryFormSubmit"] {{ background-color: {TK['btn_bg']} !important; border: 1px solid {TK['border']} !important; }}
+{_M} button[kind="primary"]:hover, {_M} button[data-testid="stBaseButton-primary"]:hover,
+{_M} button[kind="primaryFormSubmit"]:hover, {_M} button[data-testid="stBaseButton-primaryFormSubmit"]:hover {{ background-color: {TK['btn_hover']} !important; }}
+{_M} button[kind="primary"] *, {_M} button[data-testid="stBaseButton-primary"] *,
+{_M} button[kind="primaryFormSubmit"] *, {_M} button[data-testid="stBaseButton-primaryFormSubmit"] * {{ color: {TK['btn_text']} !important; -webkit-text-fill-color: {TK['btn_text']} !important; }}
 
 /* Avisos */
 div[data-testid="stAlert"] {{ background-color: {TK['info_bg']} !important; border: 1px solid {TK['info_bd']} !important; border-left: 6px solid {TK['info_bd']} !important; border-radius: 10px !important; }}
@@ -2243,7 +2385,7 @@ else:
         opcoes = ["✍  Abrir Solicitação", "📋  Status"]
     elif st.session_state["perfil"] == "logistica":
         opcoes = [
-            "🚛  Solicitações Logística",
+            "🚛  Solicitações de Janelas",
             "◰  Agenda Principal",
             "🕮  Manual do Sistema"
         ]
@@ -2254,7 +2396,7 @@ else:
             "🗎  Cadastro Direto",
             "⚡  Alimentar Horímetros/Odômetros",
             "🗀  Chamados Oficina",
-            "🚛  Solicitações Logística",
+            "🚛  Solicitações de Janelas",
             "🗩  Chat Mr. Halley",
             "⧖  OSs Pendentes",
             "✓  OSs Concluídas",
@@ -2320,7 +2462,7 @@ else:
         "◰  Agenda Principal": {"English": "◰  Main Schedule", "Español": "◰  Agenda Principal"},
         "🗎  Cadastro Direto": {"English": "🗎  Direct Registration", "Español": "🗎  Registro Directo"},
         "🗀  Chamados Oficina": {"English": "🗀  Workshop Requests", "Español": "🗀  Solicitudes de Taller"},
-        "🚛  Solicitações Logística": {"English": "🚛  Logistics Requests", "Español": "🚛  Solicitudes de Logística"},
+        "🚛  Solicitações de Janelas": {"English": "🚛  Window Requests", "Español": "🚛  Solicitudes de Ventanas"},
         "🗩  Chat Mr. Halley": {"English": "🗩  Mr. Halley Chat", "Español": "🗩  Chat del Sr. Halley"},
         "⧖  OSs Pendentes": {"English": "⧖  Pending WOs", "Español": "⧖  OT Pendientes"},
         "✓  OSs Concluídas": {"English": "✓  Completed WOs", "Español": "✓  OT Concluidas"},
@@ -2490,8 +2632,8 @@ else:
                     st.warning(f"🚛 {qtd_logistica_header} solicitação(ões) aguardando a sua decisão.")
                 else:
                     st.info(f"🚛 {qtd_logistica_header} nova(s) data(s) proposta(s) pela Logística aguardando seu aceite.")
-                if st.button("🚛 Abrir Solicitações Logística", key="header_logistica", use_container_width=True):
-                    set_nav("Solicitações Logística")
+                if st.button("🚛 Abrir Solicitações de Janelas", key="header_logistica", use_container_width=True):
+                    set_nav("Solicitações de Janelas")
                     st.rerun()
             if not total_notificacoes_header:
                 st.success(tr("Nenhuma notificação nova."))
@@ -2501,7 +2643,7 @@ else:
         {"alvo": "Agenda Principal", "icone": "◰", "titulo": "Agenda Principal", "descricao": "Controle de janelas de box e manutenções programadas."},
         {"alvo": "Cadastro Direto", "icone": "🗎", "titulo": "Cadastro Direto", "descricao": "Agendamento de preventivas e revisões periódicas."},
         {"alvo": "Chamados Oficina", "icone": "🗀", "titulo": "Chamados Oficina", "descricao": "Triagem técnica e diagnósticos com o Mr. Halley."},
-        {"alvo": "Solicitações Logística", "icone": "🚛", "titulo": "Solicitações Logística", "descricao": "Paradas urgentes, preventivas e corretivas maiores com a Logística."},
+        {"alvo": "Solicitações de Janelas", "icone": "🚛", "titulo": "Solicitações de Janelas", "descricao": "Paradas urgentes, preventivas, intervenções programadas e reformas com a Logística."},
         {"alvo": "Chat Mr. Halley", "icone": "🗩", "titulo": "Chat Mr. Halley", "descricao": "Primeira triagem de dúvidas técnicas e abertura de OS."},
         {"alvo": "OSs Pendentes", "icone": "⧖", "titulo": "OSs Pendentes", "descricao": "Acompanhe serviços que ainda aguardam conclusão."},
         {"alvo": "OSs Concluídas", "icone": "✓", "titulo": "OSs Concluídas", "descricao": "Consulte o histórico de serviços finalizados."},
@@ -2520,7 +2662,7 @@ else:
         ]
     elif st.session_state["perfil"] == "logistica":
         cards_acesso = [
-            {"alvo": "Solicitações Logística", "icone": "🚛", "titulo": "Solicitações Logística", "descricao": "Aprove janelas, sugira datas e dê ciência das paradas urgentes."},
+            {"alvo": "Solicitações de Janelas", "icone": "🚛", "titulo": "Solicitações de Janelas", "descricao": "Aprove janelas, sugira datas e dê ciência das paradas urgentes."},
             {"alvo": "Agenda Principal", "icone": "◰", "titulo": "Agenda Principal", "descricao": "Controle de janelas de box e manutenções programadas."},
             {"alvo": "Manual do Sistema", "icone": "🕮", "titulo": "Manual do Sistema", "descricao": "Consulte o guia operacional completo da plataforma."}
         ]
@@ -4443,99 +4585,134 @@ else:
                     return str(val)
                 return "00:00"
 
-            with st.form("form_lote_chamados"):
-                ed_c = st.data_editor(
-                    st.session_state.df_ap_work, 
-                    hide_index=True, 
-                    use_container_width=True, 
-                    column_config={
-                        "Aprovar": st.column_config.CheckboxColumn("OK", width="small"), 
-                        "prefixo": st.column_config.TextColumn("Veículo", width="small", disabled=True),
-                        "descricao": st.column_config.TextColumn("Descrição", width="large", disabled=True),
-                        "motorista": st.column_config.TextColumn("Solicitante", width="small", disabled=True),
-                        "Tipo_OS": st.column_config.SelectboxColumn("Tipo", options=LISTA_TIPOS_OS, width="small"),
-                        "Area_Destino": st.column_config.SelectboxColumn("Área", options=ORDEM_AREAS, width="small"), 
-                        "Executor": st.column_config.SelectboxColumn("Executor", options=executores_cadastrados, width="small"),
-                        "Data_Programada": st.column_config.DateColumn("Data", width="small"), 
-                        "Inicio": st.column_config.TextColumn("Início", width="small"),
-                        "Fim": st.column_config.TextColumn("Fim", width="small"),
-                        "data_solicitacao": None, 
-                        "id": None
-                    }, 
-                    key="editor_chamados_lote"
-                )
-                
-                btn_processar = st.form_submit_button("💾 Salvar e Processar Agendamentos em Lote", type="primary", use_container_width=True)
+            ed_c = st.data_editor(
+                st.session_state.df_ap_work, 
+                hide_index=True, 
+                use_container_width=True, 
+                column_config={
+                    "Aprovar": st.column_config.CheckboxColumn("OK", width="small"), 
+                    "prefixo": st.column_config.TextColumn("Veículo", width="small", disabled=True),
+                    "descricao": st.column_config.TextColumn("Descrição", width="large", disabled=True),
+                    "motorista": st.column_config.TextColumn("Solicitante", width="small", disabled=True),
+                    "Tipo_OS": st.column_config.SelectboxColumn("Tipo", options=LISTA_TIPOS_OS, width="small"),
+                    "Area_Destino": st.column_config.SelectboxColumn("Área", options=ORDEM_AREAS, width="small"), 
+                    "Executor": st.column_config.SelectboxColumn("Executor", options=executores_cadastrados, width="small"),
+                    "Data_Programada": st.column_config.DateColumn("Data", width="small"), 
+                    "Inicio": st.column_config.TextColumn("Início", width="small"),
+                    "Fim": st.column_config.TextColumn("Fim", width="small"),
+                    "data_solicitacao": None, 
+                    "id": None
+                }, 
+                key="editor_chamados_lote"
+            )
 
-            if btn_processar:
-                st.session_state.df_ap_work = ed_c
+            # Cada chamado marcado com OK abre uma caixinha de solicitação de janela (pode ser fechada)
+            marcados = ed_c[ed_c['Aprovar'] == True]
+            janelas = {}
+            if not marcados.empty:
+                st.markdown("#### 🚛 Solicitações de janela à Logística")
+                st.caption(
+                    "Cada chamado marcado com **OK** abre uma caixinha com a solicitação de janela, já com o serviço preenchido "
+                    "a partir da descrição do motorista. A Logística é notificada ao processar. Para criar a OS direto na Agenda, "
+                    "sem avisar a Logística, desmarque *Enviar solicitação de janela à Logística*."
+                )
+                tipos_janela = list(LOGISTICA_TIPOS)
+                for _, r in marcados.iterrows():
+                    cid = int(r['id'])
+                    chave = f"jan_cham_{cid}"
+                    with st.expander(f"🚛 Janela — {r['prefixo']} · chamado #{cid}", expanded=True):
+                        enviar_janela = st.checkbox("Enviar solicitação de janela à Logística", value=True, key=f"{chave}_on")
+                        if enviar_janela:
+                            tipo_padrao = "preventiva" if str(r['Tipo_OS']) == "Preventiva" else "intervencao_programada"
+                            tipo_j = st.selectbox(
+                                "Tipo de solicitação", tipos_janela, index=tipos_janela.index(tipo_padrao),
+                                format_func=_rotulo_tipo, key=f"{chave}_tipo"
+                            )
+                            campos_j = _campos_janela(chave, tipo_j, servico_padrao=str(r['descricao']))
+                            janelas[cid] = {"tipo": tipo_j, **campos_j}
+
+            if st.button("💾 Salvar e Processar Agendamentos em Lote", type="primary", use_container_width=True, key="btn_processar_lote"):
                 selecionados = ed_c[ed_c['Aprovar'] == True]
-                
-                if not selecionados.empty:
+
+                erro_janela = None
+                for cid_j, j in janelas.items():
+                    if not j["descricao"]:
+                        erro_janela = f"Informe o serviço a executar na janela do chamado #{cid_j}."
+                    elif j["tipo"] != "urgente" and not j["inicio"]:
+                        erro_janela = f"Informe o período sugerido (início e fim) na janela do chamado #{cid_j}."
+
+                if selecionados.empty:
+                    st.warning("⚠️ Marque a caixa 'OK' em ao menos um chamado antes de processar.")
+                elif erro_janela:
+                    st.warning(f"⚠️ {erro_janela}")
+                else:
                     # Exibe feedback visual imediato na tela para o usuário saber que está processando
-                    with st.spinner("⏳ Processando lote de chamados e salvando na Agenda Principal... Por favor, aguarde."):
+                    with st.spinner("⏳ Processando lote de chamados e salvando... Por favor, aguarde."):
                         try:
+                            n_janelas = 0
+                            n_agenda = 0
                             with engine.connect() as conn:
-                                tarefas_para_inserir = []
-                                ids_chamados_concluir = []
-                                
+                                proxima_os = obter_proxima_os(engine, emp_id)
                                 for _, r in selecionados.iterrows():
-                                    v_os = obter_proxima_os(engine, emp_id)
+                                    cid = int(r['id'])
+                                    j = janelas.get(cid)
+
+                                    # Janela não urgente: a OS só entra na Agenda quando a Logística aprovar a data
+                                    if j is not None and j["tipo"] != "urgente":
+                                        _criar_solicitacao(engine, conn, emp_id, usuario_ativo, {
+                                            **j, "prefixo": str(r['prefixo']), "id_chamado": cid,
+                                            "tipo_os": str(r['Tipo_OS']), "area": str(r['Area_Destino']),
+                                            "executor": str(r['Executor'])
+                                        })
+                                        n_janelas += 1
+                                        continue
+
+                                    # Demais casos: a OS entra direto na Agenda (urgente ou sem solicitação de janela)
+                                    v_os = proxima_os + n_agenda
                                     h_prox, o_prox = obter_medidor_proximo(engine, emp_id, r['prefixo'], r['Data_Programada'])
                                     desc_com_med = f"{r['descricao']} | [Leitura Ref: Horímetro {h_prox}h, Odômetro {o_prox}km]"
-                                    
-                                    t_inicio = formatar_hora_simples(r['Inicio'])
-                                    t_fim = formatar_hora_simples(r['Fim'])
-
-                                    tarefas_para_inserir.append({
-                                        "dt": str(r['Data_Programada']), 
-                                        "ex": str(r['Executor']), 
-                                        "pr": str(r['prefixo']), 
-                                        "ti": t_inicio, 
-                                        "tf": t_fim, 
-                                        "ds": desc_com_med, 
-                                        "ar": str(r['Area_Destino']), 
-                                        "tp": str(r['Tipo_OS']), 
-                                        "ic": int(r['id']), 
-                                        "eid": str(emp_id), 
-                                        "nos": v_os
-                                    })
-                                    ids_chamados_concluir.append(int(r['id']))
-
-                                # Bulk Insert otimizado no PostgreSQL
-                                if tarefas_para_inserir:
-                                    conn.execute(
+                                    id_tarefa = conn.execute(
                                         text("""
-                                            INSERT INTO tarefas (data, executor, prefixo, inicio_disp, fim_disp, descricao, area, tipo_os, turno, id_chamado, origem, empresa_id, numero_os) 
+                                            INSERT INTO tarefas (data, executor, prefixo, inicio_disp, fim_disp, descricao, area, tipo_os, turno, id_chamado, origem, empresa_id, numero_os)
                                             VALUES (:dt, :ex, :pr, :ti, :tf, :ds, :ar, :tp, 'Não definido', :ic, 'Chamado', :eid, :nos)
-                                        """), 
-                                        tarefas_para_inserir
-                                    )
-                                
-                                # Atualiza status dos chamados em lote
-                                if ids_chamados_concluir:
+                                            RETURNING id
+                                        """),
+                                        {
+                                            "dt": str(r['Data_Programada']), "ex": str(r['Executor']), "pr": str(r['prefixo']),
+                                            "ti": formatar_hora_simples(r['Inicio']), "tf": formatar_hora_simples(r['Fim']),
+                                            "ds": desc_com_med, "ar": str(r['Area_Destino']), "tp": str(r['Tipo_OS']),
+                                            "ic": cid, "eid": str(emp_id), "nos": v_os
+                                        }
+                                    ).scalar()
+                                    n_agenda += 1
                                     conn.execute(
-                                        text("UPDATE chamados SET status = 'Agendado' WHERE id = ANY(:ids) AND empresa_id = :eid"),
-                                        {"ids": ids_chamados_concluir, "eid": str(emp_id)}
+                                        text("UPDATE chamados SET status = 'Agendado' WHERE id = :id AND empresa_id = :eid"),
+                                        {"id": cid, "eid": str(emp_id)}
                                     )
-                                    
+                                    if j is not None:  # urgente: avisa a Logística (ciência ou objeção)
+                                        _criar_solicitacao(engine, conn, emp_id, usuario_ativo, {
+                                            **j, "prefixo": str(r['prefixo']), "id_chamado": cid,
+                                            "tipo_os": str(r['Tipo_OS']), "area": str(r['Area_Destino']),
+                                            "executor": str(r['Executor']), "tarefa_existente": (int(id_tarefa), int(v_os))
+                                        })
+                                        n_janelas += 1
+
                                 conn.commit()
-                            
+
                             if 'df_ap_work' in st.session_state: del st.session_state.df_ap_work
                             if 'analises_halley' in st.session_state: del st.session_state.analises_halley
-                                
+                            st.session_state.pop("editor_chamados_lote", None)
+
                             st.cache_data.clear()
-                            st.success("✅ Todos os chamados selecionados foram processados com sucesso!")
-                            time_module.sleep(0.3)
+                            st.success(f"✅ Chamados processados: {n_agenda} direto na Agenda e {n_janelas} solicitação(ões) de janela enviada(s) à Logística.")
+                            time_module.sleep(1.2)
                             st.rerun()
                         except Exception as e:
                             st.error(f"Erro ao processar lote: {e}")
-                else:
-                    st.warning("⚠️ Marque a caixa 'OK' em ao menos um chamado antes de processar.")
         else: 
             st.info("Nenhum chamado pendente no momento.")
             
-    elif "Solicitações Logística" in aba_ativa:
+    elif "Solicitações de Janelas" in aba_ativa:
         pagina_solicitacoes_logistica(engine, emp_id, usuario_ativo, st.session_state["perfil"])
 
     elif "Chat Mr. Halley" in aba_ativa:
