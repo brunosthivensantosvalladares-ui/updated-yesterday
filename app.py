@@ -22,6 +22,11 @@ BG_LOGIN_URL = "https://i.postimg.cc/RhyzZ0Xr/Na-Updated-Yesterday-nao-dependemo
 # ======================================================================================
 # JANELAS: solicitações PCM <-> Logística (urgente, preventiva, intervenção programada, reforma)
 # ======================================================================================
+import re as _re
+import smtplib
+import threading
+from email.message import EmailMessage
+
 LOGISTICA_TIPOS = {
     "urgente": "🚨 Parada urgente",
     "preventiva": "🛠️ Preventiva",
@@ -92,6 +97,7 @@ def garantir_tabelas_logistica(engine):
             data_evento TIMESTAMP DEFAULT NOW()
         )""",
         "ALTER TABLE historico_logistica ADD COLUMN IF NOT EXISTS empresa_id TEXT",
+        "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS email TEXT",
         "CREATE INDEX IF NOT EXISTS idx_sol_log_emp_status ON solicitacoes_logistica (empresa_id, status)",
         "CREATE INDEX IF NOT EXISTS idx_hist_log_sol ON historico_logistica (solicitacao_id)",
         """CREATE OR REPLACE FUNCTION uy_historico_imutavel() RETURNS trigger AS $fn$
@@ -320,7 +326,8 @@ def _aprovar(engine, emp_id, usuario, row, data_escolhida=None):
             msg = f"Janela aprovada. OS {numero_os} criada na Agenda para {_data_br(data_escolhida)}."
         registrar_historico_logistica(sid, usuario, "APROVACAO", detalhe, conn=conn, empresa_id=emp_id)
         conn.commit()
-    return True, msg
+    aviso = _notificar_decisao(engine, emp_id, row, "foi aprovada", detalhe)
+    return True, f"{msg} {aviso}".strip()
 
 
 def _recusar(engine, emp_id, usuario, row, justificativa):
@@ -349,7 +356,8 @@ def _recusar(engine, emp_id, usuario, row, justificativa):
             detalhe += f" | RECUSA TARDIA (menos de {LOGISTICA_ANTECEDENCIA_MIN_H} h do fim do período): box pode ficar ocioso"
         registrar_historico_logistica(sid, usuario, "RECUSA_LOGISTICA", detalhe, conn=conn, empresa_id=emp_id)
         conn.commit()
-    return True, "Recusa registrada" + (" (marcada como TARDIA)." if tardia else ".")
+    aviso = _notificar_decisao(engine, emp_id, row, "foi recusada" if not urgente else "recebeu uma objeção", detalhe)
+    return True, ("Recusa registrada" + (" (marcada como TARDIA)." if tardia else ".") + f" {aviso}").strip()
 
 
 def _remarcar(engine, emp_id, usuario, row, nova_data, justificativa):
@@ -373,7 +381,8 @@ def _remarcar(engine, emp_id, usuario, row, nova_data, justificativa):
             detalhe += f" | REMARCAÇÃO TARDIA (menos de {LOGISTICA_ANTECEDENCIA_MIN_H} h do fim do período): box pode ficar ocioso"
         registrar_historico_logistica(sid, usuario, "REMARCACAO", detalhe, conn=conn, empresa_id=emp_id)
         conn.commit()
-    return True, "Nova data enviada ao PCM para aceite."
+    aviso = _notificar_decisao(engine, emp_id, row, "recebeu uma nova data proposta", detalhe + "\n\nAbra o sistema para aceitar ou cancelar.")
+    return True, f"Nova data enviada ao PCM para aceite. {aviso}".strip()
 
 
 def _aceitar_nova_data(engine, emp_id, usuario, row):
@@ -395,7 +404,9 @@ def _aceitar_nova_data(engine, emp_id, usuario, row):
             f"PCM aceitou a nova data {_data_br(row['data_contraproposta'])}. OS {numero_os} criada na Agenda.",
             conn=conn, empresa_id=emp_id)
         conn.commit()
-    return True, f"Nova data aceita. OS {numero_os} criada na Agenda para {_data_br(row['data_contraproposta'])}."
+    texto = f"O PCM aceitou a nova data {_data_br(row['data_contraproposta'])}. OS {numero_os} criada na Agenda."
+    aviso = _notificar_aceite(engine, emp_id, row, texto)
+    return True, f"Nova data aceita. OS {numero_os} criada na Agenda para {_data_br(row['data_contraproposta'])}. {aviso}".strip()
 
 
 def _cancelar(engine, emp_id, usuario, row, motivo):
@@ -415,6 +426,305 @@ def _cancelar(engine, emp_id, usuario, row, motivo):
     return True, "Solicitação cancelada."
 
 
+# ------------------------------------- aviso por e-mail -------------------------------------
+def _config_smtp():
+    """Lê [smtp] dos Secrets (host, port, user, password, from_addr). Sem isso, o aviso fica desativado."""
+    try:
+        cfg = st.secrets.get("smtp")
+        if not cfg:
+            return None
+        cfg = dict(cfg)
+        if not (cfg.get("host") and cfg.get("user") and cfg.get("password")):
+            return None
+        return cfg
+    except Exception:
+        return None
+
+
+def _enviar_email_em_segundo_plano(cfg, destinatarios, assunto, corpo):
+    def _tarefa():
+        try:
+            msg = EmailMessage()
+            msg["Subject"] = assunto
+            msg["From"] = cfg.get("from_addr") or cfg["user"]
+            msg["To"] = ", ".join(destinatarios)
+            msg.set_content(corpo)
+            porta = int(cfg.get("port", 587))
+            if porta == 465:
+                with smtplib.SMTP_SSL(cfg["host"], porta, timeout=20) as srv:
+                    srv.login(cfg["user"], cfg["password"])
+                    srv.send_message(msg)
+            else:
+                with smtplib.SMTP(cfg["host"], porta, timeout=20) as srv:
+                    srv.ehlo()
+                    srv.starttls()
+                    srv.ehlo()
+                    srv.login(cfg["user"], cfg["password"])
+                    srv.send_message(msg)
+        except Exception:
+            pass
+    threading.Thread(target=_tarefa, daemon=True).start()
+
+
+def _avisar_por_email(engine, emp_id, assunto, corpo, perfis=None, logins=None):
+    """Envia o aviso sem travar a tela. Nunca levanta erro. Devolve um texto curto de status."""
+    try:
+        cfg = _config_smtp()
+        if cfg is None:
+            return ""
+        filtros, params = [], {"eid": str(emp_id)}
+        if perfis:
+            filtros.append("perfil = ANY(:perfis)")
+            params["perfis"] = list(perfis)
+        if logins:
+            filtros.append("LOWER(login) = ANY(:logins)")
+            params["logins"] = [str(l).lower() for l in logins]
+        if not filtros:
+            return ""
+        with engine.connect() as conn:
+            linhas = conn.execute(text(
+                "SELECT email FROM usuarios WHERE empresa_id = :eid AND COALESCE(TRIM(email), '') <> '' AND ("
+                + " OR ".join(filtros) + ")"), params).fetchall()
+        destinatarios = sorted({str(l[0]).strip().lower() for l in linhas if "@" in str(l[0])})
+        if not destinatarios:
+            return "📧 Ninguém com e-mail cadastrado para receber o aviso."
+        try:
+            link = st.secrets.get("app_url")
+        except Exception:
+            link = None
+        if link:
+            corpo += f"\n\nAbrir o sistema: {link}"
+        _enviar_email_em_segundo_plano(cfg, destinatarios, f"[Updated Yesterday] {assunto}", corpo)
+        return f"📧 Aviso por e-mail enviado a {len(destinatarios)} pessoa(s)."
+    except Exception:
+        return ""
+
+
+def _quando_texto(d):
+    if d.get("tipo") == "urgente":
+        return "Hoje (urgente)"
+    ini, fim = _data_br(d.get("inicio")), _data_br(d.get("fim"))
+    return f"Período sugerido: {ini}" if fim in ("—", ini) else f"Período sugerido: {ini} a {fim}"
+
+
+def _notificar_novas_solicitacoes(engine, emp_id, usuario, itens):
+    """Um único e-mail para a Logística, com todas as solicitações recém-criadas."""
+    if not itens:
+        return ""
+    urgentes = sum(1 for i in itens if i["tipo"] == "urgente")
+    if len(itens) == 1:
+        i = itens[0]
+        assunto = f"{'URGENTE - ' if urgentes else ''}Nova solicitação de janela #{i['sid']} - {i['prefixo']} ({LOGISTICA_TIPOS_TXT[i['tipo']]})"
+    else:
+        assunto = f"{len(itens)} novas solicitações de janela" + (f" ({urgentes} urgente(s))" if urgentes else "")
+    blocos = []
+    for i in itens:
+        blocos.append(
+            f"#{i['sid']} - {LOGISTICA_TIPOS_TXT[i['tipo']]} - Veículo {i['prefixo']}\n"
+            f"  {_quando_texto(i)} | Box estimado: {float(i['box']):g} h | Risco: {i['risco']}\n"
+            f"  Serviço: {i['descricao']}"
+            + (f"\n  Observações técnicas: {i['observacoes']}" if i.get("observacoes") else ""))
+    corpo = (f"{usuario} enviou {'uma solicitação' if len(itens) == 1 else str(len(itens)) + ' solicitações'} de janela "
+             f"para a Logística:\n\n" + "\n\n".join(blocos)
+             + "\n\nAprove uma data dentro do período, sugira outra data ou registre a objeção no sistema.")
+    return _avisar_por_email(engine, emp_id, assunto, corpo, perfis=["logistica"])
+
+
+def _notificar_decisao(engine, emp_id, row, evento, detalhe):
+    """Avisa quem criou a solicitação sobre a decisão da Logística."""
+    criador = _txt(_val(row, "criado_por"))
+    if not criador:
+        return ""
+    assunto = f"Solicitação de janela #{int(row['id'])} {evento} - {row['prefixo']}"
+    corpo = (f"A Logística {evento} a solicitação #{int(row['id'])} "
+             f"({LOGISTICA_TIPOS_TXT.get(str(row['tipo_solicitacao']), row['tipo_solicitacao'])}, veículo {row['prefixo']}).\n\n{detalhe}")
+    return _avisar_por_email(engine, emp_id, assunto, corpo, logins=[criador])
+
+
+def _notificar_aceite(engine, emp_id, row, detalhe):
+    assunto = f"PCM aceitou a nova data - solicitação #{int(row['id'])} ({row['prefixo']})"
+    return _avisar_por_email(engine, emp_id, assunto, detalhe, perfis=["logistica"])
+
+
+# --------------------------------- ocupação do box (PCM) ---------------------------------
+def _horas_da_os(ini, fim, desc):
+    def _min(x):
+        try:
+            h, m = str(x).strip().split(":")[:2]
+            return int(h) * 60 + int(m)
+        except Exception:
+            return None
+    a, b = _min(ini), _min(fim)
+    if a is not None and b is not None and b > a:
+        return (b - a) / 60.0, True
+    achado = _re.search(r"Box estimado:\s*([\d.,]+)\s*h", str(desc or ""))
+    if achado:
+        try:
+            return float(achado.group(1).replace(",", ".")), True
+        except Exception:
+            pass
+    return 0.0, False
+
+
+@st.cache_data(ttl=30, show_spinner=False)
+def _ocupacao_box(emp_id, inicio_iso, fim_iso):
+    df = pd.read_sql(text("""
+        SELECT data, inicio_disp, fim_disp, descricao FROM tarefas
+        WHERE empresa_id = :eid AND data >= :ini AND data <= :fim AND COALESCE(realizado, FALSE) = FALSE
+    """), get_engine(), params={"eid": str(emp_id), "ini": inicio_iso, "fim": fim_iso})
+    saida = {}
+    for _, r in df.iterrows():
+        horas, tem = _horas_da_os(r["inicio_disp"], r["fim_disp"], r["descricao"])
+        dia = str(r["data"])[:10]
+        n, h, sem = saida.get(dia, (0, 0.0, 0))
+        saida[dia] = (n + 1, h + horas, sem + (0 if tem else 1))
+    return saida
+
+
+def _mostrar_ocupacao_box(emp_id, inicio, fim):
+    """Mostra ao PCM quantas OS e horas de box já existem em cada dia do período."""
+    if emp_id is None or not inicio or not fim:
+        return
+    try:
+        total_dias = (fim - inicio).days + 1
+        fim_vis = fim if total_dias <= 31 else inicio + timedelta(days=30)
+        dados = _ocupacao_box(str(emp_id), str(inicio), str(fim_vis))
+        nomes = ["seg", "ter", "qua", "qui", "sex", "sáb", "dom"]
+        linhas = ["| Dia | OS agendadas | Horas de box |", "|---|---:|---:|"]
+        tot_os, tot_h, sem_total = 0, 0.0, 0
+        for k in range((fim_vis - inicio).days + 1):
+            d = inicio + timedelta(days=k)
+            n, h, sem = dados.get(str(d), (0, 0.0, 0))
+            tot_os, tot_h, sem_total = tot_os + n, tot_h + h, sem_total + sem
+            if n:
+                nota = f" (+{sem} OS sem horário)" if sem else ""
+                linhas.append(f"| {nomes[d.weekday()]} {d.strftime('%d/%m')} | {n} | {h:g} h{nota} |")
+            else:
+                linhas.append(f"| {nomes[d.weekday()]} {d.strftime('%d/%m')} | 0 | livre |")
+        st.markdown("**📊 Ocupação do box no período** (OS já agendadas e não concluídas)")
+        st.markdown("\n".join(linhas))
+        extra = " Mostrando os 31 primeiros dias." if total_dias > 31 else ""
+        st.caption(f"Total no período: {tot_os} OS · {tot_h:g} h. OS sem horário definido não somam horas.{extra}")
+    except Exception:
+        pass
+
+
+def _resumo_janela(chave, tipo_padrao):
+    """Resumo de uma linha da caixinha (lê o que já foi escolhido nos campos)."""
+    if not st.session_state.get(f"{chave}_on", True):
+        return "sem solicitação · OS direto na Agenda"
+    tipo = st.session_state.get(f"{chave}_tipo", tipo_padrao)
+    box = st.session_state.get(f"{chave}_box", 4.0)
+    if tipo == "urgente":
+        return f"{LOGISTICA_TIPOS_TXT.get(tipo, tipo)} · hoje · {float(box):g} h"
+    per = st.session_state.get(f"{chave}_periodo")
+    if isinstance(per, (list, tuple)) and len(per) == 2:
+        quando = f"{_data_br(per[0])} a {_data_br(per[1])}"
+    elif isinstance(per, (list, tuple)) and len(per) == 1:
+        quando = _data_br(per[0])
+    else:
+        quando = "período padrão (próximos 7 dias)"
+    return f"{LOGISTICA_TIPOS_TXT.get(tipo, tipo)} · {quando} · {float(box):g} h"
+
+
+def _resumo_spec(spec):
+    """Resumo de uma linha de uma janela já especificada."""
+    tipo = spec.get("tipo")
+    if tipo == "urgente":
+        quando = "hoje"
+    elif spec.get("inicio") and spec.get("fim") and spec["inicio"] != spec["fim"]:
+        quando = f"{_data_br(spec['inicio'])} a {_data_br(spec['fim'])}"
+    else:
+        quando = _data_br(spec.get("inicio"))
+    return f"{LOGISTICA_TIPOS_TXT.get(tipo, tipo)} · {quando} · {float(spec.get('box', 0)):g} h"
+
+
+def _aplicar_a_todos_cb(ids):
+    tipo = st.session_state.get("jan_todos_tipo")
+    box = st.session_state.get("jan_todos_box", 4.0)
+    per = st.session_state.get("jan_todos_periodo")
+    for cid in ids:
+        ch = f"jan_cham_{cid}"
+        if tipo:
+            st.session_state[f"{ch}_tipo"] = tipo
+        st.session_state[f"{ch}_box"] = float(box)
+        if isinstance(per, (list, tuple)) and len(per) == 2:
+            st.session_state[f"{ch}_periodo"] = tuple(per)
+
+
+def _precarregar_janela(chave, spec, tipo_padrao):
+    """Reabre a caixa com o que já foi especificado antes."""
+    if f"{chave}_tipo" in st.session_state:
+        return
+    st.session_state[f"{chave}_tipo"] = spec.get("tipo", tipo_padrao)
+    st.session_state[f"{chave}_risco"] = spec.get("risco", "Moderado")
+    st.session_state[f"{chave}_box"] = float(spec.get("box", 4.0))
+    if spec.get("inicio") and spec.get("fim"):
+        st.session_state[f"{chave}_periodo"] = (spec["inicio"], spec["fim"])
+    st.session_state[f"{chave}_servico"] = spec.get("descricao", "")
+    st.session_state[f"{chave}_obs"] = spec.get("observacoes", "")
+
+
+_dialog_streamlit = getattr(st, "dialog", None) or getattr(st, "experimental_dialog", None)
+if _dialog_streamlit is None:          # Streamlit antigo: sem balão, a função roda direto na página
+    def _dialog_streamlit(*args, **kwargs):
+        return lambda f: f
+
+
+@_dialog_streamlit("🚛 Especificar janela à Logística", width="large")
+def _dialogo_especificar_janela(chamados, emp_id):
+    """Balão flutuante: define a janela de cada chamado marcado com OK."""
+    janelas = st.session_state.setdefault("janelas_chamados", {})
+    tipos = list(LOGISTICA_TIPOS)
+    st.caption("A OS só entra na Agenda quando a Logística definir a data (a Parada urgente entra hoje). "
+               "Chamados sem janela usam a data da tabela.")
+    ids = [c["id"] for c in chamados]
+    if len(chamados) > 1:
+        with st.expander("⚡ Aplicar a todos"):
+            ca, cb = st.columns(2)
+            hoje = datetime.now().date()
+            with ca:
+                st.selectbox("Tipo de solicitação", tipos, index=tipos.index("intervencao_programada"),
+                             format_func=_rotulo_tipo, key="jan_todos_tipo")
+                st.number_input("Tempo estimado de box (horas)", min_value=0.5, max_value=2400.0, value=4.0, step=0.5,
+                                key="jan_todos_box")
+            with cb:
+                st.date_input("Período sugerido (início e fim)", value=(hoje + timedelta(days=1), hoje + timedelta(days=7)),
+                              min_value=hoje, format="DD/MM/YYYY", key="jan_todos_periodo")
+            st.button("Aplicar a todos", key="jan_todos_aplicar", on_click=_aplicar_a_todos_cb, args=(ids,),
+                      use_container_width=True)
+    coletados = {}
+    for c in chamados:
+        cid = c["id"]
+        chave = f"jan_cham_{cid}"
+        tipo_padrao = "preventiva" if c.get("tipo_os") == "Preventiva" else "intervencao_programada"
+        if cid in janelas:
+            _precarregar_janela(chave, janelas[cid], tipo_padrao)
+        with st.expander(f"🚛 {c['prefixo']} · chamado #{cid} — {_resumo_janela(chave, tipo_padrao)}",
+                         expanded=(len(chamados) == 1)):
+            incluir = st.checkbox("Incluir solicitação de janela (desmarque para usar a data da tabela)",
+                                  value=True, key=f"{chave}_on")
+            if incluir:
+                st.session_state.setdefault(f"{chave}_tipo", tipo_padrao)
+                tipo = st.selectbox("Tipo de solicitação", tipos, format_func=_rotulo_tipo, key=f"{chave}_tipo")
+                campos = _campos_janela(chave, tipo, servico_padrao=c.get("descricao", ""), emp_id=emp_id)
+                coletados[cid] = {"tipo": tipo, **campos}
+    if st.button("✅ Confirmar janela(s)", type="primary", use_container_width=True, key="jan_confirmar"):
+        erro = None
+        for cid, j in coletados.items():
+            if not j["descricao"]:
+                erro = f"Informe o serviço a executar no chamado #{cid}."
+            elif j["tipo"] != "urgente" and not j["inicio"]:
+                erro = f"Informe o período sugerido (início e fim) no chamado #{cid}."
+        if erro:
+            st.warning(erro)
+        else:
+            for c in chamados:
+                janelas.pop(c["id"], None)
+            janelas.update(coletados)
+            st.rerun()
+
+
 # ------------------------------------------ telas ------------------------------------------
 def _msg_flash():
     msg = st.session_state.pop("_logistica_msg", None)
@@ -429,21 +739,24 @@ def _finalizar_acao(resultado):
     st.rerun()
 
 
-def _campos_janela(chave, tipo, servico_padrao=""):
+def _campos_janela(chave, tipo, servico_padrao="", emp_id=None):
     """Campos da solicitação de janela (usados na aba e na aprovação de chamados)."""
     hoje = datetime.now().date()
     c1, c2 = st.columns(2)
     with c1:
-        risco = st.selectbox("Risco operacional", LOGISTICA_RISCOS, index=1, key=f"{chave}_risco")
-        box = st.number_input("Tempo estimado de box (horas)", min_value=0.5, max_value=2400.0, value=4.0, step=0.5,
+        st.session_state.setdefault(f"{chave}_risco", "Moderado")
+        risco = st.selectbox("Risco operacional", LOGISTICA_RISCOS, key=f"{chave}_risco")
+        st.session_state.setdefault(f"{chave}_box", 4.0)
+        box = st.number_input("Tempo estimado de box (horas)", min_value=0.5, max_value=2400.0, step=0.5,
                               key=f"{chave}_box")
     inicio = fim = None
     with c2:
         if tipo == "urgente":
             st.info("🚨 A OS entra direto na Agenda hoje e a Logística é avisada.")
         else:
-            periodo = st.date_input("Período sugerido (início e fim)", value=(hoje + timedelta(days=1), hoje + timedelta(days=7)),
-                                    min_value=hoje, format="DD/MM/YYYY", key=f"{chave}_periodo",
+            st.session_state.setdefault(f"{chave}_periodo", (hoje + timedelta(days=1), hoje + timedelta(days=7)))
+            periodo = st.date_input("Período sugerido (início e fim)", min_value=hoje, format="DD/MM/YYYY",
+                                    key=f"{chave}_periodo",
                                     help="A Logística escolhe uma data dentro deste período ou sugere outra.")
             if isinstance(periodo, (list, tuple)):
                 if len(periodo) == 2:
@@ -452,7 +765,10 @@ def _campos_janela(chave, tipo, servico_padrao=""):
                     inicio = fim = periodo[0]
             else:
                 inicio = fim = periodo
-    servico = st.text_input("Serviço a executar", value=servico_padrao, key=f"{chave}_servico",
+    if tipo != "urgente":
+        _mostrar_ocupacao_box(emp_id, inicio, fim)
+    st.session_state.setdefault(f"{chave}_servico", servico_padrao)
+    servico = st.text_input("Serviço a executar", key=f"{chave}_servico",
                             placeholder="Ex.: troca do para-brisa / revisão de 250 h")
     obs = st.text_area("Observações técnicas", key=f"{chave}_obs",
                        placeholder="Ex.: evitar perda de garantia, risco de quebra em campo...")
@@ -464,17 +780,17 @@ def _secao_nova_solicitacao(engine, emp_id, usuario_ativo):
     st.markdown("#### ➕ Nova solicitação de janela")
     st.caption("🚨 **Urgente:** a OS entra direto na Agenda e a Logística confirma ciência ou registra objeção.  "
                "🛠️🔧🏗️ **Preventiva, Intervenção programada e Reforma:** você sugere um período e a Logística "
-               "escolhe uma data dentro dele ou sugere outra.")
+               "escolhe uma data dentro dele ou sugere outra. A tabela de ocupação ajuda a escolher o período.")
     prefixos = _listar_prefixos(engine, emp_id)
-    tipo = st.selectbox("Tipo de solicitação", list(LOGISTICA_TIPOS), format_func=_rotulo_tipo, key="log_nova_tipo")
-    with st.form("form_nova_solicitacao_logistica", clear_on_submit=True):
-        if prefixos:
-            prefixo = st.selectbox("Veículo", prefixos, index=None, placeholder="Selecione o veículo")
-        else:
-            prefixo = st.text_input("Veículo (prefixo)")
-        campos = _campos_janela("log_nova", tipo)
-        enviar = st.form_submit_button("📨 Enviar à Logística", type="primary", use_container_width=True)
-    if enviar:
+    ver = st.session_state.get("log_nova_ver", 0)
+    chave = f"log_nova_{ver}"
+    tipo = st.selectbox("Tipo de solicitação", list(LOGISTICA_TIPOS), format_func=_rotulo_tipo, key=f"{chave}_tipo_sel")
+    if prefixos:
+        prefixo = st.selectbox("Veículo", prefixos, index=None, placeholder="Selecione o veículo", key=f"{chave}_prefixo")
+    else:
+        prefixo = st.text_input("Veículo (prefixo)", key=f"{chave}_prefixo")
+    campos = _campos_janela(chave, tipo, emp_id=emp_id)
+    if st.button("📨 Enviar à Logística", type="primary", use_container_width=True, key=f"{chave}_enviar"):
         prefixo = str(prefixo or "").strip()
         if not prefixo:
             st.warning("Informe o veículo.")
@@ -484,11 +800,14 @@ def _secao_nova_solicitacao(engine, emp_id, usuario_ativo):
             st.warning("Informe o período sugerido (início e fim).")
         else:
             try:
+                dados = {"tipo": tipo, "prefixo": prefixo, **campos}
                 with engine.connect() as conn:
-                    sid = _criar_solicitacao(engine, conn, emp_id, usuario_ativo, {"tipo": tipo, "prefixo": prefixo, **campos})
+                    sid = _criar_solicitacao(engine, conn, emp_id, usuario_ativo, dados)
                     conn.commit()
-                st.session_state["_logistica_msg"] = ("ok", f"Solicitação #{sid} enviada à Logística.")
+                aviso = _notificar_novas_solicitacoes(engine, emp_id, usuario_ativo, [{**dados, "sid": sid}])
+                st.session_state["_logistica_msg"] = ("ok", f"Solicitação #{sid} enviada à Logística. {aviso}".strip())
                 st.session_state["_logistica_ir_para"] = "📥 Em andamento"
+                st.session_state["log_nova_ver"] = ver + 1
                 st.cache_data.clear()
                 st.rerun()
             except Exception as e:
@@ -516,7 +835,8 @@ def _cartao_solicitacao(row):
         st.write(f"**Observações técnicas:** {_txt(row.get('justificativa'))}")
     if str(row["status"]) == "Remarcada":
         extra = " ⚠️ remarcação tardia" if _flag(row.get("recusa_tardia")) else ""
-        st.info(f"📅 A Logística propôs **{_data_br(row['data_contraproposta'])}**{extra}. Motivo: {_txt(row.get('justificativa_decisao'), '—')}")
+        st.info(f"📅 A Logística propôs **{_data_br(row['data_contraproposta'])}** (fora do período pedido){extra}. "
+                f"Motivo: {_txt(row.get('justificativa_decisao'), '—')}  \nO PCM precisa **aceitar a nova data** para a OS entrar na Agenda.")
 
 
 def _acoes_logistica(engine, emp_id, usuario_ativo, row):
@@ -529,13 +849,30 @@ def _acoes_logistica(engine, emp_id, usuario_ativo, row):
     else:
         ini = max(_como_data(row["data_sugerida"]), hoje)
         fim = max(_como_data(_fim_periodo(row)), ini)
-        with st.expander("✅ Aprovar janela (escolher a data dentro do período)"):
-            data_esc = st.date_input("Data da janela", value=ini, min_value=ini, max_value=fim, format="DD/MM/YYYY",
-                                     key=f"log_apr_dt_{sid}")
-            if st.button("Aprovar nesta data", key=f"log_apr_{sid}", type="primary", use_container_width=True):
-                _finalizar_acao(_aprovar(engine, emp_id, usuario_ativo, row, data_esc))
+        with st.expander("📅 Definir a data da janela", expanded=True):
+            st.caption(f"Período pedido pelo PCM: {_data_br(ini)} a {_data_br(fim)}. "
+                       "Data dentro do período: a OS entra direto na Agenda. Data fora do período: o PCM precisa aceitar.")
+            data_esc = st.date_input("Data da janela", value=ini, min_value=hoje, format="DD/MM/YYYY", key=f"log_apr_dt_{sid}")
+            dentro = ini <= data_esc <= fim
+            motivo = ""
+            if dentro:
+                st.success("✅ Dentro do período: vai direto para a Agenda.")
+                rotulo = "Aprovar nesta data"
+            else:
+                st.warning("⚠️ Fora do período: será enviada ao PCM para aceite.")
+                if _horas_ate_data(_fim_periodo(row)) < LOGISTICA_ANTECEDENCIA_MIN_H:
+                    st.warning(f"Faltam menos de {LOGISTICA_ANTECEDENCIA_MIN_H} h para o fim do período: será registrada como **remarcação tardia**.")
+                motivo = st.text_area("Motivo (obrigatório)", key=f"log_rem_j_{sid}")
+                rotulo = "Enviar nova data ao PCM"
+            if st.button(rotulo, key=f"log_apr_{sid}", type="primary", use_container_width=True):
+                if dentro:
+                    _finalizar_acao(_aprovar(engine, emp_id, usuario_ativo, row, data_esc))
+                elif not motivo.strip():
+                    st.warning("Informe o motivo da nova data.")
+                else:
+                    _finalizar_acao(_remarcar(engine, emp_id, usuario_ativo, row, data_esc, motivo.strip()))
     aviso_tardio = (not urgente) and _horas_ate_data(_fim_periodo(row)) < LOGISTICA_ANTECEDENCIA_MIN_H
-    with st.expander("⛔ Registrar objeção (veículo segue em operação)" if urgente else "❌ Recusar"):
+    with st.expander("⛔ Registrar objeção (veículo segue em operação)" if urgente else "❌ Recusar a solicitação"):
         if aviso_tardio:
             st.warning(f"Faltam menos de {LOGISTICA_ANTECEDENCIA_MIN_H} h para o fim do período. Recusar agora será registrado como "
                        "**recusa tardia** (o box pode ficar ocioso).")
@@ -545,18 +882,6 @@ def _acoes_logistica(engine, emp_id, usuario_ativo, row):
                 st.warning("Informe a justificativa: ela fica registrada como respaldo.")
             else:
                 _finalizar_acao(_recusar(engine, emp_id, usuario_ativo, row, j.strip()))
-    if not urgente:
-        with st.expander("📅 Sugerir outra data"):
-            if aviso_tardio:
-                st.warning(f"Remarcar com menos de {LOGISTICA_ANTECEDENCIA_MIN_H} h do fim do período será registrado como **remarcação tardia**.")
-            nova = st.date_input("Nova data", value=hoje + timedelta(days=7), min_value=hoje, format="DD/MM/YYYY",
-                                 key=f"log_nova_{sid}")
-            j = st.text_area("Motivo (obrigatório)", key=f"log_rem_j_{sid}")
-            if st.button("Enviar nova data ao PCM", key=f"log_rem_b_{sid}", use_container_width=True):
-                if not j.strip():
-                    st.warning("Informe o motivo da remarcação.")
-                else:
-                    _finalizar_acao(_remarcar(engine, emp_id, usuario_ativo, row, nova, j.strip()))
 
 
 def _acoes_pcm(engine, emp_id, usuario_ativo, row):
@@ -648,6 +973,30 @@ def _secao_historico(engine, emp_id):
         st.dataframe(dfh, hide_index=True, use_container_width=True)
 
 
+def _meu_email(engine, emp_id, usuario_ativo):
+    with st.expander("📧 Meu e-mail para avisos"):
+        if _config_smtp() is None:
+            st.caption("Avisos por e-mail desativados: falta configurar a seção [smtp] nos Secrets do app.")
+        try:
+            with engine.connect() as conn:
+                atual = conn.execute(text("SELECT email FROM usuarios WHERE LOWER(login) = LOWER(:l) AND empresa_id = :eid"),
+                                     {"l": str(usuario_ativo), "eid": str(emp_id)}).scalar()
+        except Exception:
+            atual = None
+        novo = st.text_input("E-mail", value=_txt(atual), key="log_meu_email", placeholder="nome@empresa.com.br")
+        st.caption("A Logística recebe um aviso a cada nova solicitação; o PCM recebe quando a Logística decide.")
+        if st.button("Salvar e-mail", key="log_meu_email_salvar"):
+            valor = novo.strip().lower()
+            if valor and not _re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", valor):
+                st.warning("Informe um e-mail válido.")
+            else:
+                with engine.connect() as conn:
+                    conn.execute(text("UPDATE usuarios SET email = :e WHERE LOWER(login) = LOWER(:l) AND empresa_id = :eid"),
+                                 {"e": valor or None, "l": str(usuario_ativo), "eid": str(emp_id)})
+                    conn.commit()
+                st.success("E-mail salvo.")
+
+
 def pagina_solicitacoes_logistica(engine, emp_id, usuario_ativo, perfil):
     pode_criar = perfil in PERFIS_PCM
     pode_decidir = perfil in PERFIS_DECISAO_LOGISTICA
@@ -659,6 +1008,12 @@ def pagina_solicitacoes_logistica(engine, emp_id, usuario_ativo, perfil):
         st.error(f"Não foi possível preparar as tabelas de janelas: {e}")
         return
     _msg_flash()
+    if pode_criar:
+        aguardando = contar_pendencias_logistica(engine, emp_id, perfil)
+        if aguardando:
+            st.warning(f"📅 {aguardando} solicitação(ões) com data fora do período proposta pela Logística aguardando o seu aceite. "
+                       "Abra **📥 Em andamento** e clique em **Aceitar nova data** para a OS entrar na Agenda.")
+    _meu_email(engine, emp_id, usuario_ativo)
     secoes = (["➕ Nova solicitação"] if pode_criar else []) + ["📥 Em andamento", "📜 Histórico e respaldo"]
     destino = st.session_state.pop("_logistica_ir_para", None)
     if destino in secoes:
@@ -4585,89 +4940,88 @@ else:
                     return str(val)
                 return "00:00"
 
-            ed_c = st.data_editor(
-                st.session_state.df_ap_work, 
-                hide_index=True, 
-                use_container_width=True, 
-                column_config={
-                    "Aprovar": st.column_config.CheckboxColumn("OK", width="small"), 
-                    "prefixo": st.column_config.TextColumn("Veículo", width="small", disabled=True),
-                    "descricao": st.column_config.TextColumn("Descrição", width="large", disabled=True),
-                    "motorista": st.column_config.TextColumn("Solicitante", width="small", disabled=True),
-                    "Tipo_OS": st.column_config.SelectboxColumn("Tipo", options=LISTA_TIPOS_OS, width="small"),
-                    "Area_Destino": st.column_config.SelectboxColumn("Área", options=ORDEM_AREAS, width="small"), 
-                    "Executor": st.column_config.SelectboxColumn("Executor", options=executores_cadastrados, width="small"),
-                    "Data_Programada": st.column_config.DateColumn("Data", width="small"), 
-                    "Inicio": st.column_config.TextColumn("Início", width="small"),
-                    "Fim": st.column_config.TextColumn("Fim", width="small"),
-                    "data_solicitacao": None, 
-                    "id": None
-                }, 
-                key="editor_chamados_lote"
-            )
-
-            # Cada chamado marcado com OK abre uma caixinha de solicitação de janela (pode ser fechada)
-            marcados = ed_c[ed_c['Aprovar'] == True]
-            janelas = {}
-            if not marcados.empty:
-                st.markdown("#### 🚛 Solicitações de janela à Logística")
-                st.caption(
-                    "Cada chamado marcado com **OK** abre uma caixinha com a solicitação de janela, já com o serviço preenchido "
-                    "a partir da descrição do motorista. A Logística é notificada ao processar. Para criar a OS direto na Agenda, "
-                    "sem avisar a Logística, desmarque *Enviar solicitação de janela à Logística*."
+            with st.form("form_lote_chamados"):
+                ed_c = st.data_editor(
+                    st.session_state.df_ap_work, 
+                    hide_index=True, 
+                    use_container_width=True, 
+                    column_config={
+                        "Aprovar": st.column_config.CheckboxColumn("OK", width="small"), 
+                        "prefixo": st.column_config.TextColumn("Veículo", width="small", disabled=True),
+                        "descricao": st.column_config.TextColumn("Descrição", width="large", disabled=True),
+                        "motorista": st.column_config.TextColumn("Solicitante", width="small", disabled=True),
+                        "Tipo_OS": st.column_config.SelectboxColumn("Tipo", options=LISTA_TIPOS_OS, width="small"),
+                        "Area_Destino": st.column_config.SelectboxColumn("Área", options=ORDEM_AREAS, width="small"), 
+                        "Executor": st.column_config.SelectboxColumn("Executor", options=executores_cadastrados, width="small"),
+                        "Data_Programada": st.column_config.DateColumn("Data", width="small", help="Data da OS na Agenda quando não houver janela especificada."), 
+                        "Inicio": st.column_config.TextColumn("Início", width="small"),
+                        "Fim": st.column_config.TextColumn("Fim", width="small"),
+                        "data_solicitacao": None, 
+                        "id": None
+                    }, 
+                    key="editor_chamados_lote"
                 )
-                tipos_janela = list(LOGISTICA_TIPOS)
-                for _, r in marcados.iterrows():
-                    cid = int(r['id'])
-                    chave = f"jan_cham_{cid}"
-                    with st.expander(f"🚛 Janela — {r['prefixo']} · chamado #{cid}", expanded=True):
-                        enviar_janela = st.checkbox("Enviar solicitação de janela à Logística", value=True, key=f"{chave}_on")
-                        if enviar_janela:
-                            tipo_padrao = "preventiva" if str(r['Tipo_OS']) == "Preventiva" else "intervencao_programada"
-                            tipo_j = st.selectbox(
-                                "Tipo de solicitação", tipos_janela, index=tipos_janela.index(tipo_padrao),
-                                format_func=_rotulo_tipo, key=f"{chave}_tipo"
-                            )
-                            campos_j = _campos_janela(chave, tipo_j, servico_padrao=str(r['descricao']))
-                            janelas[cid] = {"tipo": tipo_j, **campos_j}
+                st.caption("ℹ️ Marque **OK** nos chamados. Para pedir uma janela à Logística, clique em **Especificar janela**. "
+                           "Sem janela, a OS entra na Agenda na data da tabela.")
+                col_janela, col_proc = st.columns(2)
+                btn_janela = col_janela.form_submit_button("🚛 Especificar janela", use_container_width=True)
+                btn_processar = col_proc.form_submit_button("💾 Salvar e Processar Agendamentos em Lote", type="primary", use_container_width=True)
 
-            if st.button("💾 Salvar e Processar Agendamentos em Lote", type="primary", use_container_width=True, key="btn_processar_lote"):
+            janelas = st.session_state.get("janelas_chamados", {})
+
+            if btn_janela:
+                marcados = ed_c[ed_c['Aprovar'] == True]
+                if marcados.empty:
+                    st.warning("⚠️ Marque a caixa 'OK' em ao menos um chamado antes de especificar a janela.")
+                else:
+                    _dialogo_especificar_janela(
+                        [{"id": int(r['id']), "prefixo": str(r['prefixo']), "descricao": str(r['descricao']),
+                          "tipo_os": str(r['Tipo_OS'])} for _, r in marcados.iterrows()],
+                        emp_id
+                    )
+
+            if janelas:
+                st.markdown("#### 🚛 Janelas especificadas")
+                st.caption("Valem para os chamados marcados com OK ao processar. Para alterar, marque o chamado e clique em *Especificar janela* de novo.")
+                mapa_prefixo = {int(r['id']): str(r['prefixo']) for _, r in st.session_state.df_ap_work.iterrows()}
+                for cid_j, spec_j in list(janelas.items()):
+                    cj1, cj2 = st.columns([0.88, 0.12])
+                    cj1.markdown(f"**{mapa_prefixo.get(cid_j, '?')} · chamado #{cid_j}** — {_resumo_spec(spec_j)}")
+                    if cj2.button("🗑️", key=f"jan_rm_{cid_j}", help="Remover esta janela"):
+                        janelas.pop(cid_j, None)
+                        st.rerun()
+
+            if btn_processar:
                 selecionados = ed_c[ed_c['Aprovar'] == True]
-
-                erro_janela = None
-                for cid_j, j in janelas.items():
-                    if not j["descricao"]:
-                        erro_janela = f"Informe o serviço a executar na janela do chamado #{cid_j}."
-                    elif j["tipo"] != "urgente" and not j["inicio"]:
-                        erro_janela = f"Informe o período sugerido (início e fim) na janela do chamado #{cid_j}."
 
                 if selecionados.empty:
                     st.warning("⚠️ Marque a caixa 'OK' em ao menos um chamado antes de processar.")
-                elif erro_janela:
-                    st.warning(f"⚠️ {erro_janela}")
                 else:
                     # Exibe feedback visual imediato na tela para o usuário saber que está processando
                     with st.spinner("⏳ Processando lote de chamados e salvando... Por favor, aguarde."):
                         try:
                             n_janelas = 0
                             n_agenda = 0
+                            novas_solicitacoes = []
                             with engine.connect() as conn:
                                 proxima_os = obter_proxima_os(engine, emp_id)
                                 for _, r in selecionados.iterrows():
                                     cid = int(r['id'])
                                     j = janelas.get(cid)
 
-                                    # Janela não urgente: a OS só entra na Agenda quando a Logística aprovar a data
+                                    # Janela não urgente: a OS só entra na Agenda quando a Logística definir a data
                                     if j is not None and j["tipo"] != "urgente":
-                                        _criar_solicitacao(engine, conn, emp_id, usuario_ativo, {
+                                        dados_j = {
                                             **j, "prefixo": str(r['prefixo']), "id_chamado": cid,
                                             "tipo_os": str(r['Tipo_OS']), "area": str(r['Area_Destino']),
                                             "executor": str(r['Executor'])
-                                        })
+                                        }
+                                        sid_j = _criar_solicitacao(engine, conn, emp_id, usuario_ativo, dados_j)
+                                        novas_solicitacoes.append({**dados_j, "sid": sid_j})
                                         n_janelas += 1
                                         continue
 
-                                    # Demais casos: a OS entra direto na Agenda (urgente ou sem solicitação de janela)
+                                    # Demais casos: a OS entra direto na Agenda (urgente ou sem janela especificada)
                                     v_os = proxima_os + n_agenda
                                     h_prox, o_prox = obter_medidor_proximo(engine, emp_id, r['prefixo'], r['Data_Programada'])
                                     desc_com_med = f"{r['descricao']} | [Leitura Ref: Horímetro {h_prox}h, Odômetro {o_prox}km]"
@@ -4690,22 +5044,27 @@ else:
                                         {"id": cid, "eid": str(emp_id)}
                                     )
                                     if j is not None:  # urgente: avisa a Logística (ciência ou objeção)
-                                        _criar_solicitacao(engine, conn, emp_id, usuario_ativo, {
+                                        dados_j = {
                                             **j, "prefixo": str(r['prefixo']), "id_chamado": cid,
                                             "tipo_os": str(r['Tipo_OS']), "area": str(r['Area_Destino']),
                                             "executor": str(r['Executor']), "tarefa_existente": (int(id_tarefa), int(v_os))
-                                        })
+                                        }
+                                        sid_j = _criar_solicitacao(engine, conn, emp_id, usuario_ativo, dados_j)
+                                        novas_solicitacoes.append({**dados_j, "sid": sid_j})
                                         n_janelas += 1
 
                                 conn.commit()
 
+                            aviso_email = _notificar_novas_solicitacoes(engine, emp_id, usuario_ativo, novas_solicitacoes)
+
                             if 'df_ap_work' in st.session_state: del st.session_state.df_ap_work
                             if 'analises_halley' in st.session_state: del st.session_state.analises_halley
                             st.session_state.pop("editor_chamados_lote", None)
+                            st.session_state.pop("janelas_chamados", None)
 
                             st.cache_data.clear()
-                            st.success(f"✅ Chamados processados: {n_agenda} direto na Agenda e {n_janelas} solicitação(ões) de janela enviada(s) à Logística.")
-                            time_module.sleep(1.2)
+                            st.success(f"✅ Chamados processados: {n_agenda} direto na Agenda e {n_janelas} solicitação(ões) de janela enviada(s) à Logística. {aviso_email}".strip())
+                            time_module.sleep(1.5)
                             st.rerun()
                         except Exception as e:
                             st.error(f"Erro ao processar lote: {e}")
@@ -4828,12 +5187,13 @@ else:
                     u = st.text_input("Login")
                     s = st.text_input("Senha", type="password")
                     p = st.selectbox("Cargo", ["motorista", "pcm", "logistica", "admin"])
+                    email_novo = st.text_input("E-mail (opcional, para avisos)")
                     if st.form_submit_button("Criar Acesso"):
                         if u and s:
                             senha_hash = gerar_hash_senha(s)
                             with engine.connect() as conn:
-                                conn.execute(text("INSERT INTO usuarios (login, senha, perfil, empresa_id) VALUES (:u, :s, :p, :eid)"), 
-                                             {"u": u.lower().strip(), "s": senha_hash, "p": p, "eid": str(emp_id)})
+                                conn.execute(text("INSERT INTO usuarios (login, senha, perfil, empresa_id, email) VALUES (:u, :s, :p, :eid, :em)"), 
+                                             {"u": u.lower().strip(), "s": senha_hash, "p": p, "eid": str(emp_id), "em": email_novo.strip().lower() or None})
                                 conn.commit()
                             st.success("Acesso criado com sucesso!")
                             st.rerun()
@@ -4865,18 +5225,19 @@ else:
         st.divider()
         st.subheader("Integrantes Cadastrados")
         
-        df_users = pd.read_sql(text("SELECT id, login, perfil as cargo FROM usuarios WHERE empresa_id = :eid"), engine, params={"eid": str(emp_id)})
+        df_users = pd.read_sql(text("SELECT id, login, perfil as cargo, email FROM usuarios WHERE empresa_id = :eid"), engine, params={"eid": str(emp_id)})
         
         if not df_users.empty:
             df_users['Exc'] = False
             ed_users = st.data_editor(
-                df_users[['Exc', 'login', 'cargo', 'id']], 
+                df_users[['Exc', 'login', 'cargo', 'email', 'id']], 
                 hide_index=True, 
                 use_container_width=True, 
                 column_config={
                     "id": None, 
                     "Exc": st.column_config.CheckboxColumn("Excluir", width="small"), 
-                    "cargo": st.column_config.SelectboxColumn("Cargo", options=["motorista", "pcm", "logistica", "admin"])
+                    "cargo": st.column_config.SelectboxColumn("Cargo", options=["motorista", "pcm", "logistica", "admin"]),
+                    "email": st.column_config.TextColumn("E-mail (avisos)")
                 }, 
                 key="editor_equipe"
             )
@@ -4893,7 +5254,7 @@ else:
                     st.rerun()
 
             if st.session_state.editor_equipe.get("edited_rows"):
-                COLUNAS_PERMITIDAS_USUARIOS = {"perfil": "perfil", "login": "login", "cargo": "perfil"}
+                COLUNAS_PERMITIDAS_USUARIOS = {"perfil": "perfil", "login": "login", "cargo": "perfil", "email": "email"}
                 with engine.connect() as conn:
                     for idx, changes in st.session_state.editor_equipe["edited_rows"].items():
                         uid = int(df_users.iloc[idx]['id'])
@@ -4903,6 +5264,8 @@ else:
                                 conn.execute(text("UPDATE usuarios SET perfil = :v WHERE id = :i AND empresa_id = :eid"), {"v": str(val).strip(), "i": uid, "eid": str(emp_id)})
                             elif col_real == "login":
                                 conn.execute(text("UPDATE usuarios SET login = :v WHERE id = :i AND empresa_id = :eid"), {"v": str(val).lower().strip(), "i": uid, "eid": str(emp_id)})
+                            elif col_real == "email":
+                                conn.execute(text("UPDATE usuarios SET email = :v WHERE id = :i AND empresa_id = :eid"), {"v": (str(val).lower().strip() or None) if val is not None else None, "i": uid, "eid": str(emp_id)})
                     conn.commit()
                 st.rerun()
 
