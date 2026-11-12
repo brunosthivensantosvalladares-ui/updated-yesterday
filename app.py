@@ -1045,6 +1045,49 @@ def contar_pendencias_logistica(engine, emp_id, perfil):
         return 0
 
 
+def _para_time(valor):
+    """'HH:MM' (ou 800, 8:30, 08:30:00) -> datetime.time, para o campo de hora do editor."""
+    if isinstance(valor, time):
+        return valor.replace(second=0, microsecond=0)
+    try:
+        if valor is None or pd.isna(valor):
+            return time(0, 0)
+    except Exception:
+        pass
+    txt = str(valor).strip()
+    achado = _re.match(r"^(\d{1,2}):?(\d{2})", txt)
+    if achado and int(achado.group(1)) < 24 and int(achado.group(2)) < 60:
+        return time(int(achado.group(1)), int(achado.group(2)))
+    digitos = "".join(ch for ch in txt if ch.isdigit())
+    if len(digitos) in (1, 2) and int(digitos) < 24:
+        return time(int(digitos), 0)
+    return time(0, 0)
+
+
+FILTROS_PERSISTENTES = ("dt_filter", "filtro_agenda_area", "filtro_agenda_turno",
+                        "log_filtro_status", "log_sel_timeline", "logistica_secao")
+
+
+def _sincronizar_filtros():
+    """O Streamlit apaga o estado de um filtro quando a aba muda; aqui o valor é guardado e devolvido ao voltar."""
+    salvos = st.session_state.setdefault("_filtros_salvos", {})
+    for chave in FILTROS_PERSISTENTES:
+        if chave in st.session_state:
+            salvos[chave] = st.session_state[chave]
+        elif chave in salvos:
+            st.session_state[chave] = salvos[chave]
+
+
+def _hora_para_texto(valor):
+    t = _para_time(valor)
+    return f"{t.hour:02d}:{t.minute:02d}"
+
+
+def _coluna_hora(rotulo):
+    """Campo de hora com os dois pontos fixos: digitar 0830 vira 08:30."""
+    return st.column_config.TimeColumn(rotulo, format="HH:mm", step=60)
+
+
 COR_BRONZE = "#4A3C31"  
 COR_OURO = "#C5A059"    
 COR_CHAPA = "#F7F5F0"   
@@ -1284,6 +1327,53 @@ else:
 
 # Injeta o estilo ativo na página
 st.markdown(estilo_fundo_login, unsafe_allow_html=True)
+
+# Véu de carregamento: logo após o login, só o recado central aparece; o painel surge de uma vez ao terminar
+_veu_carregamento = st.empty()
+if not st.session_state.get("logado", False):
+    st.session_state["_painel_carregado"] = False
+elif not st.session_state.get("_painel_carregado", False):
+    _veu_carregamento.markdown(f"""
+    <style>
+    html body .stApp {{
+        background: url('{BG_LOGIN_URL}') center center / cover no-repeat fixed !important;
+    }}
+    html body .stApp [data-testid="stAppViewContainer"],
+    html body .stApp [data-testid="stMain"],
+    html body .stApp header[data-testid="stHeader"] {{
+        background: transparent !important;
+    }}
+    html body .stApp [data-testid="stMainBlockContainer"],
+    html body .stApp section[data-testid="stSidebar"],
+    html body .stApp header[data-testid="stHeader"],
+    html body .stApp [data-testid="stBottom"],
+    html body .stApp [data-testid="stSidebarCollapsedControl"] {{
+        visibility: hidden;
+        animation: uy-revela 0.01s linear 30s forwards;
+    }}
+    html body .stApp::after {{
+        content: "UPDATED YESTERDAY\\A Carregando seu painel…";
+        white-space: pre;
+        text-align: center;
+        position: fixed;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 1000000;
+        pointer-events: none;
+        font-family: 'Cinzel', serif;
+        font-weight: 700;
+        font-size: 1.5rem;
+        letter-spacing: 3px;
+        line-height: 1.8;
+        color: #E3C684;
+        text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
+        animation: uy-pulso 1.4s ease-in-out infinite, uy-some 0.01s linear 30s forwards;
+    }}
+    @keyframes uy-revela {{ to {{ visibility: visible; }} }}
+    @keyframes uy-some {{ to {{ visibility: hidden; }} }}
+    </style>
+    """, unsafe_allow_html=True)
 
 # --- 2. FUNÇÕES DE SUPORTE E BANCO ---
 @st.cache_resource
@@ -2719,6 +2809,7 @@ else:
         _iniciar_logistica_uma_vez()
     except Exception:
         pass
+    _sincronizar_filtros()
     emp_id = st.session_state["empresa"] 
     usuario_ativo = st.session_state.get("usuario_ativo", "")
     
@@ -3977,13 +4068,18 @@ else:
         hoje_input, amanha = datetime.now().date(), datetime.now().date() + timedelta(days=1)
         
         c_per, c_area, c_turno = st.columns([0.4, 0.3, 0.3])
-        with c_per: p_sel = st.date_input("Filtrar Período", [hoje_input, amanha], key="dt_filter")
+        st.session_state.setdefault("dt_filter", [hoje_input, amanha])
+        with c_per: p_sel = st.date_input("Filtrar Período", key="dt_filter")
         
         opcoes_area = ["Todas"] + ORDEM_AREAS
         opcoes_turno = ["Todos"] + LISTA_TURNOS
         
-        with c_area: f_area = st.selectbox("Filtrar Área", opcoes_area)
-        with c_turno: f_turno = st.selectbox("Filtrar Turno", opcoes_turno)
+        if st.session_state.get("filtro_agenda_area") not in opcoes_area:
+            st.session_state["filtro_agenda_area"] = "Todas"
+        if st.session_state.get("filtro_agenda_turno") not in opcoes_turno:
+            st.session_state["filtro_agenda_turno"] = "Todos"
+        with c_area: f_area = st.selectbox("Filtrar Área", opcoes_area, key="filtro_agenda_area")
+        with c_turno: f_turno = st.selectbox("Filtrar Turno", opcoes_turno, key="filtro_agenda_turno")
         
         c_pdf, c_xls, _ = st.columns([0.2, 0.2, 0.6])
 
@@ -4032,15 +4128,20 @@ else:
                             
                             cols_para_editor = [c for c in ['realizado', 'Nº OS', 'area', 'turno', 'prefixo', 'inicio_disp', 'fim_disp', 'executor', 'descricao', 'id_chamado'] if c in df_editor_base.columns]
                             
+                            df_view_agenda = df_editor_base[cols_para_editor].copy()
+                            for _c_hora in ("inicio_disp", "fim_disp"):
+                                if _c_hora in df_view_agenda.columns:
+                                    df_view_agenda[_c_hora] = df_view_agenda[_c_hora].apply(_para_time)
+
                             edited_df = st.data_editor(
-                                df_editor_base[cols_para_editor], 
+                                df_view_agenda, 
                                 column_config={
                                     "realizado": st.column_config.CheckboxColumn("OK", width="small"),
                                     "Nº OS": st.column_config.TextColumn("Nº OS", disabled=True),
                                     "area": st.column_config.SelectboxColumn("Área", options=ORDEM_AREAS),
                                     "turno": st.column_config.SelectboxColumn("Turno", options=LISTA_TURNOS),
-                                    "inicio_disp": st.column_config.TextColumn("Início (Preencher)"),
-                                    "fim_disp": st.column_config.TextColumn("Fim (Preencher)"),
+                                    "inicio_disp": _coluna_hora("Início (Preencher)"),
+                                    "fim_disp": _coluna_hora("Fim (Preencher)"),
                                     "executor": st.column_config.TextColumn("Executor"),
                                     "id_chamado": None
                                 }, 
@@ -4054,8 +4155,8 @@ else:
                 with engine.connect() as conn:
                     for sec_key, (df_orig, df_edit, cols_ed) in edits_por_secao.items():
                         for row_id, row in df_edit.iterrows():
-                            t_inicio = formatar_hora_simples(row['inicio_disp'])
-                            t_fim = formatar_hora_simples(row['fim_disp'])
+                            t_inicio = _hora_para_texto(row['inicio_disp'])
+                            t_fim = _hora_para_texto(row['fim_disp'])
 
                             conn.execute(text("""
                                 UPDATE tarefas SET 
@@ -4243,13 +4344,18 @@ else:
                 
                 cols_ed = ['Exc', 'Nº OS', 'data', 'turno', 'executor', 'prefixo', 'inicio_disp', 'fim_disp', 'descricao', 'area', 'id']
                 
+                df_lista_view = df_lista[cols_ed].copy()
+                for _c_hora in ("inicio_disp", "fim_disp"):
+                    df_lista_view[_c_hora] = df_lista_view[_c_hora].apply(_para_time)
                 ed_l = st.data_editor(
-                    df_lista[cols_ed], 
+                    df_lista_view, 
                     hide_index=True, 
                     use_container_width=True, 
                     key="ed_lista_servicos_direto",
                     column_config={
-                        "Nº OS": st.column_config.TextColumn("Nº OS", disabled=True)
+                        "Nº OS": st.column_config.TextColumn("Nº OS", disabled=True),
+                        "inicio_disp": _coluna_hora("Início"),
+                        "fim_disp": _coluna_hora("Fim")
                     }
                 )
                 
@@ -4269,7 +4375,8 @@ else:
                             rid = int(df_lista.iloc[int(idx)]['id'])
                             for col, val in changes.items():
                                 if col in COLUNAS_PERMITIDAS_TAREFAS: 
-                                    conn.execute(text(f"UPDATE tarefas SET {col} = :v WHERE id = :i AND empresa_id = :eid"), {"v": str(val), "i": rid, "eid": str(emp_id)})
+                                    valor_salvo = _hora_para_texto(val) if col in ("inicio_disp", "fim_disp") else str(val)
+                                    conn.execute(text(f"UPDATE tarefas SET {col} = :v WHERE id = :i AND empresa_id = :eid"), {"v": valor_salvo, "i": rid, "eid": str(emp_id)})
                         conn.commit()
                     st.cache_data.clear()
                     st.rerun()
@@ -4941,8 +5048,11 @@ else:
                 return "00:00"
 
             with st.form("form_lote_chamados"):
+                df_ap_view = st.session_state.df_ap_work.copy()
+                for _c_hora in ("Inicio", "Fim"):
+                    df_ap_view[_c_hora] = df_ap_view[_c_hora].apply(_para_time)
                 ed_c = st.data_editor(
-                    st.session_state.df_ap_work, 
+                    df_ap_view, 
                     hide_index=True, 
                     use_container_width=True, 
                     column_config={
@@ -4954,8 +5064,8 @@ else:
                         "Area_Destino": st.column_config.SelectboxColumn("Área", options=ORDEM_AREAS, width="small"), 
                         "Executor": st.column_config.SelectboxColumn("Executor", options=executores_cadastrados, width="small"),
                         "Data_Programada": st.column_config.DateColumn("Data", width="small", help="Data da OS na Agenda quando não houver janela especificada."), 
-                        "Inicio": st.column_config.TextColumn("Início", width="small"),
-                        "Fim": st.column_config.TextColumn("Fim", width="small"),
+                        "Inicio": _coluna_hora("Início"),
+                        "Fim": _coluna_hora("Fim"),
                         "data_solicitacao": None, 
                         "id": None
                     }, 
@@ -5033,7 +5143,7 @@ else:
                                         """),
                                         {
                                             "dt": str(r['Data_Programada']), "ex": str(r['Executor']), "pr": str(r['prefixo']),
-                                            "ti": formatar_hora_simples(r['Inicio']), "tf": formatar_hora_simples(r['Fim']),
+                                            "ti": _hora_para_texto(r['Inicio']), "tf": _hora_para_texto(r['Fim']),
                                             "ds": desc_com_med, "ar": str(r['Area_Destino']), "tp": str(r['Tipo_OS']),
                                             "ic": cid, "eid": str(emp_id), "nos": v_os
                                         }
@@ -5275,3 +5385,8 @@ if st.session_state.get("logado") and "empresa" in st.session_state:
 
     # Chamada do módulo offline devidamente indentada no mesmo bloco
     renderizar_modulo_sincronizacao_offline(emp_id)
+
+# Painel completo: remove o véu de carregamento (os itens aparecem de uma só vez)
+if st.session_state.get("logado", False):
+    st.session_state["_painel_carregado"] = True
+    _veu_carregamento.empty()
