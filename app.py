@@ -225,7 +225,7 @@ def _atualizar_status_chamado(conn, emp_id, id_chamado, novo_status, somente_se=
     conn.execute(text(sql), params)
 
 
-def _criar_tarefa_agenda(engine, conn, emp_id, sol, data_execucao, numero_os=None):
+def _criar_tarefa_agenda(engine, conn, emp_id, sol, data_execucao, numero_os=None, inicio_janela=None, fim_janela=None):
     """Insere a OS na Agenda Principal e devolve (id_tarefa, numero_os)."""
     numero_os = int(numero_os) if numero_os else obter_proxima_os(engine, emp_id)
     tipo = str(_val(sol, "tipo_solicitacao", ""))
@@ -239,12 +239,15 @@ def _criar_tarefa_agenda(engine, conn, emp_id, sol, data_execucao, numero_os=Non
         partes.append(f"Box estimado: {float(sol['tempo_box_horas']):g} h")
     h_prox, o_prox = obter_medidor_proximo(engine, emp_id, prefixo, data_os)
     partes.append(f"[Leitura Ref: Horímetro {h_prox}h, Odômetro {o_prox}km]")
+    hora_inicio = inicio_janela.strftime("%H:%M") if inicio_janela is not None else "00:00"
+    hora_fim = fim_janela.strftime("%H:%M") if fim_janela is not None else "00:00"
     id_tarefa = conn.execute(text("""
         INSERT INTO tarefas (data, executor, prefixo, inicio_disp, fim_disp, descricao, area, tipo_os,
                              turno, id_chamado, origem, empresa_id, numero_os)
-        VALUES (:dt, :ex, :pr, '00:00', '00:00', :ds, :ar, :tp, 'Não definido', :ic, :og, :eid, :nos)
+        VALUES (:dt, :ex, :pr, :hora_ini, :hora_fim, :ds, :ar, :tp, 'Não definido', :ic, :og, :eid, :nos)
         RETURNING id
     """), {"dt": str(data_os), "ex": _txt(_val(sol, "executor")), "pr": prefixo, "ds": " | ".join(partes),
+           "hora_ini": hora_inicio, "hora_fim": hora_fim,
            "ar": _txt(_val(sol, "area_destino"), "Mecânica"),
            "tp": _txt(_val(sol, "tipo_os")) or LOGISTICA_TIPO_OS.get(tipo, "Corretiva"),
            "ic": None if id_chamado is None else int(id_chamado),
@@ -295,7 +298,7 @@ def _criar_solicitacao(engine, conn, emp_id, usuario, d):
     return int(sid)
 
 
-def _aprovar(engine, emp_id, usuario, row, data_escolhida=None):
+def _aprovar(engine, emp_id, usuario, row, data_escolhida=None, inicio_janela=None, fim_janela=None):
     sid = int(row["id"])
     urgente = str(row["tipo_solicitacao"]) == "urgente"
     if not urgente:
@@ -304,7 +307,11 @@ def _aprovar(engine, emp_id, usuario, row, data_escolhida=None):
         fim = max(_como_data(_fim_periodo(row)), ini)
         if data_escolhida is None or not (ini <= _como_data(data_escolhida) <= fim):
             return False, f"Escolha uma data dentro do período ({_data_br(ini)} a {_data_br(fim)})."
-    with engine.connect() as conn:
+    if (inicio_janela is None) != (fim_janela is None):
+        return False, "Informe os dois horários ou deixe ambos em branco."
+    if inicio_janela is not None and fim_janela <= inicio_janela:
+        return False, "O horário de fim deve ser posterior ao horário de início."
+    with engine.begin() as conn:
         ok = conn.execute(text("""
             UPDATE solicitacoes_logistica SET status = 'Aprovada', aprovado_por = :usr, data_decisao = NOW(),
                    data_aprovada = :da
@@ -312,20 +319,20 @@ def _aprovar(engine, emp_id, usuario, row, data_escolhida=None):
         """), {"usr": str(usuario), "id": sid, "eid": str(emp_id),
                "da": None if urgente else _como_data(data_escolhida)}).fetchone()
         if not ok:
-            conn.rollback()
             return False, "Esta solicitação já foi decidida por outra pessoa."
         if urgente:
             detalhe = "Logística ciente da parada urgente; veículo liberado para a oficina."
             msg = "Ciência registrada. Veículo liberado para a oficina."
         else:
-            id_tarefa, numero_os = _criar_tarefa_agenda(engine, conn, emp_id, row, data_escolhida)
+            id_tarefa, numero_os = _criar_tarefa_agenda(engine, conn, emp_id, row, data_escolhida, inicio_janela=inicio_janela, fim_janela=fim_janela)
             conn.execute(text("UPDATE solicitacoes_logistica SET id_tarefa = :t, numero_os = :n WHERE id = :id"),
                          {"t": id_tarefa, "n": numero_os, "id": sid})
             _atualizar_status_chamado(conn, emp_id, _val(row, "id_chamado"), "Agendado")
-            detalhe = f"Janela aprovada para {_data_br(data_escolhida)}. OS {numero_os} criada na Agenda."
+            faixa_horaria = (f" das {inicio_janela:%H:%M} às {fim_janela:%H:%M}"
+                             if inicio_janela is not None else " (horário a definir na Agenda)")
+            detalhe = f"Janela aprovada para {_data_br(data_escolhida)}{faixa_horaria}. OS {numero_os} criada na Agenda."
             msg = f"Janela aprovada. OS {numero_os} criada na Agenda para {_data_br(data_escolhida)}."
         registrar_historico_logistica(sid, usuario, "APROVACAO", detalhe, conn=conn, empresa_id=emp_id)
-        conn.commit()
     aviso = _notificar_decisao(engine, emp_id, row, "foi aprovada", detalhe)
     return True, f"{msg} {aviso}".strip()
 
@@ -735,7 +742,7 @@ def _msg_flash():
 def _finalizar_acao(resultado):
     ok, msg = resultado
     st.session_state["_logistica_msg"] = ("ok" if ok else "aviso", msg)
-    st.cache_data.clear()
+    _ocupacao_box.clear()
     st.rerun()
 
 
@@ -871,20 +878,27 @@ def _acoes_logistica(engine, emp_id, usuario_ativo, row):
             st.caption(f"Período pedido pelo PCM: {_data_br(ini)} a {_data_br(fim)}. "
                        "Data dentro do período: a OS entra direto na Agenda. Data fora do período: o PCM precisa aceitar.")
             data_esc = st.date_input("Data da janela", value=ini, min_value=hoje, format="DD/MM/YYYY", key=f"log_apr_dt_{sid}")
+            st.caption("Horário da janela (opcional). Se não informado, poderá ser definido depois na Agenda Principal.")
+            marcar_horario = st.checkbox("Definir horário agora", key=f"log_habilitar_horario_{sid}")
+            hora_inicio = hora_fim = None
+            if marcar_horario:
+                h1, h2 = st.columns(2)
+                hora_inicio = h1.time_input("Início da janela", value=time(8, 0), step=900, key=f"log_inicio_{sid}")
+                hora_fim = h2.time_input("Fim da janela", value=time(10, 0), step=900, key=f"log_fim_{sid}")
             dentro = ini <= data_esc <= fim
             motivo = ""
             if dentro:
                 st.success("✅ Dentro do período: vai direto para a Agenda.")
                 rotulo = "Aprovar nesta data"
             else:
-                st.warning("⚠️ Fora do período: será enviada ao PCM para aceite.")
+                st.warning("⚠️ Fora do período: será enviada ao PCM para aceite. Os horários poderão ser definidos na Agenda após o aceite.")
                 if _horas_ate_data(_fim_periodo(row)) < LOGISTICA_ANTECEDENCIA_MIN_H:
                     st.warning(f"Faltam menos de {LOGISTICA_ANTECEDENCIA_MIN_H} h para o fim do período: será registrada como **remarcação tardia**.")
                 motivo = st.text_area("Motivo (obrigatório)", key=f"log_rem_j_{sid}")
                 rotulo = "Enviar nova data ao PCM"
             if st.button(rotulo, key=f"log_apr_{sid}", type="primary", use_container_width=True):
                 if dentro:
-                    _finalizar_acao(_aprovar(engine, emp_id, usuario_ativo, row, data_esc))
+                    _finalizar_acao(_aprovar(engine, emp_id, usuario_ativo, row, data_esc, hora_inicio, hora_fim))
                 elif not motivo.strip():
                     st.warning("Informe o motivo da nova data.")
                 else:
@@ -1346,47 +1360,8 @@ else:
 # Injeta o estilo ativo na página
 st.markdown(estilo_fundo_login, unsafe_allow_html=True)
 
-# Véu de carregamento: logo após o login, só o recado central aparece; o painel surge de uma vez ao terminar
+# A sobreposição de login é controlada diretamente pelo navegador (ver bloco de login).
 _veu_carregamento = st.empty()
-if not st.session_state.get("logado", False):
-    st.session_state["_painel_carregado"] = False
-elif not st.session_state.get("_painel_carregado", False):
-    _veu_carregamento.markdown(f"""
-    <style>
-    /* Cobertura opaca de toda a interface, inclusive cabeçalho e barra lateral,
-       até que o script finalize a montagem do painel. */
-    .stApp::before {{
-        content: "";
-        position: fixed;
-        inset: 0;
-        z-index: 2147483000;
-        background: #301905 url('{BG_LOGIN_URL}') center center / cover no-repeat;
-        pointer-events: auto;
-    }}
-    .stApp::after {{
-        content: "UPDATED YESTERDAY\\A Carregando seu painel…";
-        white-space: pre;
-        text-align: center;
-        position: fixed;
-        left: 50%; top: 50%;
-        transform: translate(-50%, -50%);
-        z-index: 2147483001;
-        pointer-events: auto;
-        font-family: 'Cinzel', serif;
-        font-weight: 700;
-        font-size: 1.5rem;
-        letter-spacing: 3px;
-        line-height: 1.8;
-        color: #E3C684;
-        text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
-        animation: uy-pulso 1.4s ease-in-out infinite;
-    }}
-    @keyframes uy-pulso {{
-        0%, 100% {{ opacity: 0.65; }}
-        50% {{ opacity: 1; }}
-    }}
-    </style>
-    """, unsafe_allow_html=True)
 
 # --- 2. FUNÇÕES DE SUPORTE E BANCO ---
 @st.cache_resource
@@ -2590,6 +2565,7 @@ def exibir_painel_pagamento_pro(origem):
             st.session_state[f"show_pay_{origem}"] = False
             st.rerun()
 
+@st.cache_resource(show_spinner=False)
 def inicializar_banco():
     engine = get_engine()
     try:
@@ -2696,6 +2672,31 @@ if "usuario_ativo" not in st.session_state:
     st.session_state["usuario_ativo"] = ""
 
 if not st.session_state["logado"]:
+    # A tela de carregamento é criada no navegador no instante do clique,
+    # antes de o Streamlit iniciar autenticação, conexão e renderização.
+    components.html("""
+    <script>
+    (function () {
+      const doc = window.parent.document;
+      const old = doc.getElementById('uy-login-loading-overlay');
+      if (old) old.remove();
+      if (!doc.__uyLoginOverlayListener) {
+        doc.__uyLoginOverlayListener = true;
+        doc.addEventListener('click', function(ev) {
+          const btn = ev.target.closest('button');
+          if (!btn || !/^(acessar|entrar)(\\s|$)/i.test((btn.innerText || '').trim())) return;
+          if (doc.getElementById('uy-login-loading-overlay')) return;
+          const overlay = doc.createElement('div');
+          overlay.id = 'uy-login-loading-overlay';
+          overlay.style.cssText = 'position:fixed;inset:0;z-index:2147483646;background:#301905;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:#E3C684;font-family:Georgia,serif;letter-spacing:2px;';
+          overlay.innerHTML = '<div style="font-size:26px;font-weight:bold">UPDATED YESTERDAY</div><div style="font-size:17px;margin-top:15px;letter-spacing:1px">Carregando seu painel...</div>';
+          doc.body.appendChild(overlay);
+          window.parent.setTimeout(() => overlay.remove(), 15000);
+        }, true);
+      }
+    })();
+    </script>
+    """, height=0)
     _, col_login, _ = st.columns([1.2, 1, 1.2])
     with col_login:
         st.markdown(f"""
@@ -5539,6 +5540,11 @@ if st.session_state.get("logado") and "empresa" in st.session_state:
 # Nas navegações posteriores, não há espera adicional.
 if st.session_state.get("logado", False):
     if not st.session_state.get("_painel_carregado", False):
-        time_module.sleep(1.3)
         st.session_state["_painel_carregado"] = True
     _veu_carregamento.empty()
+    components.html("""
+    <script>
+      const overlay = window.parent.document.getElementById('uy-login-loading-overlay');
+      if (overlay) overlay.remove();
+    </script>
+    """, height=0)
