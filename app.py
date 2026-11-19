@@ -776,7 +776,25 @@ def _campos_janela(chave, tipo, servico_padrao="", emp_id=None):
             "observacoes": obs.strip()}
 
 
+def _preencher_solicitacao_preventiva():
+    """Transfere o plano selecionado no sino para o formulário de janelas."""
+    item = st.session_state.pop("_preventiva_para_logistica", None)
+    if not item:
+        return
+    versao = st.session_state.get("log_nova_ver", 0)
+    chave = f"log_nova_{versao}"
+    st.session_state[f"{chave}_tipo_sel"] = "preventiva"
+    st.session_state[f"{chave}_prefixo"] = str(item["prefixo"])
+    st.session_state[f"{chave}_servico"] = f"Plano preventivo: {item['plano']}"
+    st.session_state[f"{chave}_obs"] = f"Critério: {item['criterio']}. {item['saldo_texto']}."
+    st.session_state[f"{chave}_risco"] = "Moderado"
+    st.session_state[f"{chave}_box"] = 4.0
+    st.info(f"🔧 Plano **{item['plano']}** do veículo **{item['prefixo']}** carregado. "
+            "Revise o período e o tempo de box antes de enviar à Logística.")
+
+
 def _secao_nova_solicitacao(engine, emp_id, usuario_ativo):
+    _preencher_solicitacao_preventiva()
     st.markdown("#### ➕ Nova solicitação de janela")
     st.caption("🚨 **Urgente:** a OS entra direto na Agenda e a Logística confirma ciência ou registra objeção.  "
                "🛠️🔧🏗️ **Preventiva, Intervenção programada e Reforma:** você sugere um período e a Logística "
@@ -2928,6 +2946,97 @@ else:
     def traduzir_nav(opcao):
         return TRADUCOES_NAVEGACAO.get(opcao, {}).get(st.session_state.idioma_atual, opcao)
 
+    def listar_alertas_preventivas():
+        """Alertas por veículo/plano a partir dos Planos Master e leituras existentes.
+
+        Horímetro/odômetro: saldo até o próximo múltiplo do intervalo,
+        tomando como referência a última preventiva concluída quando disponível.
+        Dias: última preventiva concluída + periodicidade; sem histórico,
+        a data de cadastro não é conhecida e não se inventa vencimento.
+        """
+        if st.session_state.get("perfil") not in PERFIS_PCM:
+            return []
+        planos = carregar_planos_master_empresa(emp_id)
+        if planos.empty:
+            return []
+        medidores = carregar_medidores_empresa(emp_id)
+        tarefas = carregar_tarefas_empresa(emp_id)
+        hoje = datetime.now().date()
+        alertas = []
+        for _, plano in planos.iterrows():
+            criterio = str(plano.get("tipo_criterio", ""))
+            if criterio not in ("Dias", "Horímetro", "Odômetro"):
+                continue
+            try:
+                intervalo = float(plano["intervalo_valor"])
+                if intervalo <= 0:
+                    continue
+            except (TypeError, ValueError):
+                continue
+            nome = str(plano["nome_plano"])
+            for prefixo in [x.strip() for x in str(plano.get("prefixo", "")).split(",") if x.strip()]:
+                historico = tarefas[
+                    tarefas["prefixo"].astype(str).str.casefold().eq(prefixo.casefold())
+                    & tarefas["descricao"].fillna("").astype(str).str.contains(nome, case=False, regex=False)
+                ] if not tarefas.empty else pd.DataFrame()
+                concluidas = historico[historico["realizado"].fillna(False).astype(bool)] if not historico.empty else pd.DataFrame()
+                if not concluidas.empty:
+                    concluidas = concluidas.sort_values("data", ascending=False)
+                leituras = medidores[medidores["prefixo"].astype(str).str.casefold().eq(prefixo.casefold())] if not medidores.empty else pd.DataFrame()
+                saldo = None
+                if criterio == "Dias":
+                    if concluidas.empty:
+                        continue  # sem data de última execução, não há base confiável
+                    ultima = pd.to_datetime(concluidas.iloc[0]["data"], errors="coerce")
+                    if pd.isna(ultima):
+                        continue
+                    saldo = (ultima.date() + timedelta(days=int(intervalo)) - hoje).days
+                    unidade = "dia" if abs(saldo) == 1 else "dias"
+                else:
+                    campo = "horimetro" if criterio == "Horímetro" else "odometro"
+                    valores = pd.to_numeric(leituras[campo], errors="coerce").dropna() if not leituras.empty else pd.Series(dtype=float)
+                    if valores.empty:
+                        continue  # não mostrar saldo fictício sem leitura
+                    atual = float(valores.iloc[0])
+                    if atual < 0:
+                        continue
+                    ultima_base = None
+                    for _, os_row in concluidas.iterrows():
+                        descricao = str(os_row.get("descricao", ""))
+                        rotulo = "Horímetro" if criterio == "Horímetro" else "Odômetro"
+                        match = re.search(rf"{rotulo}:\s*([\d.,]+)", descricao, re.I)
+                        if match:
+                            try:
+                                ultima_base = float(match.group(1).replace(",", "."))
+                                break
+                            except ValueError:
+                                pass
+                    if ultima_base is not None and atual >= ultima_base:
+                        # Primeira meta após a última preventiva executada.
+                        proxima = ultima_base + intervalo
+                        saldo = proxima - atual
+                    else:
+                        # Sem histórico: referência nos múltiplos da periodicidade.
+                        resto = atual % intervalo
+                        saldo = intervalo - resto if resto else intervalo
+                    unidade = "h de horímetro" if criterio == "Horímetro" else "km no odômetro"
+                # Limite de alerta: até 5 dias ou últimos 20% do intervalo.
+                limite = 5 if criterio == "Dias" else intervalo * 0.20
+                if saldo > limite:
+                    continue
+                numero = f"{abs(saldo):,.1f}".replace(",", "X").replace(".", ",").replace("X", ".")
+                if numero.endswith(",0"):
+                    numero = numero[:-2]
+                if saldo < 0:
+                    saldo_texto = f"Vencido há {numero} {unidade}"
+                elif saldo == 0:
+                    saldo_texto = "Vence hoje" if criterio == "Dias" else "Limite de manutenção atingido"
+                else:
+                    saldo_texto = f"Faltam {numero} {unidade}"
+                alertas.append({"plano": nome, "prefixo": prefixo, "criterio": criterio,
+                                "saldo": saldo, "saldo_texto": saldo_texto})
+        return sorted(alertas, key=lambda x: x["saldo"])
+
     def obter_notificacoes_header():
         qtd_atrasadas = 0
         qtd_chamados = 0
@@ -2935,7 +3044,7 @@ else:
         qtd_logistica = 0
         try:
             hoje_header = str(datetime.now().date())
-            limite_alerta = str(datetime.now().date() + timedelta(days=3))
+            limite_alerta = str(datetime.now().date() + timedelta(days=5))
             with engine.connect() as conn:
                 qtd_atrasadas = conn.execute(
                     text("SELECT COUNT(*) FROM tarefas WHERE data < :hoje AND realizado = FALSE AND empresa_id = :eid"),
@@ -2948,13 +3057,10 @@ else:
                         {"eid": str(emp_id)}
                     ).scalar() or 0
                     
-                    # Preventivas próximas do vencimento (vencem hoje ou nos próximos 3 dias)
-                    qtd_preventivas = conn.execute(
-                        text("SELECT COUNT(*) FROM planos_preventivas WHERE ativo = TRUE AND proxima_data_vencimento <= :limite AND empresa_id = :eid"),
-                        {"limite": limite_alerta, "eid": str(emp_id)}
-                    ).scalar() or 0
+                    # Alertas vêm dos Planos Master efetivamente cadastrados.
         except Exception:
             pass
+        qtd_preventivas = len(alertas_preventivas_header)
         qtd_logistica = contar_pendencias_logistica(engine, emp_id, st.session_state.get("perfil"))
         return int(qtd_atrasadas), int(qtd_chamados), int(qtd_preventivas), int(qtd_logistica)
 
@@ -3017,6 +3123,11 @@ else:
 
     st.markdown("<div class='top-fixed-section'>", unsafe_allow_html=True)
     
+    try:
+        alertas_preventivas_header = listar_alertas_preventivas()
+    except Exception as erro_alertas:
+        alertas_preventivas_header = []
+        st.caption(f"Não foi possível consultar os vencimentos preventivos: {erro_alertas}")
     qtd_atrasadas_header, qtd_chamados_header, qtd_preventivas_header, qtd_logistica_header = obter_notificacoes_header()
     total_notificacoes_header = qtd_atrasadas_header + qtd_chamados_header + qtd_preventivas_header + qtd_logistica_header
     
@@ -3069,10 +3180,18 @@ else:
                     set_nav("Chamados Oficina")
                     st.rerun()
             if qtd_preventivas_header:
-                st.warning(f"🔧 {qtd_preventivas_header} planos preventivos próximos ao vencimento.")
-                if st.button("📅 Ver Cadastro Direto / Preventivas", key="header_prev", use_container_width=True):
-                    set_nav("Cadastro Direto")
-                    st.rerun()
+                st.warning(f"🔧 {qtd_preventivas_header} preventiva(s) próximas do vencimento ou vencidas.")
+                for indice, alerta in enumerate(alertas_preventivas_header):
+                    with st.container(border=True):
+                        st.markdown(f"**🔧 {alerta['plano']}**")
+                        st.caption(f"Veículo: {alerta['prefixo']} · Critério: {alerta['criterio']}")
+                        st.write(f"⏳ **{alerta['saldo_texto']}**")
+                        if st.button("🚛 Solicitar janela à Logística", key=f"header_prev_janela_{indice}",
+                                     use_container_width=True):
+                            st.session_state["_preventiva_para_logistica"] = dict(alerta)
+                            st.session_state["_logistica_ir_para"] = "➕ Nova solicitação"
+                            set_nav("Solicitações de Janelas")
+                            st.rerun()
             if qtd_logistica_header:
                 if st.session_state.get("perfil") == "logistica":
                     st.warning(f"🚛 {qtd_logistica_header} solicitação(ões) aguardando a sua decisão.")
