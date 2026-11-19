@@ -2754,6 +2754,7 @@ if not st.session_state["logado"]:
                                 except Exception:
                                     pass
 
+                            st.session_state["_painel_carregado"] = False
                             st.session_state["logado"] = True
                             st.session_state["empresa"] = empresa[1]
                             st.session_state["perfil"] = "admin"
@@ -2780,6 +2781,7 @@ if not st.session_state["logado"]:
                                     except Exception:
                                         pass
 
+                                st.session_state["_painel_carregado"] = False
                                 st.session_state["logado"] = True
                                 st.session_state["empresa"] = usuario[1]
                                 st.session_state["perfil"] = usuario[2]
@@ -4259,7 +4261,7 @@ else:
             with st.form("form_agenda_principal_lote"):
                 edits_por_secao = {}
                 
-                for d in sorted(df_f['data'].unique(), reverse=True):
+                for d in sorted(df_f['data'].dropna().unique()):
                     st.markdown(f"#### 🗓️ {d.strftime('%d/%m/%Y')}")
                     areas_para_exibir = ORDEM_AREAS if f_area == "Todas" else [f_area]
                     for area in areas_para_exibir:
@@ -5532,7 +5534,11 @@ if st.session_state.get("logado") and "empresa" in st.session_state:
     # Chamada do módulo offline devidamente indentada no mesmo bloco
     renderizar_modulo_sincronizacao_offline(emp_id)
 
-# Painel completo: remove o véu de carregamento (os itens aparecem de uma só vez)
+# O véu é mantido durante a construção do painel e por um curto intervalo
+# adicional para que o navegador tenha tempo de exibir a mensagem de carregamento.
+# Nas navegações posteriores, não há espera adicional.
 if st.session_state.get("logado", False):
-    st.session_state["_painel_carregado"] = True
+    if not st.session_state.get("_painel_carregado", False):
+        time_module.sleep(1.3)
+        st.session_state["_painel_carregado"] = True
     _veu_carregamento.empty()
