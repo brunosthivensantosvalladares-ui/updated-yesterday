@@ -1353,32 +1353,25 @@ if not st.session_state.get("logado", False):
 elif not st.session_state.get("_painel_carregado", False):
     _veu_carregamento.markdown(f"""
     <style>
-    html body .stApp {{
-        background: url('{BG_LOGIN_URL}') center center / cover no-repeat fixed !important;
+    /* Cobertura opaca de toda a interface, inclusive cabeçalho e barra lateral,
+       até que o script finalize a montagem do painel. */
+    .stApp::before {{
+        content: "";
+        position: fixed;
+        inset: 0;
+        z-index: 2147483000;
+        background: #301905 url('{BG_LOGIN_URL}') center center / cover no-repeat;
+        pointer-events: auto;
     }}
-    html body .stApp [data-testid="stAppViewContainer"],
-    html body .stApp [data-testid="stMain"],
-    html body .stApp header[data-testid="stHeader"] {{
-        background: transparent !important;
-    }}
-    html body .stApp [data-testid="stMainBlockContainer"],
-    html body .stApp section[data-testid="stSidebar"],
-    html body .stApp header[data-testid="stHeader"],
-    html body .stApp [data-testid="stBottom"],
-    html body .stApp [data-testid="stSidebarCollapsedControl"] {{
-        visibility: hidden;
-        animation: uy-revela 0.01s linear 30s forwards;
-    }}
-    html body .stApp::after {{
+    .stApp::after {{
         content: "UPDATED YESTERDAY\\A Carregando seu painel…";
         white-space: pre;
         text-align: center;
         position: fixed;
-        left: 50%;
-        top: 50%;
+        left: 50%; top: 50%;
         transform: translate(-50%, -50%);
-        z-index: 1000000;
-        pointer-events: none;
+        z-index: 2147483001;
+        pointer-events: auto;
         font-family: 'Cinzel', serif;
         font-weight: 700;
         font-size: 1.5rem;
@@ -1386,10 +1379,12 @@ elif not st.session_state.get("_painel_carregado", False):
         line-height: 1.8;
         color: #E3C684;
         text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
-        animation: uy-pulso 1.4s ease-in-out infinite, uy-some 0.01s linear 30s forwards;
+        animation: uy-pulso 1.4s ease-in-out infinite;
     }}
-    @keyframes uy-revela {{ to {{ visibility: visible; }} }}
-    @keyframes uy-some {{ to {{ visibility: hidden; }} }}
+    @keyframes uy-pulso {{
+        0%, 100% {{ opacity: 0.65; }}
+        50% {{ opacity: 1; }}
+    }}
     </style>
     """, unsafe_allow_html=True)
 
@@ -2961,6 +2956,14 @@ else:
             return []
         medidores = carregar_medidores_empresa(emp_id)
         tarefas = carregar_tarefas_empresa(emp_id)
+        # Uma janela pendente, remarcada ou aprovada já encaminha a preventiva.
+        # Não considerar solicitações recusadas/canceladas nem janelas antigas concluídas.
+        janelas_ativas = pd.read_sql(text("""
+            SELECT prefixo, descricao, status, data_sugerida, data_aprovada, id_tarefa
+            FROM solicitacoes_logistica
+            WHERE empresa_id = :eid AND tipo_solicitacao = 'preventiva'
+              AND status IN ('Pendente', 'Remarcada', 'Aprovada')
+        """), engine, params={"eid": str(emp_id)})
         hoje = datetime.now().date()
         alertas = []
         for _, plano in planos.iterrows():
@@ -2975,6 +2978,30 @@ else:
                 continue
             nome = str(plano["nome_plano"])
             for prefixo in [x.strip() for x in str(plano.get("prefixo", "")).split(",") if x.strip()]:
+                # Associa pela identificação do veículo e pelo nome exato do plano
+                # no campo preenchido automaticamente pelo botão da notificação.
+                # Para solicitações aprovadas, mantém o alerta oculto enquanto
+                # a OS vinculada ainda estiver aberta.
+                janela_em_andamento = False
+                if not janelas_ativas.empty:
+                    candidatas = janelas_ativas[
+                        janelas_ativas["prefixo"].astype(str).str.casefold().eq(prefixo.casefold())
+                        & janelas_ativas["descricao"].fillna("").astype(str).str.strip().str.casefold().eq(
+                            f"Plano preventivo: {nome}".casefold())
+                    ]
+                    for _, janela in candidatas.iterrows():
+                        if janela["status"] in ("Pendente", "Remarcada"):
+                            janela_em_andamento = True
+                            break
+                        if janela["status"] == "Aprovada":
+                            tarefa_id = janela.get("id_tarefa")
+                            if pd.notna(tarefa_id) and not tarefas.empty:
+                                os_vinculada = tarefas[tarefas["id"].eq(int(tarefa_id))]
+                                if not os_vinculada.empty and not bool(os_vinculada.iloc[0]["realizado"]):
+                                    janela_em_andamento = True
+                                    break
+                if janela_em_andamento:
+                    continue
                 historico = tarefas[
                     tarefas["prefixo"].astype(str).str.casefold().eq(prefixo.casefold())
                     & tarefas["descricao"].fillna("").astype(str).str.contains(nome, case=False, regex=False)
